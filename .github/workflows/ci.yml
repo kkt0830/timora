@@ -3,6 +3,9 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: timora-checks-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -22,6 +25,7 @@ jobs:
         run: npm install --no-save --package-lock=false playwright@1.51.1
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+        timeout-minutes: 5
       - name: Browser review images
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,3 +59,12 @@ jobs:
       - run: psql -v ON_ERROR_STOP=1 -f tests/db-bootstrap.sql
       - run: psql -v ON_ERROR_STOP=1 -f db/schema.sql
       - run: psql -v ON_ERROR_STOP=1 -f tests/rls.sql
+  cancel-obsolete-validation:
+    if: github.ref == 'refs/heads/work/v0.1-validation'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh run cancel 36846043858 --repo kkt0830/timora
+        env:
+          GH_TOKEN: ${{ github.token }}

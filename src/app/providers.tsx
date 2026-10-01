@@ -64,9 +64,9 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   const mounted = useRef(false);
   const generation = useRef(0);
   const lock = useRef(false);
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (showLoading = true) => {
     const version = ++generation.current;
-    setLoading(true); setError('');
+    if (showLoading) setLoading(true); setError('');
     try { const next = await repository.load(account.id); if (mounted.current && version === generation.current) setData(next); }
     catch (e) { if (mounted.current && version === generation.current) setError(messageOf(e)); }
     finally { if (mounted.current && version === generation.current) setLoading(false); }
@@ -99,7 +99,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
         return next;
       });
     }),
-    convert: async (id, target) => mutate(async () => { await repository.convertInbox(account.id, id, target); if (mounted.current) await reload(); }),
+    convert: async (id, target) => mutate(async () => { await repository.convertInbox(account.id, id, target); if (mounted.current) await reload(false); }),
     saveSettings: async settings => mutate(async () => { const next = await repository.saveSettings(settings); if (mounted.current) setData(previous => ({ ...previous, settings: next })); }),
   };
   useEffect(() => {

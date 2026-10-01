@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 const { chromium } = await import(process.env.TIMORA_PLAYWRIGHT_MODULE ?? 'playwright');
-const server = spawn('npm', ['run', 'dev', '--', '--port', '4173'], {
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '4173'], {
   env: { ...process.env, VITE_SUPABASE_URL: 'https://test.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
