@@ -4,8 +4,8 @@
 
 | 버전 | 방향 | 완료 판단의 출발점 |
 | --- | --- | --- |
-| Skeleton 0.0.1 | 현재 전달물 | 9개 화면, 샘플 데이터, 탐색, 문서, 빌드 |
-| v0.1 | Core Workspace | 실제 작업·메모·일정·프로젝트·자료의 핵심 CRUD와 Inbox 처리. 인증/저장 방식, 기본 권한과 데이터 소유 경계 확정 |
+| Pre-v0.1 | Skeleton / 설계 | 9개 화면, 샘플 데이터, 탐색, 문서, 빌드 |
+| v0.1 | Core Workspace | Core CRUD, Inbox Task/Note 이동, Auth 서비스, SQL/RLS, 실제 데이터 화면, Netlify 설정 구현. 실제 Supabase/Netlify 연결 및 운영 검증은 PC 설정 단계 |
 | v0.2 | GitHub Integration | 연결/해제, 선택적 저장소 및 이슈 연결, 오류/권한 상태 표현 |
 | v0.3 | Relations | 객체 간 관계 생성·조회·해제 및 연결된 맥락 탐색 |
 | v0.4 | Global Search / Command / Quick Capture | 키보드 중심 탐색, 전역 검색, 빠른 기록과 분류 |
@@ -25,3 +25,15 @@
 - 위젯은 모바일 앱의 인증·동기화·권한 정책이 마련된 후 추가합니다.
 
 각 버전의 상세 범위는 개발을 시작할 때 이 문서에서 구체화합니다. v0.1에 후속 기능을 앞당겨 넣지 않습니다.
+
+## v0.1 구현 상태
+
+완료된 코드: 기존 9개 화면/반응형 셸 유지, Auth 흐름, 사용자 소유 Entity 및 Settings, Tasks/Notes/Projects/Events/Library/Inbox CRUD, Task/Note 원자적 Inbox 이동, Dashboard/Today/Month Calendar, Project 상세, Netlify fallback, 자동 검증.
+
+남은 연결 작업: 실제 Supabase 프로젝트에 SQL 적용, 환경 변수, 이메일/REST 권한 확인, 실제 Netlify 배포 및 URL 새로고침 검증. 코드 검증 결과는 docs/verification.md에 기록한다.
+
+v0.2는 GitHub Integration에 집중한다. 연결/해제, Repository 참조, 권한/실패 UI와 토큰의 서버 보관 경계를 먼저 설계하며 내부 Project UUID를 외부 ID로 대체하지 않는다.
+
+## v0.2 이후 개발 규칙
+
+`main → version/v0.x → 개발 → 테스트 → PR → 검토 → main merge`를 따른다. 필요하면 version 브랜치 내부에서 feature 브랜치를 사용한다. Version PR은 개요/추가·개선 기능/구현 방식/코드/Database/UI·UX/버그 원인·수정/테스트/알려진 문제/다음 버전을 포함한다. Database 변경이 없으면 없다고 명시한다. 상세는 docs/git-workflow.md와 PR template을 따른다.

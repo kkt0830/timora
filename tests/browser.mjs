@@ -86,7 +86,7 @@ try {
     await dialog.waitFor({ state: 'hidden' });
   }
   await page.goto('http://localhost:4173'); await login('a');
-  await page.screenshot({ path: 'test-results/home-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/home-desktop.png', fullPage: true, animations: 'disabled' });
   for (const label of ['Today', 'Tasks', 'Notes', 'Calendar', 'Projects', 'Library', 'Settings']) {
     await nav(label); await visible(page.getByRole('heading', { name: label, exact: true, level: 1 }));
   }
@@ -136,7 +136,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('button', { name: '메뉴 열기' }).click();
   await nav('Tasks'); await visible(page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-  await page.screenshot({ path: 'test-results/tasks-mobile-dark.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/tasks-mobile-dark.png', fullPage: true, animations: 'disabled' });
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Task edited', exact: true }).click(); await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: '메뉴 열기' }).click(); await nav('Settings'); await page.getByRole('button', { name: '로그아웃', exact: true }).click();
@@ -165,4 +165,4 @@ try {
   await visible(page.getByRole('link', { name: '프로젝트 목록으로', exact: true }));
   assert.deepEqual(errors, []);
   console.log('Browser checks passed: navigation, CRUD, auth persistence/logout, simulated account switching, dates, errors/loading, Markdown, project detail, settings and mobile layout.');
-} catch (error) { if (activePage) await activePage.screenshot({ path: 'test-results/failure.png', fullPage: true }).catch(() => {}); throw error; } finally { await browser?.close(); server.kill('SIGTERM'); }
+} catch (error) { if (activePage) await activePage.screenshot({ path: 'test-results/failure.png', fullPage: true, animations: 'disabled' }).catch(() => {}); throw error; } finally { await browser?.close(); server.kill('SIGTERM'); }

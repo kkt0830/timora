@@ -1,40 +1,40 @@
-# Architecture — 초기 경계
+# Architecture — Timora v0.1
 
-현재는 **단일 웹 프런트엔드**입니다. 향후 Desktop, Mobile, Backend가 나뉠 수 있도록 UI와 데이터 계약의 소유권을 구분합니다. 현재 저장소에 백엔드나 모바일 런타임이 존재한다는 뜻은 아닙니다.
+기존 React/Vite 진입점, Router, Sidebar/Layout, CSS를 유지했습니다. 샘플 배열 import를 제거하고 서비스 계약과 Supabase 어댑터를 연결했습니다.
 
 ```text
-현재:
-Browser → React Router / Screen → typed sample data
-
-향후 후보:
-Desktop Web / Windows shell ─┐
-                             ├→ shared domain contracts → application services → repository interfaces → backend adapters
-Android / Tablet UI ──────────┘                                             ├→ Supabase Auth / Database / Storage
-                                                                            └→ GitHub adapter
+React 화면 / 공통 편집기
+    ↓
+AuthProvider / WorkspaceProvider (세션·로딩·오류·저장 상태)
+    ↓
+AuthService / WorkspaceRepository 계약 + domain 날짜·검증 규칙
+    ↓
+SupabaseAuth HTTP adapter / SupabaseRepository PostgREST adapter
+    ↓
+Supabase Auth / PostgreSQL + RLS + composite FK + Inbox RPC
 ```
 
-## 경계별 책임
+## 경계
 
-| 경계 | 현재 | 후속 방향 |
-| --- | --- | --- |
-| UI | `src/app/App.tsx`, `src/styles.css` | 기능별 화면/컴포넌트 분리, 로딩/오류 상태 |
-| Domain | `src/domain/models.ts`의 UI 계약 | 앱 공통 객체 ID, 상태 전이, 관계 규칙 |
-| Data | `src/data/sample.ts` | Repository 인터페이스 + 로컬 구현 + 서버 구현 |
-| Backend | 없음 | 인증 검증, 사용자별 권한, 파일 저장, 연동 동기화 |
-| Platform | 브라우저 | Windows shell, Android/Tablet 및 위젯 어댑터 |
+- `src/app/App.tsx`: 기존 셸 및 인증/Workspace 경계, 9개 화면 라우팅.
+- `src/app/WorkspacePages.tsx`: 기능 화면, 날짜/프로젝트 필터와 Dashboard 계산. `EntityEditor.tsx`, `rows.tsx`, `components.tsx`로 편집·표시 패턴을 분리.
+- `src/domain`: Entity 계약, Task date/Event instant 규칙, URL·날짜·입력 검증. React에 의존하지 않음.
+- `src/services/contracts.ts`: AuthService와 WorkspaceRepository. 모바일/데스크톱은 다른 UI에서 같은 계약을 사용할 수 있음.
+- `src/data`: fetch를 사용한 Supabase Auth 및 REST 어댑터. public 환경 변수는 `services/backend.ts`에서만 읽음.
+- `db/schema.sql`: DB 제약, 인덱스, updated_at 트리거, 소유권 RLS, Inbox 변환 트랜잭션.
 
-## 확장 순서와 규칙
+## 결정
 
-1. 화면에서 샘플 배열을 직접 import하는 부분을 Repository 호출로 치환합니다. Repository의 출력은 도메인 계약으로 고정합니다.
-2. 인증 공급자를 결정할 때 세션 수명, 로그인/로그아웃, 서버의 사용자 검증 및 권한 경계를 설계합니다.
-3. Supabase를 선택하면 인증, 데이터, Storage의 adapter를 둡니다. 브라우저에는 공개용 설정만 노출하고 비밀 키는 서버 측에만 둡니다. 공개 스키마 테이블에는 RLS와 실제 소유권 정책을 설계·검증합니다. 이 문서는 SQL이나 정책 구현을 포함하지 않습니다.
-4. GitHub 연결은 별도 integration 계층에서 토큰과 권한을 다룹니다. 외부 데이터 ID는 내부 객체 ID와 구분합니다. 연동의 실패나 연결 해제가 핵심 작업 데이터를 지우지 않게 설계합니다.
-5. 검색, 명령 팔레트, Quick Capture는 application service를 호출하는 여러 진입점이 됩니다.
-6. Windows와 Android는 UI와 OS 기능을 각각 구현하되 안정된 도메인 계약과 API를 재사용합니다.
-7. 동기화 전 삭제 표식, 버전, 변경 시각, 충돌 처리 방식과 offline queue를 결정합니다. 클라이언트 시간을 유일한 충돌 판단 근거로 삼지 않습니다.
+v0.1에서는 기존 의존성/lockfile을 유지하면서 Supabase의 Auth HTTP API와 PostgREST를 사용합니다. UI는 전송 형식을 직접 호출하지 않습니다. 이후 SDK나 다른 플랫폼의 인증 어댑터를 도입해도 계약 뒤에서 교체할 수 있습니다. 현재 HTTP 인증 어댑터는 이메일/비밀번호와 이메일 확인 링크만 지원하며 OAuth/Password recovery는 후속 범위입니다.
 
-## 현재 알려진 제약
+Auth 토큰은 프로젝트 URL별 localStorage에 저장하고 비밀번호는 저장하지 않습니다. 복원 시 `/auth/v1/user`로 서버 사용자를 확인합니다. 요청 전에 만료를 확인하고 갱신하며, Data API의 401은 한 번 갱신 후 재시도합니다. 30초 점검과 visibility 복귀 시 만료를 확인합니다. 동시 갱신은 단일 promise와 지원되는 브라우저의 Web Locks로 직렬화합니다. 다른 탭의 저장/로그아웃은 storage event로 반영합니다. Web Locks 미지원 브라우저의 동시 탭 사용은 연결 후 추가 검증 대상입니다.
 
-- 샘플 데이터는 읽기 전용이고, 고정 날짜를 사용합니다.
-- `App.tsx`는 초기 골격이어서 한 파일에 화면이 모여 있습니다. 실제 v0.1 개발 초기 작업은 feature 단위로 분리하는 것입니다.
-- 인증, SQL 스키마, 저장소 버킷, 서버 API, 데스크톱 패키저, 모바일 프레임워크는 아직 선택하지 않았습니다. 구현 시 해당 기술의 최신 공식 문서를 확인합니다.
+사용자 전환 시 WorkspaceProvider를 user ID로 새로 만들고 이전 데이터·편집 상태를 제거합니다. 오래된 load 응답은 generation 검사로 무시합니다. 생성·수정은 서버가 반환한 행으로 상태를 갱신하며 실패하면 편집기를 닫지 않습니다. Inbox 변환은 RPC 완료 후 재조회합니다. 다른 탭에서 바뀐 데이터는 상단 새로고침으로 재조회합니다. 오프라인 큐/Realtime 동기화는 포함하지 않습니다.
+
+RLS가 최종 권한 경계입니다. 클라이언트 user_id 필터는 방어 계층이며 권한 정책을 대체하지 않습니다. JWT user_metadata를 권한 판단에 사용하지 않습니다. FK가 다른 사용자의 프로젝트 연결을 막습니다. SECURITY DEFINER 함수/권한 우회 view는 없습니다.
+
+## 데이터 규모와 후속 확장
+
+각 테이블은 500개 단위로 조회해 Supabase 기본 1,000행 제한에 의한 누락을 피합니다. Data API max rows는 최소 500으로 설정합니다. 초기 개인 Workspace에 맞춰 모든 객체를 메모리에 유지하므로 큰 데이터의 화면별 서버 필터/페이지네이션은 v0.8에서 개선합니다. 동시에 다른 기기에서 편집할 때는 마지막 저장이 우선이며 충돌 병합은 v0.6 범위입니다.
+
+`project_id`는 v0.1의 구체적인 관계입니다. v0.3의 범용 Relation Engine으로 교체할지 함께 유지할지는 그 버전에서 결정합니다. GitHub 외부 ID와 OAuth 토큰은 내부 UUID를 대체하지 않으며 v0.2의 별도 integration 계층에서 설계합니다. Windows/Android 런타임과 Storage 버킷은 현재 없습니다.

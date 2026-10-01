@@ -1,172 +1,83 @@
 # Timora
 
-> «나의 일상과 시간을 하나의 흐름으로.»
+> «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
-Timora는 할 일, 일정, 기록, 프로젝트, 자료와 개발 활동을 하나의 공간에서 연결하고 관리하기 위한 개인 Workspace 애플리케이션입니다.
+Timora는 Tasks, Notes, Calendar, Projects, Library를 하나의 개인 Workspace에서 관리하고 연결하는 생산성 웹 애플리케이션입니다. 장기적으로 Windows, Android, Tablet에서 같은 흐름을 이어가는 Personal Workspace를 지향합니다.
 
-우리는 하루를 보내면서 해야 할 일을 만들고, 새로운 일정을 계획하고, 생각을 기록하며, 여러 프로젝트를 진행하고, 다시 보고 싶은 자료를 저장합니다.
+**현재 상태: Timora v0.1 — Core Workspace 구현. 실제 Supabase 프로젝트 연결 및 Netlify 배포는 PC 설정 단계로 남아 있습니다.** 기존 Pre-v0.1의 React/Vite 구조, Sidebar, 9개 화면과 디자인을 이어서 개발했습니다. 설정 없이 실행하면 연결 안내를 표시하며, 샘플 데이터를 실제 저장 데이터처럼 보여주지 않습니다.
 
-하지만 이러한 정보와 시간은 서로 다른 애플리케이션과 공간에 흩어지기 쉽습니다.
+## 현재 기능
 
-Timora는 흩어진 일상과 시간을 하나의 흐름으로 연결하는 것을 목표로 합니다.
-
-Tasks, Notes, Calendar, Projects, Library가 서로 독립적으로 존재하는 것이 아니라 하나의 Workspace 안에서 서로 연결되며, 궁극적으로는 PC와 모바일, 태블릿 등 어떤 기기에서도 같은 일상과 작업의 흐름을 이어갈 수 있도록 설계합니다.
-
-**현재 상태: Pre-v0.1 / Skeleton**
-
-현재는 본격적인 기능 개발 이전 단계입니다. 프로젝트 구조와 PC 중심 UI Skeleton, 데이터 구조 및 향후 개발 방향을 구축하고 있습니다.
-
-## Vision
-
-Timora가 관리하고자 하는 것은 단순한 할 일 목록이나 일정이 아닙니다.
-
-내가 해야 하는 것.  
-내가 생각한 것.  
-내가 알고 있는 것.  
-내가 만들어가는 것.  
-그리고 그것들을 위해 사용하는 시간.
-
-Timora는 이 모든 것을 하나의 흐름으로 연결하는 개인 Workspace를 목표로 합니다.
-
----
-
-## 나의 일상과 시간, 기록과 작업을 하나의 흐름으로
-
-우리는 하루 동안 수많은 도구를 사용합니다. 해야 할 일은 할 일 관리 앱에 기록하고, 일정은 캘린더에 저장하며, 생각은 메모 앱에 적습니다. 개발 프로젝트는 GitHub에서 관리하고, 나중에 다시 보고 싶은 자료는 북마크에 저장합니다.
-
-하지만 이 정보들은 대부분 서로 다른 공간에 흩어져 있습니다. Timora는 이들을 하나의 개인 Workspace 안에서 연결하는 것을 목표로 합니다.
-
-## 프로젝트의 목표
-
-| 내 일상의 정보 | Timora의 영역 |
+| 화면 | 구현 내용 |
 | --- | --- |
-| 내가 해야 하는 것 | Tasks |
-| 내가 언제 해야 하는 것 | Calendar |
-| 내가 생각하고 기록한 것 | Notes |
-| 내가 만들고 있는 것 | Projects |
-| 내가 발견하고 보관한 것 | Library |
+| Home | 오늘 Task 진행도, 다음 일정, 최근 프로젝트·노트, 미분류 Inbox, 다가오는 마감 |
+| Today | 오늘 시작/진행/마감하는 작업, 기한이 지난 미완료 작업, 오늘과 겹치는 일정, 프로젝트 링크 |
+| Inbox | 빠른 기록, 수정·삭제, 분류, Task/Note로 원자적 이동 |
+| Tasks | 생성·수정·삭제, 완료 전환, 상태, 우선순위, 시작일·마감일, 프로젝트 연결, 기본 필터 |
+| Notes | 생성·수정·삭제, Markdown 원문 저장 및 기본 미리보기, 프로젝트 연결 |
+| Calendar | 월 이동, 오늘 이동, 날짜별 Event 및 Task 마감 조회, Event CRUD |
+| Projects | CRUD, 상태·색상, Task 기반 완료율, Overview/Tasks/Notes/Events/Library 상세 |
+| Library | URL CRUD, Website/Article/GitHub Repository/Video/PDF/File URL/Other, 프로젝트 연결 |
+| Settings | Account, Logout, Workspace 이름, Light/Dark/System, 후속 기능 Coming later |
 
-이 모든 정보가 서로 연결되어 하나의 흐름을 만드는 것이 Timora의 핵심 목표입니다.
+회원가입·로그인·로그아웃·새로고침 후 세션 복원 및 토큰 갱신을 구현했습니다. 사용자 소유권은 PostgreSQL RLS로 제한하며, 다른 사용자의 프로젝트 연결은 복합 외래 키로 차단합니다. 설정도 사용자별로 저장합니다. 실제 서비스의 이메일 확인과 서버 설정은 연결 후 확인해야 합니다.
 
-## 기본 구조
+## PC에서 시작하기
 
-### Home
-
-현재 나의 상태를 한눈에 확인하는 공간입니다. 오늘의 할 일, 예정된 일정, 진행 중인 프로젝트, 최근 작성한 노트와 Inbox 등을 보여줍니다.
-
-### Today
-
-오늘이라는 시간에 집중하는 공간입니다. 오늘 해야 할 일과 일정, 프로젝트 작업 등을 한곳에서 확인할 수 있습니다.
-
-### Inbox
-
-갑자기 떠오른 생각이나 해야 할 일을 빠르게 기록하는 공간입니다. 처음부터 정보의 종류를 결정할 필요 없이 기록한 뒤 나중에 Task, Note, Event, Project, Library 등으로 정리할 수 있도록 설계할 예정입니다.
-
-### Tasks
-
-해야 할 일을 관리합니다. 마감일, 우선순위, 프로젝트, 태그 등을 이용해 작업을 관리할 수 있도록 개발할 예정입니다.
-
-### Notes
-
-생각과 지식을 기록하는 공간입니다. Markdown을 기반으로 하며 향후 문서 간 링크와 Backlink 등을 지원하는 것을 목표로 합니다.
-
-### Calendar
-
-일정과 Task의 마감일을 시간의 관점에서 확인합니다. 향후 외부 Calendar 서비스와의 연동도 고려하고 있습니다.
-
-### Projects
-
-Timora의 핵심 영역 중 하나입니다. 하나의 프로젝트 안에서 관련된 Tasks, Notes, Calendar, Library, Files 및 GitHub 활동을 함께 관리하는 것을 목표로 합니다.
-
-### Library
-
-웹사이트, 문서, 영상, GitHub Repository, PDF 등 나중에 다시 확인하고 싶은 자료를 저장하는 공간입니다.
-
-## 연결
-
-Timora에서 정보는 서로 완전히 분리되어 있지 않습니다. 하나의 프로젝트에 Task와 Note를 연결하고, 특정 Task와 관련된 자료를 Library에서 연결하는 것처럼 각 정보를 서로 연결할 수 있는 구조를 목표로 합니다.
-
-```mermaid
-flowchart TD
-  P[Project] --> T[Task]
-  P --> N[Note]
-  P --> E[Event]
-  T --> R[Relation]
-  N --> R
-  E --> R
-  R --> L[Library]
-```
-
-이를 위해 장기적으로 Object + Relation 기반 데이터 구조를 구축할 예정입니다. 모델의 초기 개념은 [docs/data-model.md](docs/data-model.md)에 있습니다.
-
-## GitHub Integration
-
-개발 프로젝트를 관리하기 위해 GitHub 연동을 지원할 예정입니다. 프로젝트에 GitHub Repository를 연결하면 향후 다음 정보를 Timora에서 확인할 수 있도록 개발할 계획입니다.
-
-- Repository
-- Branch
-- Commit
-- Issue
-- Pull Request
-- 최근 개발 활동
-
-장기적으로는 Workspace Task와 GitHub Issue를 연결하는 기능도 고려하고 있습니다.
-
-## 개발 로드맵
-
-| 단계 | 목표 |
-| --- | --- |
-| 현재 — Skeleton | 향후 개발을 위한 구조, PC 중심 UI, 문서 |
-| v0.1 — Core | Home / Today / Inbox / Tasks / Notes / Calendar / Projects / Library / Settings 핵심 기능 |
-| v0.2 — GitHub | GitHub 계정 및 Repository 연동 시작 |
-| v0.3 — Relations | Task, Note, Project, Event, Library 간 연결 |
-| v0.4 — Search & Capture | Global Search, Command Palette, Quick Capture |
-| v0.5 — Desktop | Windows 설치형 Desktop Application |
-| v0.6 ~ v0.9 | 동기화, Offline, Backup, Security, 성능 개선, Mobile Architecture 준비 |
-| v1.0 — Multi Device | Android 및 Tablet, 여러 기기에서 같은 데이터 사용 |
-| v1.1+ | Home Screen Widget, Today Widget, Notifications, 모바일 Quick Capture, Widget에서 Task 완료 |
-
-자세한 단계는 [ROADMAP.md](ROADMAP.md)에 정리합니다.
-
-## 장기적인 방향
-
-PC, 모바일, 태블릿에서 동기화된 Timora Core를 통해 Tasks, Notes, Projects, Calendar, Library와 GitHub를 연결하는 구조를 지향합니다.
-
-Timora의 최종 목표는 많은 기능을 가진 생산성 앱을 만드는 것만이 아닙니다.
-
-내가 오늘 무엇을 해야 하는지, 무엇을 생각했는지, 무엇을 만들고 있는지, 무엇을 발견했는지, 그리고 나의 시간이 어디에 사용되고 있는지를 하나의 공간에서 이어주는 것. 그것이 Timora가 지향하는 방향입니다.
-
-## 현재 상태와 실행
-
-🚧 **초기 개발 / Skeleton** — 실제 사용을 위한 완성 버전이 아닙니다. v0.x 개발 과정에서 구조, UI, 데이터 모델 및 API가 크게 변경될 수 있습니다.
-
-현재는 9개 샘플 화면의 이동과 기본 반응형 레이아웃만 구현했습니다. 생성, 편집, 저장, 검색, 인증, GitHub 연결, 동기화는 동작하지 않습니다. 샘플 날짜는 고정되어 있습니다.
-
-Node.js 20 이상에서:
+Node.js **22.18 이상**(권장 24)과 npm을 사용합니다. ZIP 다운로드로 작업해도 실행할 수 있습니다.
 
 ```bash
 npm ci
-npm run dev
 ```
 
-터미널에 표시된 주소를 브라우저에서 엽니다. `npm run typecheck`와 `npm run build`로 확인할 수 있습니다. 배포 환경에서 하위 경로를 직접 열려면 SPA fallback이 필요합니다.
+1. 새 Supabase 프로젝트의 SQL Editor에서 [db/schema.sql](db/schema.sql)을 **한 번** 실행합니다. 기존 테이블을 초기화하는 스크립트가 아닙니다.
+2. `.env.example`을 `.env`로 복사하고 아래 두 공개 설정을 넣습니다.
+3. Supabase Auth의 Site URL/Redirect URLs에 개발 주소 `http://localhost:5173`을 등록하고 Email 인증을 활성화합니다.
+4. `npm run dev`로 시작하고 계정을 만듭니다. 이메일 확인이 켜져 있으면 확인 링크를 연 뒤 로그인합니다.
 
-## 프로젝트 구조
+| 환경 변수 | 설명 |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase 프로젝트 URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | 브라우저용 publishable key; legacy anon 키도 호환 |
+
+`VITE_*`는 빌드에 포함되어 브라우저에 공개됩니다. Secret/service_role 키, DB 비밀번호, 실제 `.env`는 저장소에 넣지 않습니다. 앱은 secret/service_role 키 설정을 거부합니다. 인증 토큰은 해당 브라우저의 localStorage에 저장되며 비밀번호는 저장하지 않습니다.
+
+## 구조
 
 ```text
-src/
-  app/App.tsx          공통 셸, 화면, 라우팅의 초기 구현
-  data/sample.ts       고정 샘플 데이터
-  domain/models.ts     UI용 객체·관계 타입 초안
-  main.tsx             진입점
-  styles.css           공통 스타일과 반응형 규칙
-docs/
-  architecture.md      Desktop / Mobile / Backend 분리 방향
-  data-model.md        Object + Relation 개념
-  ui-structure.md      화면과 탐색 구조
+src/app/          Skeleton 셸, 기능 화면, 공통 편집기, 상태 제공자
+src/domain/       Entity 계약, 날짜 규칙, 입력 검증
+src/services/     AuthService/WorkspaceRepository 계약과 설정 진입점
+src/data/         Supabase Auth HTTP / PostgREST 어댑터
+db/schema.sql    재현 가능한 v0.1 SQL: 7개 테이블, RLS, 함수, 인덱스
+tests/           도메인·서비스·브라우저·Postgres 권한 검사
 ```
 
-Vite, React, TypeScript, React Router를 사용합니다. 백엔드와 모바일 앱은 포함하지 않습니다. PC에서 본격적인 개발을 이어갈 때 [REQUIREMENTS.md](REQUIREMENTS.md), [ROADMAP.md](ROADMAP.md), [docs/architecture.md](docs/architecture.md), [docs/data-model.md](docs/data-model.md), [docs/ui-structure.md](docs/ui-structure.md)를 먼저 읽고 화면별 코드를 feature 단위로 분리하세요.
+기술: React 19, TypeScript, React Router 7, Vite 6, Lucide, Supabase Auth/PostgreSQL. 기존 lockfile을 유지하고 새로운 런타임 의존성을 추가하지 않았습니다. Backend SDK를 화면에서 호출하지 않으며 HTTP 어댑터를 공통 서비스 계약 뒤에 둡니다. [Architecture](docs/architecture.md), [Data model](docs/data-model.md), [UI structure](docs/ui-structure.md)를 참고하세요.
+
+## 검증
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+GitHub Actions에서 설치, 타입 검사, 단위 테스트, production build, Chromium 화면 검사와 PostgreSQL 16 RLS 검사를 실행합니다. lint 설정은 기존 저장소에 없으며 `typecheck`가 엄격한 TypeScript 검사를 수행합니다. 브라우저 테스트는 실제 UI에 HTTP fixture를 연결합니다. PostgreSQL 테스트는 실제 RLS 엔진과 최소 Auth 계약을 사용합니다. 이 두 검사는 연결된 Supabase 서비스의 이메일 발송·Auth 설정·Data API 설정 검증을 대체하지 않습니다.
+
+현재 검증 결과와 PC에서 필요한 확인은 [docs/verification.md](docs/verification.md)에 기록합니다. 실행 및 배포 절차는 [docs/development.md](docs/development.md)에 있습니다.
+
+## Netlify 배포 준비
+
+`netlify.toml`에 Build Command **`npm run build`**, Publish Directory **`dist`**, SPA fallback을 설정했습니다. 실제 Netlify 계정 연결과 배포는 아직 수행하지 않았습니다.
+
+Netlify Environment Variables에 위 두 `VITE_*` 설정을 넣고 배포합니다. 환경 변수를 변경하면 다시 빌드해야 합니다. Supabase Auth의 Site URL과 Redirect URLs에 실제 HTTPS 사이트 주소를 등록하세요. `/tasks`, `/projects/:id` 등의 직접 접근·새로고침도 확인해야 합니다.
+
+## 범위와 다음 버전
+
+v0.1은 사용자당 하나의 개인 Workspace를 제공합니다. 첨부 파일 업로드, 협업, GitHub OAuth, Wiki Link/Backlink/Graph, 전역 검색, 명령 팔레트, 오프라인 편집, Desktop/Mobile 앱은 포함하지 않습니다. Library의 File은 파일 URL 저장입니다. Notes는 Markdown 원문을 보존하며 미리보기는 제목·목록·인용·코드·굵은 글씨·HTTP 링크의 기본 부분집합입니다.
+
+[ROADMAP.md](ROADMAP.md)의 방향을 유지합니다. **v0.2부터는 `version/v0.x` → 개발·테스트 → PR → 검토 → main merge** 흐름을 사용합니다. 상세 PR 형식은 [docs/git-workflow.md](docs/git-workflow.md)와 PR template에 있습니다. 다음 버전은 GitHub Integration이며 이번 버전에서 구현하지 않았습니다.
 
 ## License
 

@@ -1,36 +1,40 @@
-# Requirements
+# Requirements — Timora v0.1
 
-## 목적
+목표는 기존 Skeleton 위에 실제 데이터를 생성·수정·삭제·저장하는 개인 웹 Workspace를 만드는 것입니다. Supabase/Netlify의 계정 연결과 실제 서비스 검증은 PC 작업으로 분리합니다.
 
-사용자가 해야 할 일, 떠오른 생각, 노트, 일정, 진행 중인 프로젝트와 참고 자료를 한 공간에서 연결해 볼 수 있게 합니다. 초기 사용 환경은 PC입니다.
+## 구현 범위
 
-## 현재 Skeleton의 범위
+- 9개 기존 화면과 Sidebar/반응형 Layout을 유지한다.
+- Supabase Auth로 가입·로그인·로그아웃·세션 복원·갱신을 제공한다.
+- 모든 Entity에 UUID와 user_id를 두고 RLS로 접근을 제한한다.
+- Tasks/Notes/Projects/Events/Library/Inbox CRUD와 사용자 설정을 제공한다.
+- Project 상세에서 연결된 Tasks/Notes/Events/Library를 조회·추가한다.
+- Home은 현황을, Today는 날짜 기반 행동 목록을 보여준다.
+- 빈 데이터/로딩/오류/재시도 상태를 제공하고 저장 실패 시 입력을 유지한다.
+- 불필요한 장식을 추가하지 않고 키보드 포커스·명시적 label·기본 모달 포커스 관리를 제공한다.
+- SQL/RLS를 재현 가능하게 남기고 설정·비밀 값은 커밋하지 않는다.
+- production build와 Netlify SPA routing을 지원한다.
 
-| 항목 | 현재 상태 |
+## 구현 중 확정한 결정
+
+| 항목 | v0.1 결정과 이유 |
 | --- | --- |
-| 공통 Sidebar / Layout | 구현 |
-| Home, Today, Inbox, Tasks, Notes, Calendar, Projects, Library, Settings | 샘플 화면 구현 |
-| 화면 간 Navigation | 구현 (직접 URL 접근 지원) |
-| 반응형 레이아웃 | 기본 구현 (좁은 화면에서 메뉴 접힘) |
-| 데이터 생성·수정·삭제·저장 | 미구현 |
-| 실제 인증·저장소·외부 연동 | 미구현 |
-| 검색·알림·위젯·Quick Capture | 미구현 |
+| Workspace | 사용자당 하나의 개인 공간; 공유와 별도 workspace_id는 후속 범위 |
+| Object + Relation | UUID Entity와 project_id를 먼저 구현; ObjectRelation 타입은 v0.3 계약으로 유지 |
+| Backend 접근 | AuthService/WorkspaceRepository 뒤의 Auth HTTP/PostgREST 어댑터; 기존 의존성과 lockfile 유지 |
+| Task 날짜 | start_date/due_date는 date; UTC 변환으로 하루가 이동하는 문제 방지 |
+| Event 시간 | UTC timestamptz 저장, 기기 시간대 표시, 날짜별 겹침 조회 |
+| Today | 오늘 일정/활성 날짜 구간의 작업 + 기한 지난 미완료 작업; 미지정 작업은 Tasks에서 관리 |
+| Inbox 이동 | Task/Note만 원자적 변환; 다른 유형은 분류 표시만 제공 |
+| Project 진행률 | 연결된 Task 완료율에서 계산; 수동 progress 저장 폐지 |
+| Library | URL 우선; 파일 업로드와 Storage는 후속 범위 |
+| Note | Markdown 원문 및 안전한 기본 미리보기; Wiki Link/Backlink는 후속 범위 |
+| Settings | user_id 기본 키 테이블; Workspace 이름과 Appearance를 서버 저장 |
 
-## v0.1을 설계할 때 지킬 요구
+## 완료 확인
 
-1. 작업, 노트, 프로젝트, 일정, 자료의 생성·조회·수정·삭제 범위를 각각 정의합니다.
-2. Inbox 항목을 기록하고 작업/노트 등으로 처리하는 흐름과 중복 생성 규칙을 정의합니다.
-3. 객체는 안정된 ID를 사용합니다. 표시용 문자열이나 외부 서비스 ID를 내부 기본 키로 사용하지 않습니다.
-4. Desktop UI, 데이터 접근 계약, Backend 로직을 분리합니다. 모바일은 같은 계약을 재사용할 수 있어야 합니다.
-5. 연결 상태, 비어 있는 상태, 로딩, 오류, 권한 부족 상태를 화면마다 설계합니다.
-6. 키보드 탐색, 의미 있는 버튼 이름, 포커스 표시 등 접근성을 포함합니다.
-7. 실제 서비스용 인증, 사용자별 데이터 격리, 파일 권한은 사용 기술을 결정한 뒤 별도로 검증합니다.
-8. 샘플 데이터에서 실제 데이터로 바꿀 때 컴포넌트가 백엔드 SDK에 직접 의존하지 않도록 합니다.
+설치·TypeScript·단위 테스트·production build·브라우저 흐름·Postgres RLS 검사를 실행한다. 실제 Supabase의 회원가입 이메일, 로그인 유지, 사용자 두 명의 REST 격리, DB 설정과 Netlify 새로고침 검사는 PC에서 연결 후 별도 확인한다. 결과를 docs/verification.md에 기록하며 배포 완료로 과장하지 않는다.
 
-## 명시적으로 현재 범위 밖
+## 다음 버전의 범위
 
-Supabase Auth/Database/Storage, GitHub OAuth/동기화, 범용 Object + Relation 저장소, 전역 검색/명령 팔레트, 클라우드/오프라인 동기화, Windows 설치 파일, Android/Tablet 앱, 위젯, 푸시 알림, Quick Capture. 현재는 문서와 UI용 타입/자리표시만 제공합니다.
-
-## 초기 검증 기준
-
-`npm ci` 후 `npm run build`가 성공하고, 모든 사이드바 항목이 서로 다른 화면으로 이동하며, 작은 화면에서 메뉴가 열리고 닫힙니다. 더 높은 수준의 기능 검증은 해당 기능 구현 시 추가합니다.
+GitHub Integration(v0.2), Object Relations/Backlinks(v0.3), Global Search/Command Palette/Quick Capture(v0.4), Windows(v0.5), Sync/Offline(v0.6), Backup/Security(v0.7), Performance/UX(v0.8), Mobile Preparation(v0.9), Android/Tablet(v1.0), Widgets/Notifications/Automation(v1.1+). 이번 버전에서 앞당기지 않는다.
