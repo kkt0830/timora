@@ -75,7 +75,7 @@ try {
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await visible(page.getByRole('heading', { name: '오늘도 나의 흐름으로 👋' }));
   }
-  async function nav(label) { await page.getByRole('navigation').getByRole('link', { name: label, exact: true }).click(); }
+  async function nav(label) { await page.locator('.sidebar').getByRole('link', { name: new RegExp(`^${label}(?:\\s*\\d+)?$`) }).click(); }
   async function create(action, title, extra = async () => {}) {
     await page.getByRole('button', { name: action, exact: true }).click();
     const dialog = page.getByRole('dialog');
