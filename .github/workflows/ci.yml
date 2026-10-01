@@ -22,6 +22,13 @@ jobs:
         run: npm install --no-save --package-lock=false playwright@1.51.1
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - name: Browser review images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-review
+          path: test-results/
+          if-no-files-found: ignore
   database:
     runs-on: ubuntu-latest
     services:

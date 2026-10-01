@@ -2,13 +2,15 @@
 // Real hosted Supabase email delivery and session configuration are a separate PC check.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
 const { chromium } = await import(process.env.TIMORA_PLAYWRIGHT_MODULE ?? 'playwright');
 const server = spawn('npm', ['run', 'dev', '--', '--port', '4173'], {
   env: { ...process.env, VITE_SUPABASE_URL: 'https://test.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let output = ''; server.stdout.on('data', data => { output += data; }); server.stderr.on('data', data => { output += data; });
-let browser;
+let browser; let activePage;
+await mkdir('test-results', { recursive: true });
 try {
   for (let attempt = 0; ; attempt++) {
     try { if ((await fetch('http://localhost:4173')).ok) break; } catch {}
@@ -22,7 +24,7 @@ try {
   const settings = { a: [], b: [] }; let failure = false; let delay = 0;
   const account = id => ({ id, email: `${id}@example.com` });
   const errors = [];
-  const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+  const page = await context.newPage(); activePage = page; page.on('pageerror', error => errors.push(error.message));
   await context.route('https://test.supabase.co/**', async route => {
     const request = route.request(); const url = new URL(request.url());
     const owner = request.headers().authorization?.endsWith('-b') ? 'b' : 'a';
@@ -84,6 +86,7 @@ try {
     await dialog.waitFor({ state: 'hidden' });
   }
   await page.goto('http://localhost:4173'); await login('a');
+  await page.screenshot({ path: 'test-results/home-desktop.png', fullPage: true });
   for (const label of ['Today', 'Tasks', 'Notes', 'Calendar', 'Projects', 'Library', 'Settings']) {
     await nav(label); await visible(page.getByRole('heading', { name: label, exact: true, level: 1 }));
   }
@@ -105,14 +108,15 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Task edited', exact: true }).count(), 0);
   await page.getByLabel('상태', { exact: true }).selectOption('all');
   await nav('Notes'); await create('새 노트', 'Note A', async dialog => {
+    await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' });
     await dialog.getByLabel('내용', { exact: true }).fill('# Heading\n**bold**\n<script>alert(1)</script>');
     await dialog.getByRole('button', { name: '미리보기', exact: true }).click();
     await visible(dialog.getByRole('heading', { name: 'Heading', exact: true }));
   });
-  await nav('Calendar'); await create('새 일정', 'Event A');
+  await nav('Calendar'); await create('새 일정', 'Event A', async dialog => { await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' }); });
   await visible(page.getByRole('button', { name: 'Event A', exact: true }));
   await page.getByRole('button', { name: '다음 달', exact: true }).click(); await page.getByRole('button', { name: '이전 달', exact: true }).click();
-  await nav('Library'); await create('자료 추가', 'Library A', async dialog => { await dialog.getByLabel('URL', { exact: true }).fill('https://example.com'); });
+  await nav('Library'); await create('자료 추가', 'Library A', async dialog => { await dialog.getByLabel('URL', { exact: true }).fill('https://example.com'); await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' }); });
   await visible(page.getByRole('link', { name: 'https://example.com ↗' }));
   await nav('Inbox'); await page.getByLabel('빠르게 기록', { exact: true }).fill('Inbox A'); await page.getByRole('button', { name: 'Inbox에 저장' }).click();
   await visible(page.getByRole('button', { name: 'Inbox A', exact: true }));
@@ -122,12 +126,15 @@ try {
   failure = true; await page.getByRole('button', { name: '새로고침', exact: true }).click(); await visible(page.getByRole('alert'));
   failure = false; delay = 500; await page.getByRole('button', { name: '다시 시도' }).click(); await visible(page.getByRole('status')); delay = 0;
   await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
+  await nav('Projects'); await page.getByRole('link', { name: 'Project A', exact: true }).click();
+  for (const name of ['Tasks (1)', 'Notes (1)', 'Events (1)', 'Library (1)']) await page.getByRole('button', { name, exact: true }).click();
   await nav('Settings'); await page.getByLabel('Workspace 이름', { exact: true }).fill('A workspace');
   await page.getByLabel('Appearance', { exact: true }).selectOption('dark'); await page.getByRole('button', { name: '설정 저장' }).click();
   await visible(page.getByText('설정을 저장했습니다.', { exact: true })); assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
   await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('button', { name: '메뉴 열기' }).click();
   await nav('Tasks'); await visible(page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: 'test-results/tasks-mobile-dark.png', fullPage: true });
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Task edited', exact: true }).click(); await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: '메뉴 열기' }).click(); await nav('Settings'); await page.getByRole('button', { name: '로그아웃', exact: true }).click();
@@ -135,6 +142,25 @@ try {
   assert.equal(await page.getByText('Project A', { exact: true }).count(), 0);
   await page.getByRole('button', { name: '메뉴 열기' }).click(); await nav('Notes');
   assert.equal(await page.getByRole('button', { name: 'Note A', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '메뉴 열기' }).click(); await nav('Settings'); await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await page.getByRole('button', { name: '새 계정 만들기', exact: true }).click();
+  await page.getByLabel('이메일', { exact: true }).fill('new@example.com'); await page.getByLabel('비밀번호', { exact: true }).fill('fixture-password');
+  await page.getByRole('button', { name: '회원가입', exact: true }).click(); await visible(page.getByRole('status'));
+  await page.getByRole('button', { name: '기존 계정으로 로그인', exact: true }).click();
+  await page.setViewportSize({ width: 1365, height: 900 }); await page.goto('http://localhost:4173'); await login('a');
+  for (const [label, title, edited] of [['Notes', 'Note A', 'Note edited'], ['Calendar', 'Event A', 'Event edited'], ['Library', 'Library A', 'Library edited']]) {
+    await nav(label); await page.getByRole('button', { name: title, exact: true }).click();
+    await page.getByRole('dialog').getByLabel('제목', { exact: true }).fill(edited);
+    await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: edited, exact: true }).click(); page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  }
+  await nav('Projects'); await page.getByRole('button', { name: '수정', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('프로젝트 이름', { exact: true }).fill('Project edited'); await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' }); await page.getByRole('link', { name: 'Project edited', exact: true }).click();
+  await page.getByRole('button', { name: '프로젝트 수정 / 삭제', exact: true }).click(); page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await visible(page.getByRole('link', { name: '프로젝트 목록으로', exact: true }));
   assert.deepEqual(errors, []);
   console.log('Browser checks passed: navigation, CRUD, auth persistence/logout, simulated account switching, dates, errors/loading, Markdown, project detail, settings and mobile layout.');
-} finally { await browser?.close(); server.kill('SIGTERM'); }
+} catch (error) { if (activePage) await activePage.screenshot({ path: 'test-results/failure.png', fullPage: true }).catch(() => {}); throw error; } finally { await browser?.close(); server.kill('SIGTERM'); }

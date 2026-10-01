@@ -102,3 +102,15 @@ test('Malformed server responses and network errors are actionable', async () =>
     await assert.rejects(apiRequest(config, '/test'), error => error.status === 0);
   } finally { mock.mock.restore(); }
 });
+
+test('Workspace load follows pages instead of silently stopping at the API row limit', async () => {
+  const repository = new SupabaseRepository(config, { token: async () => 'access' });
+  const calls = [];
+  const mock = test.mock.method(globalThis, 'fetch', async url => {
+    calls.push(url); const parsed = new URL(url);
+    if (parsed.pathname.endsWith('/notes')) return response(parsed.searchParams.get('offset') === '0' ? Array.from({ length: 500 }, (_, i) => ({ id: `n-${i}` })) : [{ id: 'n-500' }]);
+    return response([]);
+  });
+  try { const data = await repository.load(user.id); assert.equal(data.notes.length, 501); assert.equal(calls.some(url => url.includes('offset=500')), true); }
+  finally { mock.mock.restore(); }
+});
