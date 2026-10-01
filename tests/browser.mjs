@@ -104,6 +104,7 @@ try {
   await page.getByRole('button', { name: 'Task A', exact: true }).click();
   await page.getByRole('dialog').getByLabel('제목', { exact: true }).fill('Task edited');
   await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByLabel('상태', { exact: true }).selectOption('todo');
   assert.equal(await page.getByRole('button', { name: 'Task edited', exact: true }).count(), 0);
   await page.getByLabel('상태', { exact: true }).selectOption('all');
@@ -112,6 +113,7 @@ try {
     await dialog.getByLabel('내용', { exact: true }).fill('# Heading\n**bold**\n<script>alert(1)</script>');
     await dialog.getByRole('button', { name: '미리보기', exact: true }).click();
     await visible(dialog.getByRole('heading', { name: 'Heading', exact: true }));
+    assert.equal(await dialog.getByLabel('내용', { exact: true }).isVisible(), false);
   });
   await nav('Calendar'); await create('새 일정', 'Event A', async dialog => { await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' }); });
   await visible(page.getByRole('button', { name: 'Event A', exact: true }));
