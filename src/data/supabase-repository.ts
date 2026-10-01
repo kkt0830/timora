@@ -17,9 +17,17 @@ export class SupabaseRepository implements WorkspaceRepository {
       return apiRequest<T>(this.config, `/rest/v1/${path}`, init, await this.auth.token(true));
     }
   }
+  private async list<K extends EntityTable>(table: K, userId: string): Promise<EntityMap[K][]> {
+    const all: EntityMap[K][] = [];
+    for (let offset = 0; ; offset += 500) {
+      const rows = await this.request<EntityMap[K][]>(`${table}?user_id=eq.${encodeURIComponent(userId)}&order=updated_at.desc,id.desc&select=*&limit=500&offset=${offset}`);
+      all.push(...rows);
+      if (rows.length < 500) return all;
+    }
+  }
   async load(userId: string): Promise<WorkspaceData> {
     const data = emptyWorkspace(userId);
-    const rows = await Promise.all(entityTables.map(table => this.request(`${table}?user_id=eq.${encodeURIComponent(userId)}&order=updated_at.desc&select=*`)));
+    const rows = await Promise.all(entityTables.map(table => this.list(table, userId)));
     entityTables.forEach((table, index) => { Object.assign(data, { [table]: rows[index] }); });
     const settings = await this.request<WorkspaceSettings[]>(`workspace_settings?user_id=eq.${encodeURIComponent(userId)}&select=*`);
     if (settings[0]) data.settings = settings[0];

@@ -105,9 +105,9 @@ begin
   select * into item from public.inbox_items where id = item_id and user_id = auth.uid() for update;
   if not found then raise exception 'Inbox item not found or already converted'; end if;
   if target_kind = 'task' then
-    insert into public.tasks(user_id, title, description) values (auth.uid(), left(split_part(item.content, E'\n', 1), 300), item.content) returning id into new_id;
+    insert into public.tasks(user_id, title, description) values (auth.uid(), coalesce(nullif(left(btrim(split_part(btrim(item.content, E' \t\n\r'), E'\n', 1)), 300), ''), 'Inbox 기록'), item.content) returning id into new_id;
   else
-    insert into public.notes(user_id, title, content) values (auth.uid(), left(split_part(item.content, E'\n', 1), 300), item.content) returning id into new_id;
+    insert into public.notes(user_id, title, content) values (auth.uid(), coalesce(nullif(left(btrim(split_part(btrim(item.content, E' \t\n\r'), E'\n', 1)), 300), ''), 'Inbox 기록'), item.content) returning id into new_id;
   end if;
   delete from public.inbox_items where id = item_id;
   return new_id;

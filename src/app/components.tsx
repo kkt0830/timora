@@ -33,7 +33,7 @@ function inline(text: string): ReactNode[] {
 // Safe Markdown subset; raw HTML is always displayed as text.
 export function Markdown({ content }: { content: string }) {
   const blocks: ReactNode[] = []; let code: string[] | null = null;
-  content.split('\n').forEach((line, index) => {
+  for (const [index, line] of content.split('\n').entries()) {
     if (line.startsWith('```')) {
       if (code) { blocks.push(<pre key={index}><code>{code.join('\n')}</code></pre>); code = null; } else code = [];
     } else if (code) code.push(line);
@@ -43,7 +43,7 @@ export function Markdown({ content }: { content: string }) {
     else if (/^[-*] /.test(line)) blocks.push(<ul key={index}><li>{inline(line.slice(2))}</li></ul>);
     else if (line.startsWith('> ')) blocks.push(<blockquote key={index}>{inline(line.slice(2))}</blockquote>);
     else blocks.push(<p key={index}>{line ? inline(line) : <br />}</p>);
-  });
+  }
   if (code) blocks.push(<pre key="open-code"><code>{code.join('\n')}</code></pre>);
   return <div className="markdown">{blocks}</div>;
 }
