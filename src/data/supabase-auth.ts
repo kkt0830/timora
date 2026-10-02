@@ -54,6 +54,8 @@ export class SupabaseAuth implements AuthService {
         if (version !== this.epoch) return this.session?.user ?? null;
         if (this.session && this.session.user.id === user.id) this.setSession({ ...this.session, user });
       } catch (error) {
+        // A newer login/storage event owns the session; an old restore must not clear it.
+        if (version !== this.epoch) return this.session?.user ?? null;
         if (error instanceof ApiError && [400, 401, 403].includes(error.status)) {
           this.epoch++; this.setSession(null); return null;
         }

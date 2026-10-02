@@ -114,3 +114,22 @@ test('Workspace load follows pages instead of silently stopping at the API row l
   try { const data = await repository.load(user.id); assert.equal(data.notes.length, 501); assert.equal(calls.some(url => url.includes('offset=500')), true); }
   finally { mock.mock.restore(); }
 });
+
+test('An obsolete restore cannot clear a newer login when its refresh finishes later', async () => {
+  const auth = new SupabaseAuth(config, storage());
+  const mock = test.mock.method(globalThis, 'fetch', async () => response(tokens('old', 0)));
+  let finish; let announce;
+  const started = new Promise(resolve => { announce = resolve; });
+  try {
+    await auth.signIn('a@example.com', 'not-a-real-password');
+    mock.mock.mockImplementation(url => url.includes('grant_type=refresh_token')
+      ? new Promise(resolve => { finish = resolve; announce(); })
+      : Promise.resolve(response({ ...tokens('new-account'), user: { id: 'user-b', email: 'b@example.com' } })));
+    const restoring = auth.restore();
+    await started;
+    await auth.signIn('b@example.com', 'not-a-real-password');
+    finish(response(tokens('old-account-refreshed')));
+    assert.equal((await restoring)?.id, 'user-b');
+    assert.equal(await auth.token(), 'new-account');
+  } finally { mock.mock.restore(); }
+});
