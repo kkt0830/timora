@@ -27,7 +27,7 @@ Supabase Auth / PostgreSQL + RLS + composite FK + Inbox RPC
 
 v0.1에서는 기존 의존성/lockfile을 유지하면서 Supabase의 Auth HTTP API와 PostgREST를 사용합니다. UI는 전송 형식을 직접 호출하지 않습니다. 이후 SDK나 다른 플랫폼의 인증 어댑터를 도입해도 계약 뒤에서 교체할 수 있습니다. 현재 HTTP 인증 어댑터는 이메일/비밀번호와 이메일 확인 링크만 지원하며 OAuth/Password recovery는 후속 범위입니다.
 
-Auth 토큰은 프로젝트 URL별 localStorage에 저장하고 비밀번호는 저장하지 않습니다. 복원 시 `/auth/v1/user`로 서버 사용자를 확인합니다. 요청 전에 만료를 확인하고 갱신하며, Data API의 401은 한 번 갱신 후 재시도합니다. 30초 점검과 visibility 복귀 시 만료를 확인합니다. 동시 갱신은 단일 promise와 지원되는 브라우저의 Web Locks로 직렬화합니다. 다른 탭의 저장/로그아웃은 storage event로 반영합니다. Web Locks 미지원 브라우저의 동시 탭 사용은 연결 후 추가 검증 대상입니다.
+Auth 토큰은 프로젝트 URL별 localStorage에 저장하고 비밀번호는 저장하지 않습니다. 복원 시 `/auth/v1/user`로 서버 사용자를 확인합니다. 요청 전에 만료를 확인하고 갱신하며, Data API의 401은 한 번 갱신 후 재시도합니다. 30초 점검과 visibility 복귀 시 만료를 확인합니다. 동시 갱신은 단일 promise와 지원되는 브라우저의 Web Locks로 직렬화합니다. 다른 탭의 저장/로그아웃은 storage event로 반영합니다. 지연된 세션 복원 응답은 더 최근의 로그인이나 로그아웃 상태를 변경하지 않습니다. Web Locks 미지원 브라우저의 동시 탭 사용은 연결 후 추가 검증 대상입니다.
 
 사용자 전환 시 WorkspaceProvider를 user ID로 새로 만들고 이전 데이터·편집 상태를 제거합니다. 오래된 load 응답은 generation 검사로 무시합니다. 생성·수정은 서버가 반환한 행으로 상태를 갱신하며 실패하면 편집기를 닫지 않습니다. Inbox 변환은 RPC 완료 후 재조회합니다. 다른 탭에서 바뀐 데이터는 상단 새로고침으로 재조회합니다. 오프라인 큐/Realtime 동기화는 포함하지 않습니다.
 

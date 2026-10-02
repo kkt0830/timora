@@ -6,7 +6,7 @@
 | --- | --- |
 | Dependency install | GitHub Actions의 `npm ci` 성공; 기존 lockfile 유지 |
 | TypeScript | GitHub Actions `npm run typecheck` 성공 |
-| Unit/service tests | 로컬 Node 24 및 Actions 성공; 날짜/URL/Auth/갱신/로그아웃/저장소/페이지 조회 16개 |
+| Unit/service tests | 로컬 Node 24 및 Actions 성공; 날짜/URL/Auth/갱신/로그아웃/저장소/페이지 조회 18개 |
 | Production build | GitHub Actions `npm run build` 성공 |
 | SQL bootstrap / RLS | 실제 PostgreSQL 16에서 schema 적용과 tests/rls.sql 성공 |
 | Chromium UI | GitHub Actions 성공; 1365px Desktop 및 390px 모바일 흐름 확인 |
@@ -37,3 +37,9 @@ Postgres 검사는 다른 사용자 행 조회·수정·삭제 차단, 위조 ow
 실제 Supabase 이메일 발송/확인 링크, Site URL/Redirect 설정, Data API public 노출과 max rows, 두 실제 계정의 REST 접근 격리, 실제 session 만료/여러 탭 갱신, Netlify HTTPS 배포와 하위 경로 새로고침을 확인해야 합니다. 자세한 절차는 development.md에 있습니다.
 
 운영 데이터로 장기간 사용, Web Locks 미지원 브라우저, Safari/Firefox, DST 지역의 반복 시각 입력, 큰 데이터 성능은 이번 Chromium/CI 검증만으로 보장하지 않습니다. 날짜 표시는 기기 timezone을 따르며 오프라인 충돌 해결·파일 업로드는 후속 범위입니다.
+
+## 2026-10-02 추가 검수
+
+최신 main의 CI(run 36847062873)가 성공한 상태에서 코드·SQL·PC 설정을 다시 검토했습니다. 추가 회귀 테스트로 오래된 세션 복원 응답이 새 로그인을 해제하는 경우와 Today에 이전 날짜의 완료 작업이 남는 경우를 재현하고 수정했습니다. 추가 테스트를 포함한 로컬 domain/service 검사 18개가 통과했습니다. DB 변경 없이 기존 RLS/FK/RPC를 유지합니다. 수정 Commit의 전체 CI 결과는 GitHub Actions에서 확인합니다.
+
+PC 설정 문서에는 기본 Supabase SMTP의 팀원 이메일 제한과 실제 계정 두 개를 검증하기 위한 SMTP 준비를 명시했습니다. 실제 서비스 연결/메일 발송/배포는 PC에서 진행해야 합니다.

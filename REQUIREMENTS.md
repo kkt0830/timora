@@ -24,7 +24,7 @@
 | Backend 접근 | AuthService/WorkspaceRepository 뒤의 Auth HTTP/PostgREST 어댑터; 기존 의존성과 lockfile 유지 |
 | Task 날짜 | start_date/due_date는 date; UTC 변환으로 하루가 이동하는 문제 방지 |
 | Event 시간 | UTC timestamptz 저장, 기기 시간대 표시, 날짜별 겹침 조회 |
-| Today | 오늘 일정/활성 날짜 구간의 작업 + 기한 지난 미완료 작업; 미지정 작업은 Tasks에서 관리 |
+| Today | 오늘 시작·마감하는 작업/미완료인 활성 날짜 구간의 작업 + 기한 지난 미완료 작업; 미지정 작업은 Tasks에서 관리 |
 | Inbox 이동 | Task/Note만 원자적 변환; 다른 유형은 분류 표시만 제공 |
 | Project 진행률 | 연결된 Task 완료율에서 계산; 수동 progress 저장 폐지 |
 | Library | URL 우선; 파일 업로드와 Storage는 후속 범위 |
