@@ -5,7 +5,7 @@
 | 버전 | 방향 | 완료 판단의 출발점 |
 | --- | --- | --- |
 | Pre-v0.1 | Skeleton / 설계 | 9개 화면, 샘플 데이터, 탐색, 문서, 빌드 |
-| v0.1 | Core Workspace | Core CRUD, Inbox Task/Note 이동, Auth 서비스, SQL/RLS, 실제 데이터 화면, Netlify 설정 구현. 실제 Supabase/Netlify 연결 및 운영 검증은 PC 설정 단계 |
+| v0.1 | Core Workspace | Core CRUD, Inbox Task/Note 이동, Auth 서비스, SQL/RLS, 실제 데이터 화면, Netlify 설정 구현. 전용 Supabase 적용·Netlify production 배포 완료; 사용자 실제 로그인·저장·새로고침 확인 |
 | v0.2 | GitHub Integration | 연결/해제, 선택적 저장소 및 이슈 연결, 오류/권한 상태 표현 |
 | v0.3 | Relations | 객체 간 관계 생성·조회·해제 및 연결된 맥락 탐색 |
 | v0.4 | Global Search / Command / Quick Capture | 키보드 중심 탐색, 전역 검색, 빠른 기록과 분류 |
@@ -30,7 +30,7 @@
 
 완료된 코드: 기존 9개 화면/반응형 셸 유지, Auth 흐름, 사용자 소유 Entity 및 Settings, Tasks/Notes/Projects/Events/Library/Inbox CRUD, Task/Note 원자적 Inbox 이동, Dashboard/Today/Month Calendar, Project 상세, Netlify fallback, 자동 검증.
 
-남은 연결 작업: 실제 Supabase 프로젝트에 SQL 적용, 환경 변수, 이메일/REST 권한 확인, 실제 Netlify 배포 및 URL 새로고침 검증. 코드 검증 결과는 docs/verification.md에 기록한다.
+서비스 연결: 서울 리전 Timora 프로젝트에 SQL/RLS/migration 적용, 실제 DB 권한 검사 통과, Netlify production 배포 및 SPA 경로 응답 확인. 실제 로그인/저장 확인 결과와 운영 제한은 docs/verification.md에 기록한다.
 
 v0.2는 GitHub Integration에 집중한다. 연결/해제, Repository 참조, 권한/실패 UI와 토큰의 서버 보관 경계를 먼저 설계하며 내부 Project UUID를 외부 ID로 대체하지 않는다.
 

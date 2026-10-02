@@ -1,6 +1,6 @@
 # Data model — Timora v0.1
 
-실행 가능한 SQL의 기준은 `db/schema.sql`, TypeScript 계약은 `src/domain/models.ts`입니다. `auth.users`는 Supabase Auth가 관리합니다. 사용자당 하나의 개인 Workspace이며 공유 공간은 없습니다.
+실행 가능한 SQL의 기준은 `db/schema.sql` 및 파일명 순서대로 적용하는 `db/migrations/*.sql`, TypeScript 계약은 `src/domain/models.ts`입니다. `auth.users`는 Supabase Auth가 관리합니다. 사용자당 하나의 개인 Workspace이며 공유 공간은 없습니다.
 
 ## 테이블
 
@@ -42,3 +42,7 @@ user_id/updated_at, Task due_date/start_date/project_id, Event start/end/project
 - Workspace 설정은 인증 user metadata에 섞지 않고 별도 소유 테이블에 저장합니다.
 
 ObjectRelation 타입은 v0.3 계약 초안으로 남겼습니다. 범용 relations 테이블, GitHub FK, Storage 메타데이터, offline tombstone/version은 이번 SQL에 포함하지 않습니다. 이후 DB 변경은 별도 SQL migration으로 남겨 기존 데이터에 적용하며 bootstrap을 재실행하지 않습니다.
+
+## Hosted DB 적용 — 2026-10-02
+
+서울 리전 Timora 프로젝트에 `timora_v01_core`, `timora_v01_project_foreign_key_indexes` migration을 적용했습니다. Supabase Advisor가 복합 FK의 컬럼 순서와 같은 인덱스를 요구하여 `(project_id, user_id)` 인덱스 4개를 추가했습니다. 기존 `(user_id, project_id)` 조회 인덱스는 유지합니다. 보안 지적과 누락된 FK 인덱스 지적은 없습니다. 새 빈 DB의 unused_index INFO는 삭제 근거로 사용하지 않습니다.

@@ -1,6 +1,6 @@
 # Requirements — Timora v0.1
 
-목표는 기존 Skeleton 위에 실제 데이터를 생성·수정·삭제·저장하는 개인 웹 Workspace를 만드는 것입니다. Supabase/Netlify의 계정 연결과 실제 서비스 검증은 PC 작업으로 분리합니다.
+목표는 기존 Skeleton 위에 실제 데이터를 생성·수정·삭제·저장하는 개인 웹 Workspace를 만드는 것입니다. 전용 Supabase 프로젝트와 Netlify production 사이트를 연결하고 코드 검사와 실제 서비스 검증 결과를 구분해 기록합니다.
 
 ## 구현 범위
 

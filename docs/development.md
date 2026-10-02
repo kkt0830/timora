@@ -1,12 +1,12 @@
 # Development / PC setup
 
-현재 모바일 작업에서는 구현과 GitHub 검증을 진행합니다. Supabase 프로젝트 연결 및 Netlify 배포는 PC에서 아래 절차로 수행합니다. Git CLI 없이 ZIP으로 내려받아도 실행할 수 있습니다.
+Timora 전용 Supabase 프로젝트와 Netlify production 사이트를 연결했습니다. 새 환경을 재현할 때 아래 절차를 사용합니다. 현재 연결 대상은 [deployment.md](deployment.md)에 기록합니다. Git CLI 없이 ZIP으로 내려받아도 실행할 수 있습니다.
 
 ## 로컬 실행
 
 1. Node 22.18 이상(권장 24)을 설치하고 저장소의 main을 받습니다.
 2. `npm ci`로 lockfile 기준 의존성을 설치합니다.
-3. 새 Supabase 프로젝트의 SQL Editor에서 `db/schema.sql`을 한 번 실행합니다. 트랜잭션 전체가 실패하면 원인을 수정한 뒤 전체를 다시 실행합니다. 이미 성공한 bootstrap은 재실행하지 않습니다.
+3. 새 Supabase 프로젝트의 SQL Editor에서 `db/schema.sql`을 한 번 실행합니다. 트랜잭션 전체가 실패하면 원인을 수정한 뒤 전체를 다시 실행합니다. 이미 성공한 bootstrap은 재실행하지 않습니다. 새 DB에서는 이어서 `db/migrations/*.sql`을 파일명 순서대로 한 번씩 적용합니다. 현재 Timora DB에는 bootstrap과 후속 migration이 이미 적용되어 있습니다.
 4. `.env.example`을 `.env`로 복사하고 URL/publishable key를 설정합니다. Windows PowerShell에서는 `Copy-Item .env.example .env`를 사용할 수 있습니다.
 5. Supabase의 Data API가 public 스키마를 노출하는지 확인합니다. max rows는 최소 500으로 유지합니다. SQL에서 authenticated 테이블 권한과 RLS를 모두 설정합니다.
 6. Auth Email provider, Site URL `http://localhost:5173`, Redirect URLs의 개발 주소를 확인합니다. 기본 SMTP는 프로젝트 조직의 팀원 이메일로만 발송합니다. 팀원 외 주소로 가입하거나 운영하려면 Custom SMTP를 설정합니다. 발송 제한은 Supabase Auth의 Rate Limits에서 확인합니다.
@@ -58,19 +58,7 @@ Preview 배포가 필요하면 그 주소도 Redirect URLs에 명시합니다. �
 
 기기 timezone을 사용하고 별도 timezone 설정은 없습니다. 로컬 저장된 세션을 활용하지만 데이터의 오프라인 편집을 지원하지 않습니다. 다른 기기에서 같은 객체를 동시에 저장하면 마지막 저장이 우선입니다. 모든 테이블을 페이지별로 읽은 뒤 메모리에 모으므로 큰 데이터의 최적화는 후속 버전입니다. Notes 미리보기는 기본 Markdown 부분집합입니다.
 
-## 2026-10-02 PC 작업 전 최종 검수
 
-세션 복원 요청이 늦게 끝나더라도 더 최근의 로그인을 해제하지 않도록 보완했습니다. Today는 이전 날짜에 시작한 완료 작업을 계속 표시하지 않으며, 오늘 시작/마감하는 작업은 완료 후에도 오늘 진행도에 포함합니다. 두 경우를 회귀 테스트에 추가했습니다. Database schema 변경은 없습니다.
+## 현재 서비스
 
-오늘 저녁에는 다음 순서로 진행합니다.
-
-1. 최신 main을 내려받아 프로젝트 폴더에서 `npm ci`를 실행합니다.
-2. 새 Supabase 프로젝트 SQL Editor에서 `db/schema.sql` 전체를 한 번 실행합니다. `tests/db-bootstrap.sql`은 실행하지 않습니다.
-3. `.env.example`을 `.env`로 복사하고 Project URL과 publishable key를 넣습니다.
-4. Site URL/Redirect URLs에 `http://localhost:5173`을 등록합니다. Vite가 다른 포트를 표시하면 그 주소도 등록합니다.
-5. 프로젝트 팀원 이메일로 먼저 가입/확인/로그인을 시험합니다. 다른 이메일로 사용할 경우 [Custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp)를 먼저 설정합니다.
-6. `npm run dev`에서 Tasks/Notes/Projects/Events/Library/Inbox 저장과 새로고침, 로그아웃을 확인합니다.
-7. 다른 실제 계정의 데이터 격리를 확인한 후 Netlify를 연결합니다. 두 계정의 가입 메일을 받을 수 있는 SMTP/팀원 설정이 필요합니다.
-8. Netlify에 두 VITE 환경 변수를 넣고 Build `npm run build`, Publish `dist`로 배포합니다. Supabase에 실제 배포 URL을 등록하고 `/tasks` 직접 접근·새로고침을 확인합니다.
-
-실제 Supabase 연결과 Netlify 배포는 아직 수행하지 않았습니다. 코드 검증과 실제 서비스 설정 검증은 별개입니다.
+https://timora-sfj2.netlify.app 에 production 배포했습니다. Supabase Auth Site URL/Redirect URLs는 PC에서 등록 완료한 상태입니다. 실제 로그인·Task 저장·새로고침 유지가 사용자 확인을 통과했습니다. 검증 범위와 이메일 발송 제한은 verification.md에 기록합니다. GitHub 자동 배포가 필요하면 Netlify Project configuration의 Repository에서 `kkt0830/timora`, main을 연결합니다. 소스 업로드 방식의 현재 배포는 GitHub 자동 배포 연결을 만들지 않습니다.
