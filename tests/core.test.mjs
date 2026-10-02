@@ -50,3 +50,15 @@ test('Validation rejects invalid dates, date ranges and empty titles', () => {
   assert.throws(() => validateInput('events', { title: 'test', start_at: '2026-10-01T10:00Z', end_at: '2026-10-01T09:00Z' }));
   assert.doesNotThrow(() => validateInput('tasks', baseTask));
 });
+
+test('Today excludes completed tasks from previous active ranges but keeps tasks starting or due today', () => {
+  const key = '2026-10-02';
+  const tasks = [
+    { ...baseTask, id: 'old-done-no-due', status: 'done', start_date: '2026-09-30' },
+    { ...baseTask, id: 'old-done-range', status: 'done', start_date: '2026-09-30', due_date: '2026-10-04' },
+    { ...baseTask, id: 'active', start_date: '2026-09-30', due_date: '2026-10-04' },
+    { ...baseTask, id: 'starts-today-done', status: 'done', start_date: key },
+    { ...baseTask, id: 'due-today-done', status: 'done', due_date: key },
+  ];
+  assert.deepEqual(todayTasks(tasks, key).map(task => task.id), ['active', 'starts-today-done', 'due-today-done']);
+});

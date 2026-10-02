@@ -21,7 +21,7 @@ export function eventOnDay(event: CalendarEvent, key: string): boolean {
   return new Date(event.start_at) < end && new Date(event.end_at) > start;
 }
 export function taskOnDay(task: Task, key: string): boolean {
-  return task.due_date === key || (task.start_date !== null && task.start_date <= key && (task.due_date === null || task.due_date >= key));
+  return task.due_date === key || task.start_date === key || (task.status !== 'done' && task.start_date !== null && task.start_date < key && (task.due_date === null || task.due_date >= key));
 }
 export function todayTasks(tasks: Task[], key: string): Task[] {
   return tasks.filter(task => taskOnDay(task, key) || (task.status !== 'done' && task.due_date !== null && task.due_date < key));
