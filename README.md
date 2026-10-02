@@ -1,12 +1,16 @@
-# Timora
+# Timora v0.1
 
 > «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
 Timora는 Tasks, Notes, Calendar, Projects, Library를 하나의 개인 Workspace에서 관리하고 연결하는 생산성 웹 애플리케이션입니다. 장기적으로 Windows, Android, Tablet에서 같은 흐름을 이어가는 Personal Workspace를 지향합니다.
 
-**현재 상태: Timora v0.1 — Core Workspace 구현, 전용 Supabase 연결 및 Netlify production 배포 완료. 사용자가 실제 로그인·Task 저장·새로고침 유지를 확인했습니다.**
+**현재 정식 버전: Timora v0.1 — Core Workspace + 최초의 실사용 가능한 웹 애플리케이션.**
 
-웹 앱: **https://timora-sfj2.netlify.app** 기존 Pre-v0.1의 React/Vite 구조, Sidebar, 9개 화면과 디자인을 이어서 개발했습니다. 설정 없이 실행하면 연결 안내를 표시하며, 샘플 데이터를 실제 저장 데이터처럼 보여주지 않습니다.
+2026-10-02 기준으로 전용 Supabase 연결과 Netlify production 배포를 완료했습니다. 사용자가 실제 로그인·Task 저장·새로고침 유지를 확인했습니다. 구현 코드와 문서는 GitHub `main`에 반영되어 있습니다.
+
+웹 앱: **https://timora-sfj2.netlify.app**
+
+기존 Pre-v0.1의 React/Vite 구조, Sidebar, 9개 화면과 디자인을 이어서 개발했습니다. 설정 없이 실행하면 연결 안내를 표시하며, 샘플 데이터를 실제 저장 데이터처럼 보여주지 않습니다. v0.1은 개인 웹 Workspace의 첫 정식 버전이며, 이후 확장 기능과 남은 운영 검증은 아래에 명시합니다.
 
 ## 현재 기능
 
@@ -68,13 +72,37 @@ npm run build
 
 GitHub Actions에서 설치, 타입 검사, 단위 테스트, production build, Chromium 화면 검사와 PostgreSQL 16 RLS 검사를 실행합니다. lint 설정은 기존 저장소에 없으며 `typecheck`가 엄격한 TypeScript 검사를 수행합니다. 브라우저 테스트는 실제 UI에 HTTP fixture를 연결합니다. PostgreSQL 테스트는 실제 RLS 엔진과 최소 Auth 계약을 사용합니다. 이 두 검사는 연결된 Supabase 서비스의 이메일 발송·Auth 설정·Data API 설정 검증을 대체하지 않습니다.
 
-현재 검증 결과와 PC에서 필요한 확인은 [docs/verification.md](docs/verification.md)에 기록합니다. 실행 및 배포 절차는 [docs/development.md](docs/development.md)에 있습니다.
+최종 구현·배포 문서 반영 Commit의 [GitHub Actions 검사](https://github.com/kkt0830/timora/actions/runs/37029529180)가 통과했습니다. 상세 검증 결과와 남은 확인은 [docs/verification.md](docs/verification.md)에 기록합니다. 실행 절차는 [docs/development.md](docs/development.md), 현재 연결 대상과 배포 설정은 [docs/deployment.md](docs/deployment.md)에 있습니다.
 
 ## Netlify 배포
 
 `netlify.toml`에 Build Command **`npm run build`**, Publish Directory **`dist`**, SPA fallback을 설정했습니다. 전용 사이트 `timora-sfj2`에 소스 업로드 방식으로 production 배포했습니다. GitHub 자동 배포 연결은 아직 없으며, 필요하면 Netlify에서 `kkt0830/timora`의 main을 연결합니다.
 
-Netlify Environment Variables에 위 두 `VITE_*` 설정을 넣고 배포합니다. 환경 변수를 변경하면 다시 빌드해야 합니다. Supabase Auth의 Site URL과 Redirect URLs에 실제 HTTPS 사이트 주소를 등록하세요. `/tasks`, `/projects/:id` 등의 직접 접근·새로고침도 확인해야 합니다.
+현재 사이트에는 두 `VITE_*` 변수가 등록되어 있고 실제 빌드 산출물에 연결 설정이 포함된 것을 확인했습니다. Supabase Auth의 Site URL/Redirect URLs도 등록했습니다. 새 환경을 배포할 때는 같은 설정을 적용하고 환경 변수 변경 후 다시 빌드합니다. `/tasks`, `/notes`, `/projects/:id` 등의 직접 접근은 HTTPS 200 응답을 확인했습니다.
+
+## v0.1의 부분 지원과 미구현 기능
+
+Tasks/Notes/Projects/Events/Library/Inbox의 핵심 CRUD와 기본 인증은 구현했습니다. 아래 기능은 현재 지원 범위를 넘어서는 확장 기능이며, 작동하는 기능처럼 표시하지 않습니다.
+
+| 영역 | 현재 지원 | 아직 구현하지 않은 부분 |
+| --- | --- | --- |
+| Inbox | 빠른 기록, 유형 분류, Task/Note 변환 | Event/Project/Library로 실제 변환 |
+| Notes | Markdown 원문 저장, 기본 미리보기 | 전체 Markdown 문법 미리보기, Wiki Link/Backlink/Graph |
+| Calendar | Month View, 선택한 날짜 목록, Event CRUD | 별도 Week/Day View, 반복 일정, 드래그 이동 |
+| Library | HTTP(S) URL 저장 및 자료 유형 분류 | PDF/파일 직접 업로드, Supabase Storage |
+| Account | 가입·로그인·로그아웃·세션 유지 | 비밀번호 재설정·변경, 이메일 변경, 계정 삭제 UI |
+| Workspace / Settings | 개인 Workspace 하나, 이름·Appearance | 다중 Workspace, Integrations/Sync/Notifications/Shortcuts/Storage/Backup/Security의 추가 설정 |
+
+전역 검색·Command Palette·범용 Object Relations·GitHub Integration·오프라인 편집·Desktop/Android/Tablet 앱은 이후 버전에서 구현합니다. 위 확장 항목에 새 출시 일정을 임의로 부여하지 않으며 기존 Roadmap을 유지합니다.
+
+## 남은 설정과 검증
+
+다음은 기능 미구현과 구분되는 운영 설정 또는 검증 항목입니다.
+
+- **일반 이메일 가입:** 기본 Supabase SMTP는 프로젝트 조직 팀원 이메일만 지원합니다. 다른 주소로 가입하려면 Custom SMTP 설정이 필요합니다.
+- **GitHub 자동 배포:** 현재 소스 업로드 배포입니다. 코드·문서는 GitHub에 반영되어 있지만, 이후 main 변경에 따른 Netlify 자동 재배포 연결은 아직 설정하지 않았습니다.
+- **추가 인증·격리 검증:** 두 실제 계정 JWT를 사용하는 REST 격리, 실제 여러 탭의 토큰 갱신·자연 만료 검사가 남아 있습니다. DB 엔진의 두 사용자 역할/claim RLS 검사와 사용자 실제 로그인·저장은 통과했습니다.
+- **환경·규모 검증:** Safari/Firefox, 대규모 데이터·장기간 사용은 추가 검증 대상입니다. 현재 cloud의 Chromium 실행은 실패했으며 GitHub Actions Chromium 화면 검사는 통과했습니다.
 
 ## 범위와 다음 버전
 
