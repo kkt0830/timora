@@ -149,7 +149,7 @@ try {
   await visible(page.getByText('프로필을 저장했습니다.', { exact: true }));
   await page.reload(); await visible(page.getByRole('heading', { name: '나의 이름', exact: true }));
   assert.equal(await page.getByLabel('프로필 사진 URL', { exact: true }).inputValue(), '');
-  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click(); await page.getByLabel('Workspace 검색', { exact: true }).fill('bold');
+  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click(); await page.getByRole('searchbox', { name: 'Workspace 검색', exact: true }).fill('bold');
   await page.getByRole('link', { name: /Note A/ }).click(); await visible(page.getByRole('dialog'));
   await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
   await page.getByRole('button', { name: '프로필 메뉴', exact: true }).focus(); await page.keyboard.press('Enter');
@@ -190,7 +190,7 @@ try {
   await page.getByRole('button', { name: '프로젝트 수정 / 삭제', exact: true }).click(); page.once('dialog', dialog => dialog.accept());
   await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await visible(page.getByRole('link', { name: '프로젝트 목록으로', exact: true }));
-  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click(); await page.getByLabel('Workspace 검색', { exact: true }).fill('no-such-object');
+  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click(); await page.getByRole('searchbox', { name: 'Workspace 검색', exact: true }).fill('no-such-object');
   await visible(page.getByText('일치하는 기록이 없습니다.', { exact: true }));
   assert.deepEqual(errors, []);
   console.log('Browser checks passed: navigation, CRUD, auth persistence/logout, simulated account switching, dates, errors/loading, Markdown, project detail, settings and mobile layout.');

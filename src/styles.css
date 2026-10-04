@@ -383,6 +383,9 @@ strong {
   color: var(--muted);
 }
 .search-trigger {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
