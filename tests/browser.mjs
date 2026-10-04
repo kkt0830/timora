@@ -117,7 +117,7 @@ try {
     assert.equal(await dialog.getByLabel('내용', { exact: true }).isVisible(), false);
   });
   await page.getByRole('button', { name: 'Note A', exact: true }).click();
-  const draft = page.getByRole('dialog').getByLabel('내용', { exact: true });
+  const draft = page.getByRole('dialog').locator('textarea[name=content]');
   await draft.fill('unsaved note draft');
   failure = true;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
