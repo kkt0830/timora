@@ -77,7 +77,8 @@ try {
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await visible(page.getByRole('heading', { name: '오늘도 나의 흐름으로 👋' }));
   }
-  async function nav(label) { await page.locator('.sidebar').getByRole('link', { name: new RegExp(`^${label}(?:\\s*\\d+)?$`) }).click(); }
+  async function nav(label) {
+    if (label === 'Settings' || label === 'Profile') { await page.getByRole('button', { name: '프로필 메뉴', exact: true }).click(); await page.locator('.popover-panel').getByRole('link', { name: label, exact: true }).click(); return; } await page.locator('.sidebar').getByRole('link', { name: new RegExp(`^${label}(?:\\s*\\d+)?$`) }).click(); }
   async function create(action, title, extra = async () => {}) {
     await page.getByRole('button', { name: action, exact: true }).click();
     const dialog = page.getByRole('dialog');
@@ -115,6 +116,18 @@ try {
     await visible(dialog.getByRole('heading', { name: 'Heading', exact: true }));
     assert.equal(await dialog.getByLabel('내용', { exact: true }).isVisible(), false);
   });
+  await page.getByRole('button', { name: 'Note A', exact: true }).click();
+  const draft = page.getByRole('dialog').locator('textarea[name=content]');
+  await draft.fill('unsaved note draft');
+  failure = true;
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => [...document.querySelectorAll('[role=alert]')].some(el => el.textContent.includes('Fixture network error')));
+  assert.equal(await draft.inputValue(), 'unsaved note draft');
+  assert.equal(await page.getByRole('dialog').isVisible(), true);
+  failure = false;
+  await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+  await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
   await nav('Calendar'); await create('새 일정', 'Event A', async dialog => { await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' }); });
   await visible(page.getByRole('button', { name: 'Event A', exact: true }));
   await page.getByRole('button', { name: '다음 달', exact: true }).click(); await page.getByRole('button', { name: '이전 달', exact: true }).click();
@@ -125,7 +138,7 @@ try {
   await page.getByRole('button', { name: 'Note로', exact: true }).click();
   await visible(page.getByRole('status')); await nav('Notes'); await visible(page.getByRole('button', { name: 'Inbox A', exact: true }));
   await page.reload(); await visible(page.getByRole('button', { name: 'Note A', exact: true }));
-  failure = true; await page.getByRole('button', { name: '새로고침', exact: true }).click(); await visible(page.getByRole('alert'));
+  failure = true; await page.reload(); await visible(page.getByRole('alert'));
   failure = false; delay = 500; await page.getByRole('button', { name: '다시 시도' }).click(); await visible(page.getByRole('status')); delay = 0;
   await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
   await nav('Projects'); await page.getByRole('link', { name: 'Project A', exact: true }).click();
@@ -133,20 +146,60 @@ try {
   await nav('Settings'); await page.getByLabel('Workspace 이름', { exact: true }).fill('A workspace');
   await page.getByLabel('Appearance', { exact: true }).selectOption('dark'); await page.getByRole('button', { name: '설정 저장' }).click();
   await visible(page.getByText('설정을 저장했습니다.', { exact: true })); assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+  await nav('Profile'); await page.getByLabel('닉네임', { exact: true }).fill('나의 이름');
+  await page.getByRole('button', { name: '프로필 저장', exact: true }).click(); await visible(page.getByText('프로필을 저장했습니다.', { exact: true }));
+  await page.reload(); await visible(page.getByRole('heading', { name: '나의 이름', exact: true }));
+  await context.route('https://images.example.com/**', route => route.fulfill({ status: 404 }));
+  await page.getByLabel('프로필 사진 URL', { exact: true }).fill('https://images.example.com/avatar.png');
+  await page.getByRole('button', { name: '프로필 저장', exact: true }).click();
+  await visible(page.getByText('프로필을 저장했습니다.', { exact: true }));
+  await page.reload(); await visible(page.getByRole('heading', { name: '나의 이름', exact: true }));
+  assert.equal(await page.getByLabel('프로필 사진 URL', { exact: true }).inputValue(), 'https://images.example.com/avatar.png');
+  await page.waitForFunction(() => !document.querySelector('.profile-summary .avatar img'));
+  await page.getByRole('button', { name: '사진 제거', exact: true }).click();
+  await page.getByRole('button', { name: '프로필 저장', exact: true }).click();
+  await visible(page.getByText('프로필을 저장했습니다.', { exact: true }));
+  await page.reload(); await visible(page.getByRole('heading', { name: '나의 이름', exact: true }));
+  assert.equal(await page.getByLabel('프로필 사진 URL', { exact: true }).inputValue(), '');
+  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click(); await page.getByRole('searchbox', { name: 'Workspace 검색', exact: true }).fill('bold');
+  await page.getByRole('link', { name: /Note A/ }).click(); await visible(page.getByRole('dialog'));
+  await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('button', { name: '프로필 메뉴', exact: true }).focus(); await page.keyboard.press('Enter');
+  assert.equal(await page.getByRole('button', { name: '프로필 메뉴', exact: true }).getAttribute('aria-expanded'), 'true');
+  await page.keyboard.press('Escape'); assert.equal(await page.getByRole('button', { name: '프로필 메뉴', exact: true }).getAttribute('aria-expanded'), 'false');
+  await page.setViewportSize({ width: 834, height: 1112 }); await nav('Tasks');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('button', { name: '메뉴 열기' }).click();
   await nav('Tasks'); await visible(page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: 'test-results/tasks-mobile-dark.png', fullPage: true, animations: 'disabled' });
+  for (const name of ['메뉴 열기', '새 작업']) {
+    const box = await page.getByRole('button', { name, exact: true }).boundingBox();
+    assert.ok(box.width >= 44 && box.height >= 44);
+  }
+  const searchBox = await page.getByRole('link', { name: 'Workspace 검색', exact: true }).boundingBox();
+  assert.ok(searchBox.width >= 44 && searchBox.height >= 44);
+  await page.getByRole('button', { name: '메뉴 열기', exact: true }).click(); await nav('Calendar');
+  await page.setViewportSize({ width: 320, height: 740 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  const dayBox = await page.locator('.calendar-day').first().boundingBox();
+  assert.ok(dayBox.width >= 44 && dayBox.height >= 44);
+  await page.screenshot({ path: 'test-results/calendar-mobile-dark.png', fullPage: true, animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: '메뉴 열기', exact: true }).click(); await nav('Tasks');
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Task edited', exact: true }).click(); await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.getByRole('button', { name: '메뉴 열기' }).click(); await nav('Settings'); await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await page.getByRole('button', { name: '메뉴 열기' }).click(); await page.getByRole('button', { name: '프로필 메뉴', exact: true }).click(); await page.locator('.popover-panel').getByRole('button', { name: '로그아웃', exact: true }).click();
   await page.goto('http://localhost:4173'); await login('b');
   assert.equal(await page.getByText('Project A', { exact: true }).count(), 0);
   await page.getByRole('button', { name: '메뉴 열기' }).click(); await nav('Notes');
   assert.equal(await page.getByRole('button', { name: 'Note A', exact: true }).count(), 0);
-  await page.getByRole('button', { name: '메뉴 열기' }).click(); await nav('Settings'); await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await page.goto(`http://localhost:4173/notes?object=${stores.a.notes[0].id}`);
+  await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
+  assert.equal(await page.getByRole('dialog').count(), 0);
+  await page.getByRole('button', { name: '메뉴 열기' }).click(); await page.getByRole('button', { name: '프로필 메뉴', exact: true }).click(); await page.locator('.popover-panel').getByRole('button', { name: '로그아웃', exact: true }).click();
   await page.getByRole('button', { name: '새 계정 만들기', exact: true }).click();
-  await page.getByLabel('이메일', { exact: true }).fill('new@example.com'); await page.getByLabel('비밀번호', { exact: true }).fill('fixture-password');
+  await page.getByLabel('닉네임', { exact: true }).fill('새 사용자'); await page.getByLabel('이메일', { exact: true }).fill('new@example.com'); await page.getByLabel('비밀번호', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: '회원가입', exact: true }).click(); await visible(page.getByRole('status'));
   await page.getByRole('button', { name: '기존 계정으로 로그인', exact: true }).click();
   await page.setViewportSize({ width: 1365, height: 900 }); await page.goto('http://localhost:4173'); await login('a');
@@ -163,6 +216,8 @@ try {
   await page.getByRole('button', { name: '프로젝트 수정 / 삭제', exact: true }).click(); page.once('dialog', dialog => dialog.accept());
   await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await visible(page.getByRole('link', { name: '프로젝트 목록으로', exact: true }));
+  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click(); await page.getByRole('searchbox', { name: 'Workspace 검색', exact: true }).fill('no-such-object');
+  await visible(page.getByText('일치하는 기록이 없습니다.', { exact: true }));
   assert.deepEqual(errors, []);
   console.log('Browser checks passed: navigation, CRUD, auth persistence/logout, simulated account switching, dates, errors/loading, Markdown, project detail, settings and mobile layout.');
 } catch (error) { if (activePage) await activePage.screenshot({ path: 'test-results/failure.png', fullPage: true, animations: 'disabled' }).catch(() => {}); throw error; } finally { await browser?.close(); server.kill('SIGTERM'); }

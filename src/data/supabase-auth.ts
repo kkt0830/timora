@@ -1,3 +1,4 @@
+import { displayName } from '../domain/identity.ts';
 import type { Account, AuthService } from '../services/contracts.ts';
 import { apiRequest, ApiError } from './http.ts';
 import type { BackendConfig } from './http.ts';
@@ -13,7 +14,7 @@ export class SupabaseAuth implements AuthService {
   private session: Session | null = null;
   private epoch = 0;
   private listeners = new Set<(account: Account | null) => void>();
-  private refreshing: Promise<string> | null = null;
+  private refreshing: { epoch: number; promise: Promise<string> } | null = null;
 
   constructor(config: BackendConfig, storage: Storage) {
     this.config = config; this.storage = storage; this.key = `timora.auth.${config.url}`;
@@ -79,10 +80,10 @@ export class SupabaseAuth implements AuthService {
     const data = await apiRequest<TokenResponse>(this.config, '/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) });
     if (version === this.epoch) this.accept(data);
   }
-  async signUp(email: string, password: string): Promise<boolean> {
+  async signUp(email: string, password: string, nickname?: string): Promise<boolean> {
     const version = ++this.epoch;
     const redirect = typeof location === 'undefined' ? '' : `?redirect_to=${encodeURIComponent(location.origin)}`;
-    const data = await apiRequest<Partial<TokenResponse>>(this.config, `/auth/v1/signup${redirect}`, { method: 'POST', body: JSON.stringify({ email, password }) });
+    const data = await apiRequest<Partial<TokenResponse>>(this.config, `/auth/v1/signup${redirect}`, { method: 'POST', body: JSON.stringify({ email, password, ...(nickname ? { data: { display_name: displayName(nickname) } } : {}) }) });
     if (data.access_token && version === this.epoch) { this.accept(data as TokenResponse); return true; }
     return false;
   }
@@ -93,9 +94,15 @@ export class SupabaseAuth implements AuthService {
     if (token) await apiRequest(this.config, '/auth/v1/logout?scope=local', { method: 'POST' }, token);
   }
   async token(forceRefresh = false): Promise<string> {
-    if (this.refreshing) return this.refreshing;
+    if (this.refreshing?.epoch === this.epoch) return this.refreshing.promise;
+    // A valid newer account token need not wait for another account's Web Lock.
+    const current = this.read();
+    if (!forceRefresh && current && current.expires_at > Date.now() / 1000 + 60) {
+      this.session = current; return current.access_token;
+    }
+    const version = this.epoch;
     const run = async (): Promise<string> => {
-      const version = this.epoch;
+      if (version !== this.epoch) throw new ApiError('세션이 변경되었습니다. 다시 시도해 주세요.', 401);
       const stored = this.read();
       if (!stored) throw new ApiError('로그인이 필요합니다.', 401);
       const updatedElsewhere = stored.access_token !== this.session?.access_token;
@@ -111,9 +118,10 @@ export class SupabaseAuth implements AuthService {
       }
     };
     // Refresh-token rotation is serialized across tabs when Web Locks is supported.
-    this.refreshing = typeof navigator !== 'undefined' && navigator.locks
+    const pending = { epoch: this.epoch, promise: typeof navigator !== 'undefined' && navigator.locks
       ? navigator.locks.request(this.key, { signal: AbortSignal.timeout(15000) }, run)
-      : run();
-    try { return await this.refreshing; } finally { this.refreshing = null; }
+      : run() };
+    this.refreshing = pending;
+    try { return await pending.promise; } finally { if (this.refreshing === pending) this.refreshing = null; }
   }
 }

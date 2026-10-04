@@ -4,9 +4,9 @@ Timora 전용 Supabase 프로젝트와 Netlify production 사이트를 연결했
 
 ## 로컬 실행
 
-1. Node 22.18 이상(권장 24)을 설치하고 저장소의 main을 받습니다.
+1. Node 22.18 이상(권장 24)을 설치하고 검토 중인 v0.2는 `version/v0.2`를 받고, 운영 버전은 `main`을 받습니다.
 2. `npm ci`로 lockfile 기준 의존성을 설치합니다.
-3. 새 Supabase 프로젝트의 SQL Editor에서 `db/schema.sql`을 한 번 실행합니다. 트랜잭션 전체가 실패하면 원인을 수정한 뒤 전체를 다시 실행합니다. 이미 성공한 bootstrap은 재실행하지 않습니다. 새 DB에서는 이어서 `db/migrations/*.sql`을 파일명 순서대로 한 번씩 적용합니다. 현재 Timora DB에는 bootstrap과 후속 migration이 이미 적용되어 있습니다.
+3. 새 Supabase 프로젝트의 SQL Editor에서 `db/schema.sql`을 한 번 실행합니다. 트랜잭션 전체가 실패하면 원인을 수정한 뒤 전체를 다시 실행합니다. 이미 성공한 bootstrap은 재실행하지 않습니다. 새 DB에서는 이어서 `db/migrations/*.sql`을 파일명 순서대로 한 번씩 적용합니다. 운영 Timora DB에는 bootstrap과 002까지 적용되어 있습니다. v0.2의 003은 운영 반영 전 별도로 적용해야 합니다.
 4. `.env.example`을 `.env`로 복사하고 URL/publishable key를 설정합니다. Windows PowerShell에서는 `Copy-Item .env.example .env`를 사용할 수 있습니다.
 5. Supabase의 Data API가 public 스키마를 노출하는지 확인합니다. max rows는 최소 500으로 유지합니다. SQL에서 authenticated 테이블 권한과 RLS를 모두 설정합니다.
 6. Auth Email provider, Site URL `http://localhost:5173`, Redirect URLs의 개발 주소를 확인합니다. 기본 SMTP는 프로젝트 조직의 팀원 이메일로만 발송합니다. 팀원 외 주소로 가입하거나 운영하려면 Custom SMTP를 설정합니다. 발송 제한은 Supabase Auth의 Rate Limits에서 확인합니다.
@@ -52,7 +52,7 @@ Repository를 연결할 때 root를 base로 사용합니다. Build Command는 `n
 
 Netlify Environment Variables에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`를 등록합니다. 빌드 변수이므로 변경 후 redeploy합니다. Supabase Auth Site URL/Redirect URLs를 실제 배포 주소로 갱신하고 이메일 확인 링크가 이 사이트로 돌아오는지 확인합니다. `/tasks`, `/notes`, `/projects/:id` 직접 접근과 새로고침을 검사합니다.
 
-Preview 배포가 필요하면 그 주소도 Redirect URLs에 명시합니다. 파일 업로드/Storage/functions/GitHub secret 설정은 v0.1에서 필요하지 않습니다.
+Preview 배포가 필요하면 그 주소도 Redirect URLs에 명시합니다. 파일 업로드/Storage/functions/GitHub secret 설정은 v0.2에서도 필요하지 않습니다.
 
 ## 알려진 제한
 
@@ -61,4 +61,4 @@ Preview 배포가 필요하면 그 주소도 Redirect URLs에 명시합니다. �
 
 ## 현재 서비스
 
-https://timora-sfj2.netlify.app 에 production 배포했습니다. Supabase Auth Site URL/Redirect URLs는 PC에서 등록 완료한 상태입니다. 실제 로그인·Task 저장·새로고침 유지가 사용자 확인을 통과했습니다. 검증 범위와 이메일 발송 제한은 verification.md에 기록합니다. GitHub 자동 배포가 필요하면 Netlify Project configuration의 Repository에서 `kkt0830/timora`, main을 연결합니다. 소스 업로드 방식의 현재 배포는 GitHub 자동 배포 연결을 만들지 않습니다.
+https://timora-sfj2.netlify.app 에 v0.1 production을 배포했습니다. Supabase Auth Site URL/Redirect URLs는 PC에서 등록 완료한 상태입니다. 실제 로그인·Task 저장·새로고침 유지가 사용자 확인을 통과했습니다. 검증 범위와 이메일 발송 제한은 verification.md에 기록합니다. GitHub 자동 배포가 필요하면 Netlify Project configuration의 Repository에서 `kkt0830/timora`, main을 연결합니다. 소스 업로드 방식의 현재 배포는 GitHub 자동 배포 연결을 만들지 않습니다.

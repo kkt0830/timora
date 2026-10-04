@@ -59,4 +59,6 @@ jobs:
       - run: psql -v ON_ERROR_STOP=1 -f tests/db-bootstrap.sql
       - run: psql -v ON_ERROR_STOP=1 -f db/schema.sql
       - run: psql -v ON_ERROR_STOP=1 -f db/migrations/002_project_foreign_key_indexes.sql
+      - run: psql -v ON_ERROR_STOP=1 -f db/migrations/003_profile_identity.sql
       - run: psql -v ON_ERROR_STOP=1 -f tests/rls.sql
+      - run: psql -v ON_ERROR_STOP=1 -f tests/profile-rls.sql
