@@ -1,5 +1,23 @@
 # Verification — Timora v0.2 Release Candidate
 
+## Issue #4 후속 검증 — 2026-10-05 KST
+
+- 기준: main `6063a78` / tree `687902c`, 기존 작업 파일 clean 확인 후
+  `fix/issue-4-v02`에서 최소 수정.
+- 로컬 TypeScript 및 production build 통과. `node --test --test-isolation=none
+  tests/*.test.mjs`로 개별 25개 테스트 통과 확인. 별도 lint 설정은 없음.
+- Browser assertions 추가: 조합 시작/진행 중 draft와 URL 분리, 종료 후 한국어 query,
+  reload/back/forward/clear와 일반 검색, 메뉴 Workspace/Settings, 단일 logo 중앙 box,
+  명시적 Note action과 삭제 취소/승인/reload.
+- 로컬 browser는 이 환경에서 로그인 페이지를 불러오지 못해 실패했고 성공으로
+  기록하지 않음. 수정 코드 `2b42a40`의 GitHub CI
+  [37212723477](https://github.com/kkt0830/timora/actions/runs/37212723477)가 성공했고,
+  web의 설치/타입/단위/build/Chromium 및 database의 기존 schema/RLS 회귀를 확인.
+- OS의 실제 한국어 IME와 Safari/Firefox는 미검증. synthetic composition 이벤트는
+  브라우저/React/Router 계약 검사이며 실제 IME 재현을 대체하지 않음.
+- DB/schema/migration/RLS/service/data layer 변경 없음; 운영 데이터 변경 없음.
+- 신규 루틴·일기·오늘의 문장 구현 없음. 운영 Netlify는 이 PR과 별도 배포 상태.
+
 2026-10-04: v0.1 기능을 유지한 Design & Experience 변경을 검증합니다.
 아래 v0.1 production 실적은 이전 버전의 기록이며 v0.2 배포 성공을 의미하지 않습니다.
 

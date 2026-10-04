@@ -21,6 +21,9 @@ v0.1은 Core Workspace의 첫 정식 웹 버전입니다. 사용자의 v0.2 요�
 
 v0.3~v0.5는 사용자가 제안한 방향이며 다음 버전 착수 전 상세 범위를 확정합니다.
 Notes/Inbox 첨부·Drawing, Project cover는 별도 Candidate입니다.
+Issue #4의 매일 루틴, 날짜별 일기 보관, 오늘의 한 문장도 후속 Candidate입니다.
+버전 배정과 상세 계약은 미확정이며 [Task T-003~T-005](docs/issues/issue-4-workflow.md)에
+정리했습니다. 이번 후속 PR은 검색·로고·Workspace·노트 삭제 진입의 버그/UI만 다룹니다.
 
 ## 개발 흐름
 

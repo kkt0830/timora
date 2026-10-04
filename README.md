@@ -4,8 +4,9 @@
 
 **현재 웹 배포: Timora v0.2 — Design & Experience.**
 https://timora-sfj2.netlify.app 에 2026-10-04 배포했고 Profile migration을 적용했습니다.
-PR #2는 main에 병합된 상태로 확인했습니다. 배포 전 추가한 리뷰 수정은
-`version/v0.2`의 후속 PR로 정리합니다. 현재 배포는 source upload이며 GitHub
+PR #2와 배포 전 리뷰 수정을 담은 PR #3은 main에 병합됐습니다.
+Issue #4의 추가 버그·UI 수정은 `fix/issue-4-v02`의 검토 후보이며 운영 배포와
+구분합니다. 현재 배포는 source upload이며 GitHub
 commit이 자동 production 배포를 의미하지 않습니다.
 
 ## 기능과 디자인
@@ -18,6 +19,8 @@ Markdown, Month Calendar 및 Project 상세를 보존합니다.
 - Sidebar 사용자 메뉴 → Profile / Settings / Logout. 모바일 drawer focus 관리.
 - 가입 닉네임, 기존 계정의 프로필 편집, 이메일 표시, HTTPS avatar URL 변경/제거 및 실패 시 initials.
 - Tasks/Notes/Projects/Library/Inbox/Events 텍스트 검색, 본문·프로젝트·URL 검색과 결과 Object 직접 열기.
+- Issue #4 검토 후보: 검색 IME 조합 중 URL 갱신 방지, Workspace 이름을 프로필 메뉴로
+  이동, 로고 중앙 정렬, 노트 목록의 `수정 / 삭제` 진입 표시.
 - 저장 결과로 즉시 상태 갱신. window focus/online 시 재조회. 상시 Refresh 제거, 오류 Retry 유지.
 - Light/Dark/System, 키보드 focus/Escape, 44px 입력·Action target, Desktop/Tablet/Mobile layout.
 
@@ -83,6 +86,9 @@ Relations/Backlinks, Desktop/Local DB, Sync/Offline은 이번 범위가 아닙�
 Issue #1은 UX/닉네임/검색/Avatar 부분을 반영하지만 첨부·그림판 요청이 남아 있어
 전체 해결로 close하지 않습니다. [Roadmap](ROADMAP.md), [requirements](REQUIREMENTS.md),
 [UI](docs/ui-structure.md), [Git workflow](docs/git-workflow.md)를 참고하세요.
+Issue #4의 루틴·일기·오늘의 문장은 이번에 구현하지 않았습니다.
+[세 스킬의 분석·검수·개발 Task](docs/issues/issue-4-workflow.md)에 요구사항과
+미확정 질문을 보관합니다. 실제 OS 한국어 IME 입력은 수동 확인이 필요합니다.
 
 ## License
 

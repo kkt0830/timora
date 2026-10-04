@@ -37,7 +37,12 @@ Android/Tablet 전용 앱은 v1.0에서 개발합니다. 현재는 모바일 브
 
 ## v0.2 navigation and design
 
-Sidebar user area: Avatar / display name / ⋯ → Profile, Settings, Logout.
+Issue #4 검토 후보: Sidebar user area의 ⋯ → 현재 Workspace 이름, Profile,
+Settings, Logout. Workspace 이름 관리는 기존 Settings에서 한다. 가짜 전환 selector와
+header의 중복 Workspace 이름을 제거하고 현재 화면명만 표시한다.
+로고는 단일 t 노드를 중앙 정렬한다. NoteList의 `수정 / 삭제`는 기존 EntityEditor를
+열며 삭제 확인/저장 로직을 그대로 재사용한다. Search는 draft와 URL query를 분리해
+조합 중에는 URL/결과를 바꾸지 않고 composition 종료 후 확정한다.
 Top-level Settings entry is removed, /settings remains. New /profile edits display
 name/HTTPS avatar; /search finds all six object types with project/context metadata.
 Results route to existing entity editors via ?object=UUID or Project detail; only

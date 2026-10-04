@@ -223,39 +223,9 @@ strong {
   background: var(--accent);
   border-radius: 10px;
   color: var(--on-accent);
-}
-.brand-symbol:before {
-  content: "t";
   font-size: 24px;
   font-weight: 600;
-}
-.space-switch {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 12px;
-  margin: 16px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.space-switch > span:nth-child(2) {
-  flex: 1;
-  min-width: 0;
-}
-.space-switch strong {
-  display: block;
-  overflow-wrap: anywhere;
-}
-.space-switch small {
-  display: block;
-}
-.space-avatar {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  background: var(--raised);
-  border-radius: 8px;
+  line-height: 1;
 }
 .sidebar nav {
   flex: 1;
@@ -1256,3 +1226,7 @@ strong {
   color: var(--muted);
   font-size: 13px;
 }
+
+.popover-workspace { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.popover-workspace small, .popover-workspace strong { display: block; }
+.note-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
