@@ -10,7 +10,7 @@ export const messageOf = (error: unknown) => error instanceof Error ? error.mess
 interface AuthState {
   account: Account | null; loading: boolean; error: string; configured: boolean;
   retry: () => void; signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<boolean>; signOut: () => Promise<void>;
+  signUp: (email: string, password: string, nickname?: string) => Promise<boolean>; signOut: () => Promise<void>;
 }
 const AuthContext = createContext<AuthState | null>(null);
 let initialRestore: Promise<Account | null> | undefined;
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     account, loading, error, configured: Boolean(backend.auth), retry: () => setAttempt(v => v + 1),
     signIn: async (email, password) => { if (!backend.auth) throw new Error(backend.error); await backend.auth.signIn(email, password); },
-    signUp: async (email, password) => { if (!backend.auth) throw new Error(backend.error); return backend.auth.signUp(email, password); },
+    signUp: async (email, password, nickname) => { if (!backend.auth) throw new Error(backend.error); return backend.auth.signUp(email, password, nickname); },
     signOut: async () => { try { await backend.auth?.signOut(); } catch { setError('이 기기에서 로그아웃했습니다. 서버 세션 해제는 네트워크 연결 후 다시 확인해 주세요.'); } },
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -67,11 +67,18 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   const reload = useCallback(async (showLoading = true) => {
     const version = ++generation.current;
     if (showLoading) setLoading(true); setError('');
-    try { const next = await repository.load(account.id); if (mounted.current && version === generation.current) setData(next); }
+    try { const next = await repository.load(account.id);
+      if (!next.settings.display_name && typeof account.user_metadata?.display_name === 'string') next.settings.display_name = account.user_metadata.display_name.slice(0, 64);
+      if (mounted.current && version === generation.current) setData(next); }
     catch (e) { if (mounted.current && version === generation.current) setError(messageOf(e)); }
     finally { if (mounted.current && version === generation.current) setLoading(false); }
-  }, [account.id, repository]);
+  }, [account.id, account.user_metadata?.display_name, repository]);
   useEffect(() => { mounted.current = true; void reload(); return () => { mounted.current = false; generation.current++; }; }, [reload]);
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible' && !lock.current) void reload(false); };
+    window.addEventListener('focus', refresh); window.addEventListener('online', refresh);
+    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh); };
+  }, [reload]);
   const mutate = async (action: () => Promise<void>) => {
     if (lock.current) throw new Error('저장 중입니다. 잠시 기다려 주세요.');
     lock.current = true; setBusy(true);

@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { ArrowRight, Plus, X } from 'lucide-react';
+import { Button, IconButton } from '../design/components';
 import { safeUrl } from '../domain/validation';
 
 export function PageTitle({ eyebrow, title, description, action, onAction }: { eyebrow: string; title: string; description: string; action?: string; onAction?: () => void }) {
-  return <div className="page-title"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action && <button className="primary-button" type="button" onClick={onAction}><Plus size={17} /><span>{action}</span></button>}</div>;
+  return <div className="page-title"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action && <Button variant="primary" onClick={onAction}><Plus size={17} /><span>{action}</span></Button>}</div>;
 }
 export function SectionTitle({ title, to, count }: { title: string; to?: string; count?: number }) {
   return <div className="section-title"><div><h2>{title}</h2>{count !== undefined && <span className="count-badge">{count}</span>}</div>{to && <NavLink to={to} className="text-link">전체 보기 <ArrowRight size={15} /></NavLink>}</div>;
@@ -19,7 +20,7 @@ export function Dialog({ title, children, onClose, busy }: { title: string; chil
     const dialog = ref.current!; dialog.showModal();
     return () => { dialog.close(); opener.current?.focus(); };
   }, []);
-  return <dialog ref={ref} className="editor-dialog" aria-labelledby="editor-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}><div className="dialog-heading"><h2 id="editor-title">{title}</h2><button className="icon-button" type="button" disabled={busy} onClick={onClose} aria-label="닫기"><X size={20} /></button></div>{children}</dialog>;
+  return <dialog ref={ref} className="editor-dialog" aria-labelledby="editor-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}><div className="dialog-heading"><h2 id="editor-title">{title}</h2><IconButton disabled={busy} onClick={onClose} aria-label="닫기"><X size={20} /></IconButton></div>{children}</dialog>;
 }
 function inline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).map((part, index) => {
