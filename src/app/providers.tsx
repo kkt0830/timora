@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error('AuthProvider required'); return value; }
 
 interface WorkspaceState {
-  data: WorkspaceData; loading: boolean; error: string; busy: boolean;
+  data: WorkspaceData; loading: boolean; loaded: boolean; error: string; busy: boolean;
   reload: () => Promise<void>;
   save: <K extends EntityTable>(table: K, input: EntityInput<K>, id?: string) => Promise<void>;
   remove: (table: EntityTable, id: string) => Promise<void>;
@@ -59,6 +59,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   const repository = backend.repository!;
   const [data, setData] = useState(() => emptyWorkspace(account.id));
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const mounted = useRef(false);
@@ -69,7 +70,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
     if (showLoading) setLoading(true); setError('');
     try { const next = await repository.load(account.id);
       if (!next.settings.display_name && typeof account.user_metadata?.display_name === 'string') next.settings.display_name = account.user_metadata.display_name.slice(0, 64);
-      if (mounted.current && version === generation.current) setData(next); }
+      if (mounted.current && version === generation.current) { setData(next); setLoaded(true); } }
     catch (e) { if (mounted.current && version === generation.current) setError(messageOf(e)); }
     finally { if (mounted.current && version === generation.current) setLoading(false); }
   }, [account.id, account.user_metadata?.display_name, repository]);
@@ -87,7 +88,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
     try { await action(); } finally { lock.current = false; if (mounted.current) { setBusy(false); setLoading(false); } }
   };
   const value: WorkspaceState = {
-    data, loading, error, busy, reload,
+    data, loading, loaded, error, busy, reload,
     save: async (table, input, id) => mutate(async () => {
       const row = await repository.save(table, account.id, input, id);
       if (mounted.current) setData(previous => ({ ...previous, [table]: [row, ...previous[table].filter(item => item.id !== row.id)] }));

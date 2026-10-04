@@ -165,9 +165,10 @@ test('Signup passes a validated nickname as presentation metadata', async () => 
 test('A refresh queued behind a Web Lock cannot refresh a newly signed-in account', async () => {
   const auth = new SupabaseAuth(config, storage());
   let release;
-  const lock = test.mock.method(navigator.locks, 'request', (_key, _options, run) => new Promise((resolve, reject) => {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { locks: { request: (_key, _options, run) => new Promise((resolve, reject) => {
     release = () => Promise.resolve().then(run).then(resolve, reject);
-  }));
+  }) } } });
   let refreshCalls = 0;
   const mock = test.mock.method(globalThis, 'fetch', async url => {
     if (url.includes('grant_type=refresh_token')) refreshCalls++;
@@ -181,7 +182,7 @@ test('A refresh queued behind a Web Lock cannot refresh a newly signed-in accoun
     await release(); await rejected;
     assert.equal(refreshCalls, 0);
     assert.equal(await auth.token(), 'account-b');
-  } finally { lock.mock.restore(); mock.mock.restore(); }
+  } finally { if (navigatorDescriptor) Object.defineProperty(globalThis, 'navigator', navigatorDescriptor); else delete globalThis.navigator; mock.mock.restore(); }
 });
 
 test('Profile settings retain owner and reject unsafe URLs before an HTTP write', async () => {

@@ -116,6 +116,18 @@ try {
     await visible(dialog.getByRole('heading', { name: 'Heading', exact: true }));
     assert.equal(await dialog.getByLabel('내용', { exact: true }).isVisible(), false);
   });
+  await page.getByRole('button', { name: 'Note A', exact: true }).click();
+  const draft = page.getByRole('dialog').getByLabel('내용', { exact: true });
+  await draft.fill('unsaved note draft');
+  failure = true;
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => [...document.querySelectorAll('[role=alert]')].some(el => el.textContent.includes('Fixture network error')));
+  assert.equal(await draft.inputValue(), 'unsaved note draft');
+  assert.equal(await page.getByRole('dialog').isVisible(), true);
+  failure = false;
+  await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+  await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
   await nav('Calendar'); await create('새 일정', 'Event A', async dialog => { await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' }); });
   await visible(page.getByRole('button', { name: 'Event A', exact: true }));
   await page.getByRole('button', { name: '다음 달', exact: true }).click(); await page.getByRole('button', { name: '이전 달', exact: true }).click();
@@ -161,6 +173,20 @@ try {
   await nav('Tasks'); await visible(page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: 'test-results/tasks-mobile-dark.png', fullPage: true, animations: 'disabled' });
+  for (const name of ['메뉴 열기', '새 작업']) {
+    const box = await page.getByRole('button', { name, exact: true }).boundingBox();
+    assert.ok(box.width >= 44 && box.height >= 44);
+  }
+  const searchBox = await page.getByRole('link', { name: 'Workspace 검색', exact: true }).boundingBox();
+  assert.ok(searchBox.width >= 44 && searchBox.height >= 44);
+  await page.getByRole('button', { name: '메뉴 열기', exact: true }).click(); await nav('Calendar');
+  await page.setViewportSize({ width: 320, height: 740 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  const dayBox = await page.locator('.calendar-day').first().boundingBox();
+  assert.ok(dayBox.width >= 44 && dayBox.height >= 44);
+  await page.screenshot({ path: 'test-results/calendar-mobile-dark.png', fullPage: true, animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: '메뉴 열기', exact: true }).click(); await nav('Tasks');
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Task edited', exact: true }).click(); await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: '메뉴 열기' }).click(); await page.getByRole('button', { name: '프로필 메뉴', exact: true }).click(); await page.locator('.popover-panel').getByRole('button', { name: '로그아웃', exact: true }).click();

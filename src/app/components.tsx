@@ -9,7 +9,7 @@ export function PageTitle({ eyebrow, title, description, action, onAction }: { e
   return <div className="page-title"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action && <Button variant="primary" onClick={onAction}><Plus size={17} /><span>{action}</span></Button>}</div>;
 }
 export function SectionTitle({ title, to, count }: { title: string; to?: string; count?: number }) {
-  return <div className="section-title"><div><h2>{title}</h2>{count !== undefined && <span className="count-badge">{count}</span>}</div>{to && <NavLink to={to} className="text-link">전체 보기 <ArrowRight size={15} /></NavLink>}</div>;
+  return <div className="section-title"><div className="section-heading"><h2>{title}</h2>{count !== undefined && <span className="count-badge">{count}</span>}</div>{to && <NavLink to={to} className="text-link">전체 보기 <ArrowRight size={15} /></NavLink>}</div>;
 }
 export function Empty({ children = '아직 항목이 없습니다. 새 항목을 추가해 보세요.' }: { children?: ReactNode }) { return <p className="empty-state">{children}</p>; }
 export function Dialog({ title, children, onClose, busy }: { title: string; children: ReactNode; onClose: () => void; busy: boolean }) {
