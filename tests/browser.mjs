@@ -88,6 +88,8 @@ try {
   }
   await page.goto('http://localhost:4173'); await login('a');
   await page.screenshot({ path: 'test-results/home-desktop.png', fullPage: true, animations: 'disabled' });
+  assert.equal(await page.locator('.stat-card').first().evaluate(el => getComputedStyle(el).borderRadius), '12px');
+  assert.equal(await page.locator('.search-trigger').evaluate(el => getComputedStyle(el).borderRadius), '999px');
   for (const label of ['Today', 'Tasks', 'Notes', 'Calendar', 'Projects', 'Library', 'Settings']) {
     await nav(label); await visible(page.getByRole('heading', { name: label, exact: true, level: 1 }));
   }
@@ -170,6 +172,13 @@ try {
   await page.setViewportSize({ width: 834, height: 1112 }); await nav('Tasks');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('button', { name: '메뉴 열기' }).click();
+  const scrim = page.getByRole('button', { name: '메뉴 닫기', exact: true });
+  await scrim.hover({ position: { x: 300, y: 20 } });
+  assert.equal(await scrim.evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0.4)');
+  await page.mouse.down();
+  assert.equal(await scrim.evaluate(el => getComputedStyle(el).transform), 'none');
+  await page.mouse.up();
+  await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
   await nav('Tasks'); await visible(page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: 'test-results/tasks-mobile-dark.png', fullPage: true, animations: 'disabled' });

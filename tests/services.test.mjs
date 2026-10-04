@@ -202,3 +202,19 @@ test('Profile settings retain owner and reject unsafe URLs before an HTTP write'
     assert.equal(body.avatar_url, null);
   } finally { mock.mock.restore(); }
 });
+
+
+test('Profile stores normalized avatar URLs and rejects encoded URLs exceeding the DB limit', async () => {
+  const repository = new SupabaseRepository(config, { token: async () => 'access' });
+  let body, calls = 0;
+  const mock = test.mock.method(globalThis, 'fetch', async (_url, init) => {
+    calls++; body = JSON.parse(init.body); return response([body]);
+  });
+  const settings = { user_id: user.id, workspace_name: 'My workspace', appearance: 'light', display_name: '이름', avatar_url: 'HTTPS://example.com/avatar.png' };
+  try {
+    await repository.saveSettings(settings);
+    assert.equal(body.avatar_url, 'https://example.com/avatar.png');
+    await assert.rejects(repository.saveSettings({ ...settings, avatar_url: 'https://example.com/' + '가'.repeat(250) }));
+    assert.equal(calls, 1);
+  } finally { mock.mock.restore(); }
+});

@@ -10,7 +10,7 @@
 | Domain/service | Node 22.18/24에서 각각 24개 통과: 기존 18개 + 검색/프로필/계정 전환 guard |
 | Production build | npm run build 성공 |
 | PostgreSQL 16 | bootstrap → schema → 002 → 003 → 기존 RLS → Profile RLS 모두 성공 |
-| Browser | Actions [37177231216](https://github.com/kkt0830/timora/actions/runs/37177231216) 통과; CRUD/프로필/검색/모바일/입력 보존 검사 성공 |
+| Browser | Actions [37177452291](https://github.com/kkt0830/timora/actions/runs/37177452291) 통과; CRUD/프로필/검색/모바일/입력 보존 검사 성공 |
 | lint | 기존 설정 없음 |
 | 운영 적용 | v0.2 migration 및 Netlify 배포 미실행; production은 v0.1 유지 |
 

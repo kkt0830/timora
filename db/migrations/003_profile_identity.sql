@@ -1,6 +1,7 @@
 -- Additive v0.2 migration. Existing settings, owners and RLS remain unchanged.
 -- CLI migration generation was unavailable in the managed read-only home.
 begin;
+set local lock_timeout = '5s';
 alter table public.workspace_settings
   add column display_name text not null default '',
   add column avatar_url text;
