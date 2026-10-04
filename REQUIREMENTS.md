@@ -3,6 +3,14 @@
 기존 정식 v0.1 위에서 일상 사용 경험을 개선합니다. main에서 직접 개발하지 않고
 version/v0.2 → 테스트 → PR → 검토 → merge를 사용합니다.
 
+## Issue #4 후속 범위 — 2026-10-05
+
+사용자 결정: 이번에는 버그·UI만 수정. 한국어 검색 draft/composition,
+Workspace 표시의 프로필 메뉴 이동, 로고 중앙 정렬, 기존 노트 삭제 진입 개선.
+DB/RLS/삭제 API는 변경하지 않습니다. 루틴·일기·오늘의 문장은 미구현 후속 Task이며
+정책/표시/날짜 계약 확정 전 착수하지 않습니다.
+[분석·검수·명세](docs/issues/issue-4-workflow.md)를 참고하세요.
+
 ## 필수 범위
 
 - DESIGN.md의 Timora 원칙, 단일 accent #0066cc, system font, readable density,
