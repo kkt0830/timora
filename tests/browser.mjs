@@ -90,6 +90,15 @@ try {
   await page.screenshot({ path: 'test-results/home-desktop.png', fullPage: true, animations: 'disabled' });
   assert.equal(await page.locator('.stat-card').first().evaluate(el => getComputedStyle(el).borderRadius), '12px');
   assert.equal(await page.locator('.search-trigger').evaluate(el => getComputedStyle(el).borderRadius), '999px');
+  assert.equal(await page.locator('.space-switch').count(), 0);
+  assert.equal(await page.locator('.breadcrumbs').innerText(), 'Home');
+  const logo = await page.locator('.brand-symbol').evaluate(element => {
+    const range = document.createRange(); range.selectNodeContents(element);
+    const glyph = range.getBoundingClientRect(), box = element.getBoundingClientRect();
+    return { text: element.textContent, children: element.children.length, dx: Math.abs(glyph.x + glyph.width / 2 - box.x - box.width / 2), dy: Math.abs(glyph.y + glyph.height / 2 - box.y - box.height / 2) };
+  });
+  assert.equal(logo.text, 't'); assert.equal(logo.children, 0);
+  assert.ok(logo.dx < 1 && logo.dy < 3, JSON.stringify(logo));
   for (const label of ['Today', 'Tasks', 'Notes', 'Calendar', 'Projects', 'Library', 'Settings']) {
     await nav(label); await visible(page.getByRole('heading', { name: label, exact: true, level: 1 }));
   }
@@ -148,6 +157,11 @@ try {
   await nav('Settings'); await page.getByLabel('Workspace 이름', { exact: true }).fill('A workspace');
   await page.getByLabel('Appearance', { exact: true }).selectOption('dark'); await page.getByRole('button', { name: '설정 저장' }).click();
   await visible(page.getByText('설정을 저장했습니다.', { exact: true })); assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+  await page.getByRole('button', { name: '프로필 메뉴', exact: true }).click();
+  await visible(page.locator('.popover-workspace').getByText('A workspace', { exact: true }));
+  await page.locator('.popover-panel').getByRole('link', { name: 'Settings', exact: true }).click();
+  await visible(page.getByLabel('Workspace 이름', { exact: true }));
+  assert.equal(await page.locator('.popover-panel').count(), 0);
   await nav('Profile'); await page.getByLabel('닉네임', { exact: true }).fill('나의 이름');
   await page.getByRole('button', { name: '프로필 저장', exact: true }).click(); await visible(page.getByText('프로필을 저장했습니다.', { exact: true }));
   await page.reload(); await visible(page.getByRole('heading', { name: '나의 이름', exact: true }));
@@ -163,7 +177,31 @@ try {
   await visible(page.getByText('프로필을 저장했습니다.', { exact: true }));
   await page.reload(); await visible(page.getByRole('heading', { name: '나의 이름', exact: true }));
   assert.equal(await page.getByLabel('프로필 사진 URL', { exact: true }).inputValue(), '');
-  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click(); await page.getByRole('searchbox', { name: 'Workspace 검색', exact: true }).fill('bold');
+  await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click();
+  const search = page.getByRole('searchbox', { name: 'Workspace 검색', exact: true });
+  // Controlled composition events test the React/Router contract, not an OS IME.
+  await search.dispatchEvent('compositionstart');
+  for (const value of ['ㅇ', '아', '안', '안녕', '안녕하세요']) {
+    await search.fill(value);
+    assert.equal(await search.inputValue(), value);
+    assert.equal(new URL(page.url()).searchParams.get('q'), null);
+  }
+  await search.dispatchEvent('compositionend', { data: '안녕하세요' });
+  await page.waitForURL('**/search?q=*');
+  assert.equal(new URL(page.url()).searchParams.get('q'), '안녕하세요');
+  assert.equal(await search.inputValue(), '안녕하세요');
+  await page.reload(); await visible(search);
+  assert.equal(await search.inputValue(), '안녕하세요');
+  await page.goto('http://localhost:4173/search?q=second-query'); await visible(search);
+  assert.equal(await search.inputValue(), 'second-query');
+  await page.goBack(); await visible(search);
+  assert.equal(await search.inputValue(), '안녕하세요');
+  await page.goForward(); await visible(search);
+  assert.equal(await search.inputValue(), 'second-query');
+  await search.fill('');
+  await page.waitForFunction(() => !new URL(location.href).searchParams.has('q'));
+  assert.equal(await search.inputValue(), '');
+  await search.fill('bold');
   await page.getByRole('link', { name: /Note A/ }).click(); await visible(page.getByRole('dialog'));
   await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
   await page.getByRole('button', { name: '프로필 메뉴', exact: true }).focus(); await page.keyboard.press('Enter');
@@ -213,11 +251,22 @@ try {
   await page.getByRole('button', { name: '기존 계정으로 로그인', exact: true }).click();
   await page.setViewportSize({ width: 1365, height: 900 }); await page.goto('http://localhost:4173'); await login('a');
   for (const [label, title, edited] of [['Notes', 'Note A', 'Note edited'], ['Calendar', 'Event A', 'Event edited'], ['Library', 'Library A', 'Library edited']]) {
-    await nav(label); await page.getByRole('button', { name: title, exact: true }).click();
+    await nav(label); await page.getByRole('button', { name: label === 'Notes' ? `${title} 수정 / 삭제` : title, exact: true }).click();
     await page.getByRole('dialog').getByLabel('제목', { exact: true }).fill(edited);
     await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
-    await page.getByRole('button', { name: edited, exact: true }).click(); page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: edited, exact: true }).click();
+    if (label === 'Notes') {
+      page.once('dialog', dialog => dialog.dismiss());
+      await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click();
+      assert.equal(await page.getByRole('dialog').isVisible(), true);
+      assert.equal(stores.a.notes.some(note => note.title === edited), true);
+    }
+    page.once('dialog', dialog => dialog.accept());
     await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    if (label === 'Notes') {
+      await page.reload(); await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
+      assert.equal(await page.getByRole('button', { name: edited, exact: true }).count(), 0);
+    }
   }
   await nav('Projects'); await page.getByRole('button', { name: '수정', exact: true }).click();
   await page.getByRole('dialog').getByLabel('프로젝트 이름', { exact: true }).fill('Project edited'); await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();

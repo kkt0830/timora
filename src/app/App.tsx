@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { BookOpen, CalendarDays, ChevronDown, ChevronRight, FileText, FolderKanban, Home, Inbox, LayoutGrid, ListTodo, Menu, MoreHorizontal, Search, } from 'lucide-react';
+import { BookOpen, CalendarDays, FileText, FolderKanban, Home, Inbox, LayoutGrid, ListTodo, Menu, MoreHorizontal, Search, } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Avatar, Popover } from '../design/components';
 import { ProfilePage } from './ProfilePage';
@@ -35,18 +35,16 @@ function Sidebar({ close }: { close: () => void }) {
   ));
 
   return <aside className="sidebar">
-    <div className="brand"><div className="brand-symbol"><span /></div><div><strong>timora</strong><small>your personal space</small></div></div>
-    <div className="space-switch"><span className="space-avatar">W</span><span><strong>{workspaceName}</strong><small>Personal space</small></span><ChevronDown size={15} className="muted" /></div>
+    <div className="brand"><div className="brand-symbol" aria-hidden="true">t</div><div><strong>timora</strong><small>your personal space</small></div></div>
     <nav aria-label="주 메뉴"><div className="nav-label">WORKSPACE</div>{list(primary.map(item => item.path === '/inbox' ? { ...item, count: data.inbox_items.length } : item))}<div className="nav-label nav-section">ORGANIZE</div>{list(secondary)}</nav>
-    <div className="sidebar-bottom"><div className="profile"><Avatar name={data.settings.display_name || account?.email || 'Timora'} url={data.settings.avatar_url} /><span><strong>{data.settings.display_name || account?.email || 'Workspace User'}</strong><small>Personal Workspace</small></span><Popover label="프로필 메뉴" trigger={<MoreHorizontal size={18} />}>{dismiss => <><NavLink to="/profile" onClick={() => { dismiss(); close(); }}>Profile</NavLink><NavLink to="/settings" onClick={() => { dismiss(); close(); }}>Settings</NavLink><button type="button" className="danger-button" disabled={busy} onClick={() => { dismiss(); void auth.signOut(); }}>로그아웃</button></>}</Popover></div></div>
+    <div className="sidebar-bottom"><div className="profile"><Avatar name={data.settings.display_name || account?.email || 'Timora'} url={data.settings.avatar_url} /><span><strong>{data.settings.display_name || account?.email || 'Workspace User'}</strong><small>Personal Workspace</small></span><Popover label="프로필 메뉴" trigger={<MoreHorizontal size={18} />}>{dismiss => <><div className="popover-workspace"><small>Workspace</small><strong>{workspaceName}</strong></div><NavLink to="/profile" onClick={() => { dismiss(); close(); }}>Profile</NavLink><NavLink to="/settings" onClick={() => { dismiss(); close(); }}>Settings</NavLink><button type="button" className="danger-button" disabled={busy} onClick={() => { dismiss(); void auth.signOut(); }}>로그아웃</button></>}</Popover></div></div>
   </aside>;
 }
 
 function Header({ openSidebar }: { openSidebar: () => void }) {
-  const { data } = useWorkspace();
   const location = useLocation();
   const item = [...primary, ...secondary, { label: 'Settings', path: '/settings' }, { label: 'Profile', path: '/profile' }, { label: 'Search', path: '/search' }].find(v => v.path === location.pathname || (v.path === '/projects' && location.pathname.startsWith('/projects/')));
-  return <header className="topbar"><div className="breadcrumbs"><button type="button" className="mobile-menu icon-button" onClick={openSidebar} aria-label="메뉴 열기"><Menu size={21} /></button><span>{data.settings.workspace_name}</span><ChevronRight size={15} /><strong>{item?.label ?? 'Home'}</strong></div><div className="header-actions"><span className="sample-pill">v0.2</span><NavLink className="search-trigger" to="/search" aria-label="Workspace 검색"><Search size={18} /><span>검색</span></NavLink></div></header>;
+  return <header className="topbar"><div className="breadcrumbs"><button type="button" className="mobile-menu icon-button" onClick={openSidebar} aria-label="메뉴 열기"><Menu size={21} /></button><strong>{item?.label ?? 'Home'}</strong></div><div className="header-actions"><span className="sample-pill">v0.2</span><NavLink className="search-trigger" to="/search" aria-label="Workspace 검색"><Search size={18} /><span>검색</span></NavLink></div></header>;
 }
 
 function Shell() {
