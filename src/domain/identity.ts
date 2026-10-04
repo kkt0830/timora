@@ -4,5 +4,5 @@ export function displayName(value: string): string {
   return name;
 }
 export function safeAvatarUrl(value: string): string | null {
-  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && value.length <= 2048 ? url.href : null; } catch { return null; }
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && value.length <= 2048 && url.href.length <= 2048 ? url.href : null; } catch { return null; }
 }

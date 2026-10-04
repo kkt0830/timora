@@ -48,10 +48,10 @@ a {
   color: var(--accent);
   text-decoration: none;
 }
-a:hover {
+:where(a:hover) {
   text-decoration: underline;
 }
-a:not(.nav-link) {
+:where(a:not(.nav-link)) {
   border-radius: 4px;
 }
 button:focus-visible,
@@ -1058,6 +1058,11 @@ strong {
 }
 .search-input {
   border-radius: var(--pill);
+}
+.scrim:hover:not(:disabled),
+.scrim:active:not(:disabled) {
+  background: #0006;
+  transform: none;
 }
 .scrim {
   position: fixed;

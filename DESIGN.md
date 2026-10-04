@@ -44,7 +44,7 @@ controls suffice. Legacy project color is user data; new default is action blue.
 
 ## Apple reference analysis (inspiration, not Timora implementation requirements)
 
----
+```yaml
 version: alpha
 name: Apple-design-analysis
 description: A photography-first interface that turns marketing into a museum gallery. Edge-to-edge product tiles alternate light and dark canvases, framed by SF Pro Display headlines with negative letter-spacing and a single Action Blue (#0066cc) interactive color. UI chrome recedes so the product can speak — no decorative gradients, no shadows on chrome, only the one signature drop-shadow under product imagery resting on a surface.
@@ -317,7 +317,7 @@ components:
     textColor: "{colors.ink-muted-80}"
     typography: "{typography.fine-print}"
     padding: 64px
----
+```
 
 ## Overview
 

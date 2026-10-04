@@ -8,7 +8,7 @@ v0.1은 Core Workspace의 첫 정식 웹 버전입니다. 사용자의 v0.2 요�
 | --- | --- | --- |
 | Pre-v0.1 | Skeleton / 설계 | 기존 구조 보존 |
 | v0.1 | Core Workspace | 실제 Supabase/Netlify, CRUD·로그인·저장 확인 완료 |
-| v0.2 | Design & Experience | 디자인 시스템·프로필·Navigation·기본 Search; version/v0.2 검토 후보, production 미배포 |
+| v0.2 | Design & Experience | 디자인 시스템·프로필·Navigation·기본 Search; 2026-10-04 production 배포; review 수정 후속 PR |
 | v0.3 | Desktop + Local DB Foundation | 제안: shell/SQLite adapter·로컬 저장 계약부터 검증 |
 | v0.4 | GitHub Integration | 제안: 인증 토큰 서버 보관·Repository/Issue 연결 |
 | v0.5 | Relations / Advanced Search | 제안: Backlinks·Object relations·Command Palette |

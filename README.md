@@ -2,10 +2,11 @@
 
 > «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
-**v0.2 검토 후보**는 `version/v0.2`에서 개발합니다. `main`과
-https://timora-sfj2.netlify.app 의 현재 정식 production은 **v0.1**입니다.
-이 브랜치의 Commit은 production 배포를 의미하지 않습니다. PR 검토·merge와
-프로필 migration 적용 후 필요한 시점에 배포합니다.
+**현재 웹 배포: Timora v0.2 — Design & Experience.**
+https://timora-sfj2.netlify.app 에 2026-10-04 배포했고 Profile migration을 적용했습니다.
+PR #2는 main에 병합된 상태로 확인했습니다. 배포 전 추가한 리뷰 수정은
+`version/v0.2`의 후속 PR로 정리합니다. 현재 배포는 source upload이며 GitHub
+commit이 자동 production 배포를 의미하지 않습니다.
 
 ## 기능과 디자인
 
@@ -40,8 +41,8 @@ Supabase Auth Site URL/Redirect URLs에 개발/배포 주소를 등록합니다.
 
 새 DB: `db/schema.sql` 후 `db/migrations/*.sql`을 파일명 순서대로 한 번씩 적용.
 기존 v0.1 DB: **003_profile_identity.sql만 새 migration으로 적용**합니다.
-bootstrap을 재실행하거나 DB를 초기화하지 않습니다. production에는 아직 적용하지
-않았으며 PR 검토 후 v0.2 배포 전에 적용해야 합니다.
+bootstrap을 재실행하거나 DB를 초기화하지 않습니다. 현재 production에는
+003 migration을 적용했습니다. 새 환경에서는 위 순서로 적용합니다.
 
 ## Architecture
 
@@ -68,7 +69,7 @@ npm run build
 
 Netlify: `npm run build`, publish `dist`, Node 24. SPA rewrite는 netlify.toml 유지.
 두 VITE 변수를 Netlify에 등록합니다. 개발 Commit마다 production을 배포하지 않습니다.
-현재 production v0.1과 Supabase 데이터는 유지하며 v0.2 운영 배포는 별도 단계입니다.
+현재 production은 v0.2이며 기존 Supabase 사용자 데이터와 RLS는 보존했습니다.
 
 ## 범위와 제한
 

@@ -52,9 +52,10 @@ export class SupabaseRepository implements WorkspaceRepository {
     const name = settings.workspace_name.trim();
     const nickname = settings.display_name ? displayName(settings.display_name) : '';
     if (!['light', 'dark', 'system'].includes(settings.appearance)) throw new Error('Appearance를 확인해 주세요.');
-    if (settings.avatar_url && !safeAvatarUrl(settings.avatar_url)) throw new Error('프로필 사진은 2048자 이하의 HTTPS URL을 입력해 주세요.');
+    const avatar = settings.avatar_url ? safeAvatarUrl(settings.avatar_url) : null;
+    if (settings.avatar_url && (!avatar || avatar.length > 2048)) throw new Error('프로필 사진은 2048자 이하의 HTTPS URL을 입력해 주세요.');
     if (!name || name.length > 80) throw new Error('Workspace 이름은 1~80자로 입력해 주세요.');
-    const rows = await this.request<WorkspaceSettings[]>('workspace_settings?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ user_id: settings.user_id, workspace_name: name, appearance: settings.appearance, display_name: nickname, avatar_url: settings.avatar_url || null }) });
+    const rows = await this.request<WorkspaceSettings[]>('workspace_settings?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ user_id: settings.user_id, workspace_name: name, appearance: settings.appearance, display_name: nickname, avatar_url: avatar }) });
     if (!rows[0]) throw new Error('설정을 저장하지 못했습니다.');
     return rows[0];
   }
