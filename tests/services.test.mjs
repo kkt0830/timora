@@ -133,3 +133,71 @@ test('An obsolete restore cannot clear a newer login when its refresh finishes l
     assert.equal(await auth.token(), 'new-account');
   } finally { mock.mock.restore(); }
 });
+
+test('A new login does not share a previous account pending refresh', async () => {
+  const auth = new SupabaseAuth(config, storage());
+  const mock = test.mock.method(globalThis, 'fetch', async () => response(tokens('old', 0)));
+  let finish, started;
+  const ready = new Promise(resolve => { started = resolve; });
+  try {
+    await auth.signIn('a@example.com', 'fixture');
+    mock.mock.mockImplementation(url => url.includes('grant_type=refresh_token') ? new Promise(resolve => { finish = resolve; started(); }) : Promise.resolve(response(null, 204)));
+    const refresh = auth.token(); const rejected = assert.rejects(refresh);
+    await ready; await auth.signOut();
+    mock.mock.mockImplementation(async () => response({ ...tokens('account-b'), user: { id: 'user-b' } }));
+    await auth.signIn('b@example.com', 'fixture');
+    assert.equal(await auth.token(), 'account-b');
+    finish(response(tokens('obsolete'))); await rejected;
+    assert.equal(await auth.token(), 'account-b');
+  } finally { mock.mock.restore(); }
+});
+test('Signup passes a validated nickname as presentation metadata', async () => {
+  let body;
+  const auth = new SupabaseAuth(config, storage());
+  const mock = test.mock.method(globalThis, 'fetch', async (_url, init) => { body = JSON.parse(init.body); return response({ user }); });
+  try {
+    await auth.signUp('a@example.com', 'fixture', ' 이름 ');
+    assert.equal(body.data.display_name, '이름');
+    await assert.rejects(auth.signUp('a@example.com', 'fixture', 'a'.repeat(65)));
+  } finally { mock.mock.restore(); }
+});
+
+test('A refresh queued behind a Web Lock cannot refresh a newly signed-in account', async () => {
+  const auth = new SupabaseAuth(config, storage());
+  let release;
+  const lock = test.mock.method(navigator.locks, 'request', (_key, _options, run) => new Promise((resolve, reject) => {
+    release = () => Promise.resolve().then(run).then(resolve, reject);
+  }));
+  let refreshCalls = 0;
+  const mock = test.mock.method(globalThis, 'fetch', async url => {
+    if (url.includes('grant_type=refresh_token')) refreshCalls++;
+    return response(tokens('old', 0));
+  });
+  try {
+    await auth.signIn('a@example.com', 'fixture');
+    const pending = auth.token(); const rejected = assert.rejects(pending, /세션이 변경/);
+    mock.mock.mockImplementation(async () => response({ ...tokens('account-b'), user: { id: 'user-b' } }));
+    await auth.signIn('b@example.com', 'fixture');
+    await release(); await rejected;
+    assert.equal(refreshCalls, 0);
+    assert.equal(await auth.token(), 'account-b');
+  } finally { lock.mock.restore(); mock.mock.restore(); }
+});
+
+test('Profile settings retain owner and reject unsafe URLs before an HTTP write', async () => {
+  const repository = new SupabaseRepository(config, { token: async () => 'access' });
+  let body, calls = 0;
+  const mock = test.mock.method(globalThis, 'fetch', async (_url, init) => {
+    calls++; body = JSON.parse(init.body); return response([body]);
+  });
+  const settings = { user_id: user.id, workspace_name: 'My workspace', appearance: 'dark', display_name: ' 이름 ', avatar_url: 'https://example.com/avatar.png' };
+  try {
+    const saved = await repository.saveSettings(settings);
+    assert.equal(saved.display_name, '이름'); assert.equal(body.user_id, user.id);
+    assert.equal(body.avatar_url, settings.avatar_url);
+    await assert.rejects(repository.saveSettings({ ...settings, avatar_url: 'javascript:alert(1)' }));
+    assert.equal(calls, 1);
+    await repository.saveSettings({ ...settings, avatar_url: null });
+    assert.equal(body.avatar_url, null);
+  } finally { mock.mock.restore(); }
+});
