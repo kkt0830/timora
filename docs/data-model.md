@@ -41,7 +41,7 @@ user_id/updated_at, Task due_date/start_date/project_id, Event start/end/project
 - Inbox processed 대신 미분류/분류 type을 사용합니다. 이동 성공 시 원본을 삭제해 중복 처리를 막습니다.
 - Workspace 설정은 인증 user metadata에 섞지 않고 별도 소유 테이블에 저장합니다.
 
-ObjectRelation 타입은 v0.3 계약 초안으로 남겼습니다. 범용 relations 테이블, GitHub FK, Storage 메타데이터, offline tombstone/version은 이번 SQL에 포함하지 않습니다. 이후 DB 변경은 별도 SQL migration으로 남겨 기존 데이터에 적용하며 bootstrap을 재실행하지 않습니다.
+ObjectRelation 타입은 후속 버전의 계약 초안으로 남겼습니다. 범용 relations 테이블, GitHub FK, Storage 메타데이터, offline tombstone/version은 이번 SQL에 포함하지 않습니다. 이후 DB 변경은 별도 SQL migration으로 남겨 기존 데이터에 적용하며 bootstrap을 재실행하지 않습니다.
 
 ## Hosted DB 적용 — 2026-10-02
 

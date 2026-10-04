@@ -17,7 +17,7 @@ Netlify에 VITE_SUPABASE_URL과 VITE_SUPABASE_PUBLISHABLE_KEY를 전체 scope/co
 
 Auth Site URL은 production 주소, Redirect URLs는 production 주소와 http://localhost:5173 입니다(사용자가 Dashboard 등록 완료 확인). Email provider와 이메일 확인은 활성 상태입니다. 기본 SMTP는 프로젝트 조직 팀원 주소만 지원하므로 다른 이메일의 가입은 Custom SMTP를 먼저 설정합니다.
 
-현재 배포는 소스 ZIP 업로드를 통한 Netlify 원격 빌드입니다. GitHub 자동 배포 연결은 없습니다. 자동 배포가 필요하면 Netlify의 Project configuration → Build & deploy → Repository에서 kkt0830/timora와 main을 연결하고 기존 변수/build/publish 설정을 유지합니다. 이는 v0.2 앱 내 GitHub Integration과 별개인 운영 설정입니다.
+현재 배포는 소스 ZIP 업로드를 통한 Netlify 원격 빌드입니다. GitHub 자동 배포 연결은 없습니다. 자동 배포가 필요하면 Netlify의 Project configuration → Build & deploy → Repository에서 kkt0830/timora와 main을 연결하고 기존 변수/build/publish 설정을 유지합니다. 이는 향후 앱 내 GitHub Integration과 별개인 운영 설정입니다.
 
 업로드 명령의 일회성 proxy credential, .env, .netlify 상태, 테스트 결과와 dist는 커밋하지 않습니다. 이후 코드 배포 시 환경 변수 목록과 실제 bundle 설정을 확인한 뒤 로그인/저장/새로고침을 확인합니다.
 

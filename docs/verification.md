@@ -10,7 +10,7 @@
 | Domain/service | Node 22.18/24에서 각각 24개 통과: 기존 18개 + 검색/프로필/계정 전환 guard |
 | Production build | npm run build 성공 |
 | PostgreSQL 16 | bootstrap → schema → 002 → 003 → 기존 RLS → Profile RLS 모두 성공 |
-| Browser | Actions [37176788120](https://github.com/kkt0830/timora/actions/runs/37176788120) 통과; 추가 회귀 검사 최종 확인 중 |
+| Browser | Actions [37177231216](https://github.com/kkt0830/timora/actions/runs/37177231216) 통과; CRUD/프로필/검색/모바일/입력 보존 검사 성공 |
 | lint | 기존 설정 없음 |
 | 운영 적용 | v0.2 migration 및 Netlify 배포 미실행; production은 v0.1 유지 |
 
@@ -27,7 +27,9 @@
 
 실제 Supabase 가입 메일, 여러 실제 기기의 동시 편집, Safari/Firefox, 자연 만료 및
 대규모 데이터는 별도 운영 확인 대상입니다. RLS/Browser fixture 통과는 이 검사를
-대체하지 않습니다. 로컬 DB와 fixture만 사용했고 기존 production 사용자 데이터는
+대체하지 않습니다. 로컬 Chromium의 페이지 응답 중단은 성공으로 기록하지 않으며,
+위 Actions 실행에서 실제 UI의 브라우저 검사를 통과한 결과를 사용합니다.
+로컬 DB와 fixture만 사용했고 기존 production 사용자 데이터는
 변경하지 않았습니다. 배포 전 절차는 [deployment.md](deployment.md)에 기록합니다.
 
 ---

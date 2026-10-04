@@ -61,4 +61,4 @@ Preview 배포가 필요하면 그 주소도 Redirect URLs에 명시합니다. �
 
 ## 현재 서비스
 
-https://timora-sfj2.netlify.app 에 production 배포했습니다. Supabase Auth Site URL/Redirect URLs는 PC에서 등록 완료한 상태입니다. 실제 로그인·Task 저장·새로고침 유지가 사용자 확인을 통과했습니다. 검증 범위와 이메일 발송 제한은 verification.md에 기록합니다. GitHub 자동 배포가 필요하면 Netlify Project configuration의 Repository에서 `kkt0830/timora`, main을 연결합니다. 소스 업로드 방식의 현재 배포는 GitHub 자동 배포 연결을 만들지 않습니다.
+https://timora-sfj2.netlify.app 에 v0.1 production을 배포했습니다. Supabase Auth Site URL/Redirect URLs는 PC에서 등록 완료한 상태입니다. 실제 로그인·Task 저장·새로고침 유지가 사용자 확인을 통과했습니다. 검증 범위와 이메일 발송 제한은 verification.md에 기록합니다. GitHub 자동 배포가 필요하면 Netlify Project configuration의 Repository에서 `kkt0830/timora`, main을 연결합니다. 소스 업로드 방식의 현재 배포는 GitHub 자동 배포 연결을 만들지 않습니다.
