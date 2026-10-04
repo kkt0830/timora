@@ -1,6 +1,6 @@
-# UI structure — Timora v0.1
+# UI structure — Timora v0.2 (v0.1 foundation)
 
-기존 Sidebar의 Workspace/Organize 그룹, 하단 Settings, Header, 카드 레이아웃 및 디자인을 유지합니다. 샘플 날짜와 데이터를 제거하고 현재 계정의 Workspace 이름·Inbox 개수·실제 데이터를 표시합니다. 검색/알림은 비활성화 상태와 후속 버전을 명시합니다.
+기존 Sidebar의 Workspace/Organize 그룹, 하단 Profile 메뉴, Header, 화면 구조를 유지하고 DESIGN.md 기반의 색상·간격·타이포그래피를 적용합니다. 현재 계정의 Workspace 이름·Inbox 개수·실제 데이터를 표시합니다. 기본 Search를 제공하고 미구현 알림 버튼은 표시하지 않습니다.
 
 | 경로 | 화면 | 동작 |
 | --- | --- | --- |
@@ -14,6 +14,8 @@
 | `/projects/:id` | Project Workspace | Overview/Tasks/Notes/Events/Library, 연결된 항목 추가/편집 |
 | `/library` | Library | URL CRUD, 유형/프로젝트 필터, 안전한 외부 링크 |
 | `/settings` | Settings | Account/Logout, Workspace 이름, Appearance, Coming later |
+| `/profile` | Profile | 이메일 표시, 닉네임/HTTPS 사진 URL 저장·제거 |
+| `/search` | Search | 6개 Entity 텍스트 검색, Object 편집기/Project 상세 이동 |
 
 로그인하지 않은 상태에서는 URL을 유지하며 가입/로그인 화면을 표시합니다. 설정이 없으면 연결 안내를 표시하고 인증 요청을 시작하지 않습니다. 알 수 없는 경로는 Home으로 이동하며 존재하지 않는 프로젝트는 목록 복귀 링크를 제공합니다.
 
@@ -29,6 +31,20 @@
 
 ## 반응형
 
-기존 넓은 화면 246px Sidebar, 중간 화면 218px, 760px 이하 메뉴/배경 닫기, 520px 이하 단열 구조를 이어갑니다. 폼은 작은 화면에서 한 열이 되고 Modal은 viewport 높이 안에서 스크롤합니다. Calendar는 7열을 유지하고 작은 셀에는 제한된 항목만 표시하며 전체 목록은 날짜 상세 영역에서 조회합니다. 터치/키보드 입력과 focus-visible을 제공합니다.
+Desktop/Tablet은 232px Sidebar를 사용합니다. 760px 이하에서 264px Drawer와 배경 닫기를 제공하고, 520px 이하 폼/카드는 한 열로 전환합니다. 폼은 작은 화면에서 한 열이 되고 Modal은 viewport 높이 안에서 스크롤합니다. Calendar는 7열을 유지하고 작은 셀에는 제한된 항목만 표시하며 전체 목록은 날짜 상세 영역에서 조회합니다. 터치/키보드 입력과 focus-visible을 제공합니다.
 
-Android/Tablet 전용 앱은 v1.0에서 개발합니다. 현재는 모바일 브라우저에서 사용 가능한 웹 Layout입니다. 전역 Command Palette/단축키 시스템은 v0.4 범위입니다.
+Android/Tablet 전용 앱은 v1.0에서 개발합니다. 현재는 모바일 브라우저에서 사용 가능한 웹 Layout입니다. 전역 Command Palette/단축키 시스템은 후속 버전 범위입니다.
+
+## v0.2 navigation and design
+
+Sidebar user area: Avatar / display name / ⋯ → Profile, Settings, Logout.
+Top-level Settings entry is removed, /settings remains. New /profile edits display
+name/HTTPS avatar; /search finds all six object types with project/context metadata.
+Results route to existing entity editors via ?object=UUID or Project detail; only
+objects in the loaded user's dataset can open. Unknown/stale object IDs open no editor.
+
+DESIGN.md Timora section overrides Apple marketing patterns. tokens.css supports
+light/dark/system. Shared native fields, Button/IconButton, Popover, Avatar and Dialog
+use 44px actions, focus-visible and Escape. Mobile drawer contains focus and makes
+content inert. Error Retry remains; Header Refresh is removed. All nine original
+features retain CRUD, filters, Project context and readable empty/loading/error states.

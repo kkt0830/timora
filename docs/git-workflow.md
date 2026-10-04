@@ -18,7 +18,7 @@ main
   → main merge
 ```
 
-예: `version/v0.2`에서 `feature/github-auth`, `feature/github-project`, `feature/github-issues`로 나눌 수 있습니다. 버전별 범위와 실제 검증 결과를 기록하며, 미완성 기능을 작동하는 UI로 표시하지 않습니다.
+현재 v0.2의 범위는 Design & Experience이며 GitHub Integration은 후속 버전입니다. 예: `version/v0.2`에서 `feature/v0.2-design-system`, `feature/v0.2-profile`, `feature/v0.2-search`로 나눌 수 있습니다. 버전별 범위와 실제 검증 결과를 기록하며, 미완성 기능을 작동하는 UI로 표시하지 않습니다.
 
 ## Version PR 본문
 

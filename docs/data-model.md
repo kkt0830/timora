@@ -1,4 +1,4 @@
-# Data model — Timora v0.1
+# Data model — Timora v0.2 (v0.1 foundation)
 
 실행 가능한 SQL의 기준은 `db/schema.sql` 및 파일명 순서대로 적용하는 `db/migrations/*.sql`, TypeScript 계약은 `src/domain/models.ts`입니다. `auth.users`는 Supabase Auth가 관리합니다. 사용자당 하나의 개인 Workspace이며 공유 공간은 없습니다.
 
@@ -46,3 +46,19 @@ ObjectRelation 타입은 v0.3 계약 초안으로 남겼습니다. 범용 relati
 ## Hosted DB 적용 — 2026-10-02
 
 서울 리전 Timora 프로젝트에 `timora_v01_core`, `timora_v01_project_foreign_key_indexes` migration을 적용했습니다. Supabase Advisor가 복합 FK의 컬럼 순서와 같은 인덱스를 요구하여 `(project_id, user_id)` 인덱스 4개를 추가했습니다. 기존 `(user_id, project_id)` 조회 인덱스는 유지합니다. 보안 지적과 누락된 FK 인덱스 지적은 없습니다. 새 빈 DB의 unused_index INFO는 삭제 근거로 사용하지 않습니다.
+
+## v0.2 profile migration
+
+003_profile_identity.sql adds display_name text NOT NULL DEFAULT '' (up to 64 chars)
+and nullable avatar_url text (HTTPS, up to 2048 chars) to workspace_settings.
+Existing rows and owner_access USING/WITH CHECK policies remain. Names are nonunique
+presentation values. New signup metadata is a fallback until settings are saved.
+No Storage bucket or uploaded assets are created. No additional index is needed for
+a single owner-keyed settings row.
+
+Apply once using migration history. It intentionally fails duplicate execution,
+preventing partial schema drift. It is additive and old v0.1 clients tolerate it.
+Rollback: return the UI to v0.1, retain the extra columns; dropping them destroys profile
+values and is not part of routine rollback. CLI generation was attempted but the managed
+home was read-only, so the repository's sequential SQL convention is retained.
+Production migration is pending PR review; no production reset/data removal occurred.

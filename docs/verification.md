@@ -1,3 +1,37 @@
+# Verification — Timora v0.2 Release Candidate
+
+2026-10-04: v0.1 기능을 유지한 Design & Experience 변경을 검증합니다.
+아래 v0.1 production 실적은 이전 버전의 기록이며 v0.2 배포 성공을 의미하지 않습니다.
+
+| 검사 | v0.2 결과 |
+| --- | --- |
+| 의존성 설치 | npm ci 성공; 추가 런타임 라이브러리 없음 |
+| TypeScript | npm run typecheck 성공 |
+| Domain/service | Node 22.18/24에서 각각 24개 통과: 기존 18개 + 검색/프로필/계정 전환 guard |
+| Production build | npm run build 성공 |
+| PostgreSQL 16 | bootstrap → schema → 002 → 003 → 기존 RLS → Profile RLS 모두 성공 |
+| Browser | Actions [37176788120](https://github.com/kkt0830/timora/actions/runs/37176788120) 통과; 추가 회귀 검사 최종 확인 중 |
+| lint | 기존 설정 없음 |
+| 운영 적용 | v0.2 migration 및 Netlify 배포 미실행; production은 v0.1 유지 |
+
+## v0.2 추가 검증 범위
+
+- 검색: NFKC/대소문자/복수 검색어, 내용·URL·Project context, 빈 결과, 다른 계정 dataset.
+- 프로필: 닉네임 길이/공백, HTTPS URL 및 unsafe scheme/userinfo 차단, URL 제거, owner 유지.
+- 인증: 이전 계정의 진행 중 refresh 및 대기 중 Web Lock이 새 계정을 변경하지 않음.
+- DB: 기존 7개 테이블 CRUD/RLS, 다른 사용자 Profile 조회·수정·위조 owner 차단, URL 제약.
+- 브라우저 fixture: 기존 CRUD/Settings/Auth/Error/Loading/Markdown, Profile 메뉴와 Escape,
+  nickname/사진 URL 저장·새로고침·제거·실패 fallback, Search에서 Note 열기,
+  다른 계정 UUID로 편집기 열기 차단, 1365px Desktop / 834px Tablet / 390px Mobile. 추가로 320px Calendar touch target/문서 폭과
+  background refresh 실패 시 Note draft 보존을 검사합니다.
+
+실제 Supabase 가입 메일, 여러 실제 기기의 동시 편집, Safari/Firefox, 자연 만료 및
+대규모 데이터는 별도 운영 확인 대상입니다. RLS/Browser fixture 통과는 이 검사를
+대체하지 않습니다. 로컬 DB와 fixture만 사용했고 기존 production 사용자 데이터는
+변경하지 않았습니다. 배포 전 절차는 [deployment.md](deployment.md)에 기록합니다.
+
+---
+
 # Verification — Timora v0.1
 
 2026-10-02 현재 코드 검사, 실제 Supabase 적용, Netlify production 배포와 사용자 로그인·저장 확인을 완료했습니다. 자동 검사와 수동 확인의 범위를 구분합니다.
