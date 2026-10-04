@@ -61,4 +61,13 @@ preventing partial schema drift. It is additive and old v0.1 clients tolerate it
 Rollback: return the UI to v0.1, retain the extra columns; dropping them destroys profile
 values and is not part of routine rollback. CLI generation was attempted but the managed
 home was read-only, so the repository's sequential SQL convention is retained.
-Production migration is pending PR review; no production reset/data removal occurred.
+Production migration was applied on 2026-10-04; no production reset/data removal occurred.
+
+## Hosted v0.2 rollout
+
+2026-10-04 `003_profile_identity.sql`을 `timora_v02_profile_identity`로 적용했습니다.
+기존 workspace_settings 1행, Tasks 3행, Projects 2행 및 다른 Entity 개수가
+유지됐습니다. 소유권 RLS와 2개 profile column을 확인하고 core/Profile RLS
+fixtures를 모두 rollback했습니다. 작은 settings table의 현재 migration은
+두 CHECK를 즉시 검증합니다. lock_timeout 5초를 두며, 큰 테이블에 배포할
+경우 NOT VALID 추가와 별도 검증 transaction으로 분리하는 개선을 검토합니다.

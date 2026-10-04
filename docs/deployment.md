@@ -1,4 +1,4 @@
-# Deployment — Timora v0.1
+# Deployment — Timora
 
 2026-10-02 production 배포 및 전용 Supabase 연결을 완료했습니다.
 
@@ -21,20 +21,23 @@ Auth Site URL은 production 주소, Redirect URLs는 production 주소와 http:/
 
 업로드 명령의 일회성 proxy credential, .env, .netlify 상태, 테스트 결과와 dist는 커밋하지 않습니다. 이후 코드 배포 시 환경 변수 목록과 실제 bundle 설정을 확인한 뒤 로그인/저장/새로고침을 확인합니다.
 
-## v0.2 Release Candidate — 2026-10-04
+## v0.2 production — 2026-10-04
 
-`version/v0.2` 변경은 PR 검토 대상으로 준비합니다. 위 production은 v0.1이며
-v0.2 코드나 003 migration을 운영에 적용하지 않았습니다. commit/PR 작성은
-production 배포와 별개입니다. 검토 후 다음 순서로 반영합니다.
+사용자의 운영 배포 요청에 따라 기존 `timora-sfj2`에 v0.2를 배포했습니다.
 
-1. 기존 DB backup/restore 정책 확인 후 SQL Editor에서
-   `db/migrations/003_profile_identity.sql` 전체를 한 번 실행합니다.
-   기존 Entity/소유권 정책은 유지되며 두 Profile 필드만 추가됩니다.
-2. 승인된 PR을 main에 merge합니다.
-3. 기존 Netlify 환경 변수를 유지한 채 `npm run build` / `dist`로 release 배포합니다.
-   매 commit마다 production을 배포하지 않습니다.
-4. 기존 계정 로그인, Profile nickname/사진 저장·새로고침, Search 결과 이동,
-   Settings/Logout, 모바일 메뉴 및 기존 CRUD를 확인합니다.
+- Netlify deploy: `6ac1de671eb2529406185e33`, state ready.
+- Source commit: `d71f30c4c35c7b6761df5728bdbfd41e3d602b60` (`version/v0.2`).
+- Deploy URL: https://6ac1de671eb2529406185e33--timora-sfj2.netlify.app
+- Production URL: https://timora-sfj2.netlify.app
+- Supabase migration: `timora_v02_profile_identity` / `003_profile_identity.sql` 적용.
+- 기존 데이터 개수 유지 및 Hosted core/Profile RLS transaction rollback 검사 성공.
+- Production bundle의 v0.2 표기·Profile/Search·Supabase URL/public key 포함 확인.
+- /profile, /search, /tasks, /notes, /calendar SPA 직접 접근 HTTPS 200 확인.
+
+PR #2는 사용자 측에서 이미 merge된 상태였습니다. 배포 전 review 수정은
+version branch의 후속 PR로 main에 반영할 수 있도록 남깁니다. GitHub 자동
+배포 연결은 만들지 않았으며, 이후 commit만으로 production이 바뀌지 않습니다.
+실제 계정의 Profile 저장·새로고침 smoke test는 사용자 확인이 남아 있습니다.
 
 코드를 v0.1로 rollback해도 추가 column은 남겨둡니다. 이를 삭제하면 프로필
 데이터가 사라지므로 column drop은 일반 rollback 절차에 포함하지 않습니다.

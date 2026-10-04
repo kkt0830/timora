@@ -7,12 +7,12 @@
 | --- | --- |
 | 의존성 설치 | npm ci 성공; 추가 런타임 라이브러리 없음 |
 | TypeScript | npm run typecheck 성공 |
-| Domain/service | Node 22.18/24에서 각각 24개 통과: 기존 18개 + 검색/프로필/계정 전환 guard |
+| Domain/service | Node 22.18/24에서 각각 25개 통과: 검색/프로필/계정 전환 guard/URL 정규화 |
 | Production build | npm run build 성공 |
 | PostgreSQL 16 | bootstrap → schema → 002 → 003 → 기존 RLS → Profile RLS 모두 성공 |
-| Browser | Actions [37177452291](https://github.com/kkt0830/timora/actions/runs/37177452291) 통과; CRUD/프로필/검색/모바일/입력 보존 검사 성공 |
+| Browser | Actions [37178620347](https://github.com/kkt0830/timora/actions/runs/37178620347) 통과; CRUD/프로필/검색/모바일/입력 보존 검사 성공 |
 | lint | 기존 설정 없음 |
-| 운영 적용 | v0.2 migration 및 Netlify 배포 미실행; production은 v0.1 유지 |
+| 운영 적용 | v0.2 Profile migration/Netlify ready; URL·bundle·Hosted RLS 확인 |
 
 ## v0.2 추가 검증 범위
 
@@ -82,3 +82,16 @@ Hosted SQL 검사는 실제 auth.uid()와 PostgreSQL RLS 엔진을 사용합니�
 - 오프라인 편집, 파일 업로드, 범용 Relations, GitHub Integration, Desktop/Mobile은 후속 버전 범위입니다.
 
 연결 대상은 [deployment.md](deployment.md), 개발 절차는 [development.md](development.md)에 기록합니다.
+
+## v0.2 production rollout — 2026-10-04
+
+배포 전 CodeRabbit 지적 중 avatar URL 정규화/encoded length, 링크 radius,
+Drawer scrim hover/active 및 문서 표시를 수정했습니다. 추가 회귀를 포함한
+CI 37178620347의 web/database가 통과했습니다. Hosted SQL core/Profile
+검사도 성공했고 fixture는 rollback했습니다. Anonymous Profile REST는
+401, Auth settings는 200이며 실제 bundle에 연결 설정이 포함돼 있습니다.
+
+Supabase security advisor에는 leaked password protection disabled 경고가
+1건 있습니다. 프로필 migration의 RLS 누락 경고는 없으며, 해당 Auth 보호
+설정은 이번 배포에서 변경하지 않았습니다. 실제 사용자 Profile 저장·
+새로고침, 실제 여러 탭 및 Safari/Firefox 확인은 추가 검증 대상입니다.
