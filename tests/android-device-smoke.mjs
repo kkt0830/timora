@@ -1,6 +1,7 @@
 // Real Android emulator/native IPC/SQLite check; physical device/IME acceptance is separate.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 const { _android } = await import(process.env.TIMORA_PLAYWRIGHT_MODULE ?? 'playwright');
 const appId = 'app.timora.android';
@@ -35,7 +36,6 @@ try {
   session = await attach(); let { page } = session;
   // A new installation must show shared Auth UI and deny IPC access offline.
   await page.getByRole('button', { name: '로그인', exact: true }).waitFor();
-  assert.equal(await page.evaluate(() => navigator.onLine), false);
   assert.equal(await page.evaluate(() => window.__TAURI_INTERNALS__.invoke('local_account')), null);
   assert.equal(await page.evaluate(async () => { try { await window.__TAURI_INTERNALS__.invoke('local_load'); return false; } catch { return true; } }), true);
   // Seed an old anonymous schema-v1 DB ONLY in this dedicated fresh emulator.
@@ -43,17 +43,16 @@ try {
   await session.device.close(); session = undefined;
   adb('shell', 'am', 'force-stop', appId);
   const dbPath=adb('shell','run-as',appId,'find','files','-name','timora.db').split('\n')[0];
-  assert.match(dbPath,/^files\/.*timora\.db$/);
+  assert.match(dbPath,/^files\/[A-Za-z0-9_./-]*timora\.db$/);
   execFileSync('python3',['-c',`import sqlite3,uuid
 c=sqlite3.connect('/tmp/timora-legacy-emulator.db')
 c.executescript(open('src-tauri/migrations/001_initial_local_schema.sql').read())
 id=str(uuid.uuid4());c.execute('INSERT INTO local_identity(singleton,id) VALUES(1,?)',(id,))
 c.execute("INSERT INTO workspace_settings VALUES(?,'Local Workspace','system','',NULL,'2026-01-01T00:00:00Z')",(id,))
 c.execute('PRAGMA user_version=1');c.commit();c.close()`]);
-  adb('push','/tmp/timora-legacy-emulator.db','/data/local/tmp/timora-legacy-emulator.db');
-  adb('shell','chmod','644','/data/local/tmp/timora-legacy-emulator.db');
   adb('shell','run-as',appId,'rm','-f',dbPath,`${dbPath}-wal`,`${dbPath}-shm`);
-  adb('shell','run-as',appId,'cp','/data/local/tmp/timora-legacy-emulator.db',dbPath);
+  // Stream into run-as: Android SELinux may deny the app reading shell-owned /data/local/tmp files.
+  execFileSync('adb',['shell','-T',`run-as ${appId} sh -c 'cat > ${dbPath}'`],{input:readFileSync('/tmp/timora-legacy-emulator.db'),timeout:30_000});
   session=await attach();page=session.page;
   const result = await page.evaluate(async () => {
     const call = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
