@@ -1,10 +1,10 @@
 import { SupabaseAuth } from '../data/supabase-auth';
 import { SupabaseRepository } from '../data/supabase-repository';
 import { desktopInvoke, LocalAuth, LocalWorkspaceRepository } from '../data/local-repository';
-export const isDesktop = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+import { isNative } from './runtime';
 
 export function createBackend() {
-  if (isDesktop) return { error: '', auth: new LocalAuth(desktopInvoke), repository: new LocalWorkspaceRepository(desktopInvoke) };
+  if (isNative) return { error: '', auth: new LocalAuth(desktopInvoke), repository: new LocalWorkspaceRepository(desktopInvoke) };
   const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '');
   const publishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '').trim();
   if (!url || !publishableKey) return { error: 'Supabase 연결 설정이 필요합니다. PC에서 .env를 설정한 뒤 다시 실행해 주세요.', auth: null, repository: null };

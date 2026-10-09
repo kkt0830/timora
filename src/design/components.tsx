@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { safeAvatarUrl } from '../domain/identity';
+import { isAndroid } from '../services/runtime';
+import { registerBackHandler } from '../services/native-back';
 export function Button({ variant = 'secondary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' }) {
   return <button type="button" {...props} className={`${variant === 'primary' ? 'primary-button' : variant === 'danger' ? 'danger-button' : ''} ${className}`} />;
 }
@@ -13,6 +15,10 @@ export function Avatar({ name, url }: { name: string; url?: string | null }) {
 export function Popover({ label, trigger, children }: { label: string; trigger: ReactNode; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false); const root = useRef<HTMLDivElement>(null); const button = useRef<HTMLButtonElement>(null);
   const close = () => { setOpen(false); button.current?.focus(); };
+  useEffect(() => {
+    if (!isAndroid || !open) return;
+    return registerBackHandler(75, () => { setOpen(false); button.current?.focus(); return true; });
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     root.current?.querySelector<HTMLElement>('.popover-panel a, .popover-panel button')?.focus();
