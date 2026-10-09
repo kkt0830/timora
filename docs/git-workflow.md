@@ -36,3 +36,10 @@ main
 - 다음 버전
 
 예: Calendar 날짜가 하루 전으로 표시된 문제의 원인이 date를 UTC timestamp로 변환한 것이라면, date-only 필드를 보존하도록 바꾼 방식과 시간대별 검증을 함께 기록합니다. 본문을 단순히 “v0.2 완료”로 작성하지 않습니다.
+
+## v0.3 검증 후보
+
+`version/v0.3`에서 Desktop SQLite/명시적 Cloud import/Task groups를 기능별 commit으로
+분리합니다. PR은 실제 Windows 오프라인 재실행·IME 수동 합격까지 Draft 상태로 유지합니다.
+Windows build artifact와 자동 검사, 미검증 항목을 PR에 명시합니다. 임의 main merge 또는
+개발 commit별 Netlify production 재배포를 하지 않습니다.

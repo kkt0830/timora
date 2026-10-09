@@ -1,0 +1,20 @@
+-- Local schema v1. Executed inside one migration transaction; never resets a DB.
+CREATE TABLE local_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), id TEXT NOT NULL UNIQUE, cloud_user_id TEXT, imported_at TEXT);
+CREATE TABLE projects (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, remote_updated_at TEXT, sync_state TEXT NOT NULL DEFAULT 'local' CHECK(sync_state IN ('local','imported','modified')), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 300), description TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('active','paused','completed')), color TEXT NOT NULL);
+CREATE INDEX projects_updated ON projects(updated_at DESC);
+CREATE TABLE tasks (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, remote_updated_at TEXT, sync_state TEXT NOT NULL DEFAULT 'local' CHECK(sync_state IN ('local','imported','modified')), title TEXT NOT NULL CHECK(length(trim(title)) BETWEEN 1 AND 300), description TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('todo','in_progress','done')), priority TEXT NOT NULL CHECK(priority IN ('low','medium','high')), start_date TEXT, due_date TEXT, project_id TEXT REFERENCES projects(id) ON DELETE SET NULL, CHECK(start_date IS NULL OR due_date IS NULL OR start_date <= due_date));
+CREATE INDEX tasks_updated ON tasks(updated_at DESC);
+CREATE INDEX tasks_project ON tasks(project_id);
+CREATE TABLE notes (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, remote_updated_at TEXT, sync_state TEXT NOT NULL DEFAULT 'local' CHECK(sync_state IN ('local','imported','modified')), title TEXT NOT NULL CHECK(length(trim(title)) BETWEEN 1 AND 300), content TEXT NOT NULL CHECK(length(content)<=1000000), project_id TEXT REFERENCES projects(id) ON DELETE SET NULL);
+CREATE INDEX notes_updated ON notes(updated_at DESC);
+CREATE INDEX notes_project ON notes(project_id);
+CREATE TABLE events (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, remote_updated_at TEXT, sync_state TEXT NOT NULL DEFAULT 'local' CHECK(sync_state IN ('local','imported','modified')), title TEXT NOT NULL CHECK(length(trim(title)) BETWEEN 1 AND 300), description TEXT NOT NULL, start_at TEXT NOT NULL, end_at TEXT NOT NULL, project_id TEXT REFERENCES projects(id) ON DELETE SET NULL);
+CREATE INDEX events_updated ON events(updated_at DESC);
+CREATE INDEX events_project ON events(project_id);
+CREATE TABLE library_items (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, remote_updated_at TEXT, sync_state TEXT NOT NULL DEFAULT 'local' CHECK(sync_state IN ('local','imported','modified')), title TEXT NOT NULL CHECK(length(trim(title)) BETWEEN 1 AND 300), description TEXT NOT NULL, url TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('website','article','github','video','pdf','file','other')), project_id TEXT REFERENCES projects(id) ON DELETE SET NULL);
+CREATE INDEX library_items_updated ON library_items(updated_at DESC);
+CREATE INDEX library_items_project ON library_items(project_id);
+CREATE TABLE inbox_items (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, remote_updated_at TEXT, sync_state TEXT NOT NULL DEFAULT 'local' CHECK(sync_state IN ('local','imported','modified')), content TEXT NOT NULL CHECK(length(trim(content)) BETWEEN 1 AND 20000), type TEXT NOT NULL CHECK(type IN ('unclassified','task','note','event','project','resource')));
+CREATE INDEX inbox_items_updated ON inbox_items(updated_at DESC);
+CREATE TABLE workspace_settings (user_id TEXT PRIMARY KEY, workspace_name TEXT NOT NULL CHECK(length(trim(workspace_name)) BETWEEN 1 AND 80), appearance TEXT NOT NULL CHECK(appearance IN ('light','dark','system')), display_name TEXT NOT NULL CHECK(length(display_name)<=64), avatar_url TEXT, updated_at TEXT NOT NULL);
+CREATE TABLE tombstones (entity_table TEXT NOT NULL, id TEXT NOT NULL, remote_updated_at TEXT NOT NULL, deleted_at TEXT NOT NULL, PRIMARY KEY(entity_table,id));

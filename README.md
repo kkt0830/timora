@@ -1,59 +1,79 @@
-# Timora v0.2 — Design & Experience
+# Timora v0.3 — Desktop & Offline Foundation
 
 > «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
-**현재 웹 배포: Timora v0.2 — Design & Experience.**
-https://timora-sfj2.netlify.app 에 2026-10-04 배포했고 Profile migration을 적용했습니다.
-PR #2와 배포 전 리뷰 수정을 담은 PR #3은 main에 병합됐습니다.
-Issue #4의 추가 버그·UI 수정은 `fix/issue-4-v02`의 검토 후보이며 운영 배포와
-구분합니다. 현재 배포는 source upload이며 GitHub
-commit이 자동 production 배포를 의미하지 않습니다.
+**현재 소스: v0.3 검증 후보 (`version/v0.3`).** 기존 v0.2 React UI 위에
+Windows Desktop, SQLite 로컬 저장, 명시적 Cloud 가져오기와 Task 기간 그룹을 추가했습니다.
+실제 Windows에서 Wi-Fi 차단 → CRUD → 앱 완전 종료 → 재실행 후 데이터 유지 및
+한국어 IME 확인을 마쳐야 정식 v0.3 완료로 판정합니다.
+[합격 기록](docs/manual-acceptance-v03.md)에 현재 미검증 항목을 표시합니다.
 
-## 기능과 디자인
+**운영 Web: v0.2**, https://timora-sfj2.netlify.app . 이번 개발에서 Netlify production을
+재배포하거나 기존 Supabase DB·RLS·사용자 데이터를 변경하지 않았습니다.
+Issue #4의 버그/UI 수정은 PR #6으로 main에 병합됐습니다. GitHub commit과
+Netlify source-upload production 배포는 별개입니다.
 
-v0.1의 9개 화면, Auth, 사용자별 RLS, 모든 Entity CRUD, Inbox→Task/Note,
-Markdown, Month Calendar 및 Project 상세를 보존합니다.
+## 기능
 
-- Apple-inspired 단일 blue accent, neutral surface, hairline, 공유 token/control.
-- Home은 진행도·다음 일정·최근 프로젝트/노트·Inbox·다가오는 마감에 집중.
-- Sidebar 사용자 메뉴 → Profile / Settings / Logout. 모바일 drawer focus 관리.
-- 가입 닉네임, 기존 계정의 프로필 편집, 이메일 표시, HTTPS avatar URL 변경/제거 및 실패 시 initials.
-- Tasks/Notes/Projects/Library/Inbox/Events 텍스트 검색, 본문·프로젝트·URL 검색과 결과 Object 직접 열기.
-- Issue #4 검토 후보: 검색 IME 조합 중 URL 갱신 방지, Workspace 이름을 프로필 메뉴로
-  이동, 로고 중앙 정렬, 노트 목록의 `수정 / 삭제` 진입 표시.
-- 저장 결과로 즉시 상태 갱신. window focus/online 시 재조회. 상시 Refresh 제거, 오류 Retry 유지.
-- Light/Dark/System, 키보드 focus/Escape, 44px 입력·Action target, Desktop/Tablet/Mobile layout.
-
-[DESIGN.md](DESIGN.md)의 Timora 섹션이 UI Source of Truth입니다. Apple 분석의
-marketing hero/photography/극단적 여백은 적용하지 않습니다.
+- Home / Today / Inbox / Tasks / Notes / Calendar / Projects / Library / Settings,
+  Profile, Search와 기존 DESIGN.md 디자인을 공유합니다.
+- Desktop: Cloud 로그인·환경 변수 없이 로컬 Workspace 시작. 6개 Entity CRUD,
+  Task 완료/우선순위/날짜/Project 연결, Markdown, Month Calendar, Project 상세,
+  Inbox → Task/Note, 검색과 설정 저장을 SQLite로 처리합니다.
+- Tasks: 기한 지남 / 오늘 / 이번 주 / 이번 달 / 나중에 / 장기 / 일정 없음,
+  과거 완료 기록 그룹. 개수·접기·기간 필터·오늘/내일/주/월 날짜 프리셋,
+  시작~마감 범위와 남은 일수·장기 개월/년 표시. Issue #5 구현 대상입니다.
+- Desktop Cloud 가져오기: 로그인 → 항목 개수 미리보기 → 확인 → 빈 로컬 DB에
+  한 번 가져오기. UUID·관계·원문·날짜·시각 보존. 실패 시 전체 rollback.
+  Cloud에는 읽기만 수행하며 반복 가져오기·기존 로컬 덮어쓰기를 거부합니다.
+- Web: 기존 Supabase Auth/PostgreSQL/RLS 저장. 웹 자체의 오프라인 편집은 지원하지 않습니다.
+- Desktop 외부 HTTP(S) 자료/Markdown 링크는 기본 브라우저로 엽니다.
 
 ## 실행
 
-Node 22.18 이상(권장 24), React 19 / TypeScript / Vite 6 / Router 7 / Lucide,
-Supabase Auth/PostgreSQL. 새 런타임 dependency나 SQLite를 추가하지 않았습니다.
+Node 22.18 이상(권장 24), React 19, TypeScript, Vite 6, Router 7, Lucide.
+Desktop은 Tauri 2 + Rust + bundled SQLite(`rusqlite`)를 사용합니다.
 
 ```bash
 npm ci
 ```
 
-`.env.example`을 `.env`로 복사하고 `VITE_SUPABASE_URL`,
-`VITE_SUPABASE_PUBLISHABLE_KEY`를 설정한 뒤 `npm run dev`로 실행합니다.
-이 변수는 브라우저 공개 설정입니다. service_role/secret/DB password는 넣지 않습니다.
-Supabase Auth Site URL/Redirect URLs에 개발/배포 주소를 등록합니다.
-현재 기본 SMTP는 팀원 이메일만 지원하며 일반 가입에는 Custom SMTP가 필요합니다.
+**Windows Desktop**: [Tauri 공식 사전 조건](https://v2.tauri.app/start/prerequisites/)에
+따라 Rust MSVC, Visual Studio C++ Build Tools 및 WebView2를 설치합니다.
+Cloud 설정 없이 실행할 수 있습니다.
 
-새 DB: `db/schema.sql` 후 `db/migrations/*.sql`을 파일명 순서대로 한 번씩 적용.
-기존 v0.1 DB: **003_profile_identity.sql만 새 migration으로 적용**합니다.
-bootstrap을 재실행하거나 DB를 초기화하지 않습니다. 현재 production에는
-003 migration을 적용했습니다. 새 환경에서는 위 순서로 적용합니다.
+```bash
+npm run tauri dev
+npm run desktop:build
+```
 
-## Architecture
+Windows 산출물: `src-tauri/target/release/timora-desktop.exe`,
+`src-tauri/target/release/bundle/nsis/*-setup.exe`.
+[Desktop Actions](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)의
+성공한 실행에서도 `timora-v0.3-windows-x64` artifact를 받습니다.
+NSIS installer에 WebView2 offline installer를 포함합니다.
+[설치·DB 위치·검증](docs/desktop.md)을 참고하세요.
 
-UI → domain / provider → AuthService / WorkspaceRepository → Supabase adapter.
-검색은 현재 사용자의 이미 로드된 데이터에서 실행합니다. 프로필은 RLS가 적용된
-workspace_settings에 저장합니다. 가입 metadata의 이름은 표시용이며 권한 판단에
-사용하지 않습니다. Adapter 경계는 Desktop/Local DB로 확장할 수 있으며 오프라인
-저장·동기화를 이미 지원한다고 주장하지 않습니다.
+**Web**: `.env.example`을 `.env`로 복사하고 `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_PUBLISHABLE_KEY`를 설정한 뒤 `npm run dev`.
+변수는 공개 설정이며 secret/service_role/DB password를 넣지 않습니다.
+Auth Site URL/Redirect URLs 설정과 Custom SMTP 제한은 [개발 문서](docs/development.md)에 있습니다.
+새 Cloud DB는 `db/schema.sql` 후 `db/migrations/*.sql`을 순서대로 한 번 적용합니다.
+기존 Timora DB에는 v0.3 remote migration을 적용할 필요가 없습니다.
+
+## Architecture 및 저장
+
+공유 UI → Provider / domain → `AuthService` / `WorkspaceRepository`.
+Web은 Supabase adapter, Desktop은 Local adapter → Tauri IPC → Rust → SQLite입니다.
+UI에서 SQL을 실행하지 않습니다. Desktop은 native 쓰기가 성공한 후 UI 상태를 갱신합니다.
+
+로컬 DB는 앱 데이터 디렉터리의 `timora.db`에 보관하며
+`PRAGMA user_version=1`과 트랜잭션 migration을 사용합니다.
+손상·migration 실패·더 새로운 schema를 자동 초기화하지 않습니다.
+로컬 UUID와 Cloud 계정은 분리됩니다. 로컬 DB는 암호화되지 않으며 OS 계정/디스크 보호에
+의존합니다. 다른 PC·Web으로의 자동 동기화·백업은 없습니다.
+[architecture](docs/architecture.md), [data model](docs/data-model.md),
+[offline 정책](docs/offline.md)을 참고하세요.
 
 ## 검증
 
@@ -61,34 +81,27 @@ workspace_settings에 저장합니다. 가입 metadata의 이름은 표시용이
 npm run typecheck
 npm test
 npm run build
+npm run test:local
 ```
 
-브라우저/DB 검사는 [development](docs/development.md), 실제 결과와 한계는
-[verification](docs/verification.md), migration 계약은 [data model](docs/data-model.md)에 기록합니다.
-별도 lint는 없습니다. Browser HTTP fixture와 Postgres RLS는 실제 SMTP·두 실제
-계정 JWT·실제 여러 탭 갱신 검증을 대체하지 않습니다.
+`test:local`에는 Rust가 필요합니다. 별도 lint 설정은 없으며 TypeScript와
+`cargo fmt --check`를 사용합니다. 실제 SQLite 파일 테스트 8개, Node 테스트 32개,
+Web 브라우저 회귀 검사를 통과했습니다. Windows exe/NSIS CI도 통과했습니다. [설치 파일](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)을 받을 수 있습니다. 수동 결과와 검사 범위는
+[verification](docs/verification.md)에 기록합니다. 브라우저 fixture나 SQLite 단위 검사는
+실제 Windows Desktop 재실행·OS IME·운영 Supabase 계정 확인을 대체하지 않습니다.
 
-## 배포
+## 배포 및 다음 버전
 
-Netlify: `npm run build`, publish `dist`, Node 24. SPA rewrite는 netlify.toml 유지.
-두 VITE 변수를 Netlify에 등록합니다. 개발 Commit마다 production을 배포하지 않습니다.
-현재 production은 v0.2이며 기존 Supabase 사용자 데이터와 RLS는 보존했습니다.
+Netlify: `npm run build`, publish `dist`, Node 24, SPA fallback 유지.
+두 VITE 변수를 Netlify Environment Variables에 등록합니다. Desktop은 별도 Windows
+artifact로 배포하며 Netlify에 SQLite를 저장하지 않습니다. 개발 commit마다 production을
+배포하지 않습니다.
 
-## 범위와 제한
-
-Avatar는 **HTTPS URL 방식**이며 파일 업로드/Storage/quota/파일 삭제 기능은 없습니다.
-외부 이미지 서버에 요청이 전달되고 referrer는 보내지 않습니다. MIME/크기 검증,
-owner-protected Storage lifecycle은 업로드를 도입할 후속 버전에서 구현합니다.
-Notes/Inbox 이미지·그림판, Project cover, 고급 검색/Command Palette, GitHub Integration,
-Relations/Backlinks, Desktop/Local DB, Sync/Offline은 이번 범위가 아닙니다.
-비밀번호 변경/재설정·계정 삭제 UI, 다중 Workspace도 미구현입니다.
-
-Issue #1은 UX/닉네임/검색/Avatar 부분을 반영하지만 첨부·그림판 요청이 남아 있어
-전체 해결로 close하지 않습니다. [Roadmap](ROADMAP.md), [requirements](REQUIREMENTS.md),
+v0.4는 Cloud Sync / Conflict Resolution, v0.5는 GitHub Integration,
+v0.6은 Relations입니다. 루틴·일기·오늘의 한 문장, 파일 첨부·Drawing·Project cover,
+다중 Workspace·Password recovery·계정 삭제 UI는 이번 범위에 없습니다.
+[Roadmap](ROADMAP.md), [requirements](REQUIREMENTS.md),
 [UI](docs/ui-structure.md), [Git workflow](docs/git-workflow.md)를 참고하세요.
-Issue #4의 루틴·일기·오늘의 문장은 이번에 구현하지 않았습니다.
-[세 스킬의 분석·검수·개발 Task](docs/issues/issue-4-workflow.md)에 요구사항과
-미확정 질문을 보관합니다. 실제 OS 한국어 IME 입력은 수동 확인이 필요합니다.
 
 ## License
 

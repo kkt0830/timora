@@ -42,3 +42,12 @@ version branch의 후속 PR로 main에 반영할 수 있도록 남깁니다. Git
 코드를 v0.1로 rollback해도 추가 column은 남겨둡니다. 이를 삭제하면 프로필
 데이터가 사라지므로 column drop은 일반 rollback 절차에 포함하지 않습니다.
 Storage bucket, 새 secret, 새 Auth provider/Redirect URL은 필요하지 않습니다.
+
+## v0.3 개발 경계 — 2026-10-09
+
+`version/v0.3`은 Desktop/Offline 검증 후보입니다. Netlify production/Supabase remote
+schema/data/RLS를 이번에 변경하지 않았습니다. Web build 설정은 그대로이며 Desktop은
+[desktop.yml](../.github/workflows/desktop.yml)의 Windows exe/NSIS artifact로 배포합니다.
+installer에 WebView2 offline installer를 포함하며 build 다운로드는 온라인에서 수행합니다.
+Windows 실제 offline CRUD/완전 종료/재실행/IME 합격은 manual-acceptance-v03.md에 기록합니다.
+코드 commit·Actions artifact·검토 PR은 공식 production release와 구분합니다.

@@ -1,57 +1,78 @@
-# Architecture — Timora v0.2 (v0.1 foundation)
+# Architecture — Timora v0.3
 
-기존 React/Vite 진입점, Router와 서비스 경계를 유지하고 CSS는 DESIGN.md의 token과 공통 UI로 개편했습니다. 샘플 배열 import를 제거하고 서비스 계약과 Supabase 어댑터를 연결했습니다.
+기존 React/Vite UI, DESIGN.md, AuthService/WorkspaceRepository 계약을 재사용합니다.
 
 ```text
-React 화면 / 공통 편집기
-    ↓
-AuthProvider / WorkspaceProvider (세션·로딩·오류·저장 상태)
-    ↓
-AuthService / WorkspaceRepository 계약 + domain 날짜·검증 규칙
-    ↓
-SupabaseAuth HTTP adapter / SupabaseRepository PostgREST adapter
-    ↓
-Supabase Auth / PostgreSQL + RLS + composite FK + Inbox RPC
+Shared React UI / domain / providers
+             ↓
+AuthService / WorkspaceRepository
+       ↙                    ↘
+Web                       Desktop
+SupabaseAuth              LocalAuth (stable local UUID)
+SupabaseRepository        LocalWorkspaceRepository
+       ↓                    ↓ Tauri IPC
+PostgREST / Auth           Rust Database / rusqlite
+PostgreSQL + RLS           SQLite app data file
 ```
 
-## 경계
+## Composition 및 경계
 
-- `src/app/App.tsx`: 기존 셸 및 인증/Workspace 경계, 9개 화면 라우팅.
-- `src/app/WorkspacePages.tsx`: 기능 화면, 날짜/프로젝트 필터와 Dashboard 계산. `EntityEditor.tsx`, `rows.tsx`, `components.tsx`로 편집·표시 패턴을 분리.
-- `src/domain`: Entity 계약, Task date/Event instant 규칙, URL·날짜·입력 검증. React에 의존하지 않음.
-- `src/services/contracts.ts`: AuthService와 WorkspaceRepository. 모바일/데스크톱은 다른 UI에서 같은 계약을 사용할 수 있음.
-- `src/data`: fetch를 사용한 Supabase Auth 및 REST 어댑터. public 환경 변수는 `services/backend.ts`에서만 읽음.
-- `db/schema.sql`: DB 제약, 인덱스, updated_at 트리거, 소유권 RLS, Inbox 변환 트랜잭션.
+- `services/backend.ts`: Tauri runtime 존재 여부로 adapter 선택. Desktop 분기는 VITE
+  Cloud 변수 검사보다 먼저 실행해 Cloud 설정 없는 시작을 보장합니다.
+- `main.tsx`: Web BrowserRouter / Desktop HashRouter. Desktop deep-link 새로고침은
+  bundled index.html을 유지하고 Search/편집기 query는 Router 계약을 공유합니다.
+- `app/providers.tsx`: account별 Workspace, generation guard, mutation lock,
+  load/error/retry/empty 상태. 저장 완료 응답으로 UI를 갱신합니다. Desktop은 Cloud token
+  timer 없이 local DB만 읽습니다. focus/online 재조회 역시 선택된 repository를 사용합니다.
+- `data/local-repository.ts`: typed IPC adapter, 에러 정규화. 화면에서 SQL을 실행하지 않습니다.
+- `src-tauri/src/main.rs`: worker에서 실행하는 단일 Mutex connection과 lazy open. 파일 IO/잠금 대기가 native UI event loop를 막지 않도록 spawn_blocking을 사용합니다. DB 열기/migration 오류를
+  UI로 반환하며 자동 삭제하지 않습니다. DB 생성 위치는 app_data_dir/timora.db입니다.
+- `src-tauri/src/lib.rs`: 허용된 entity/필드, native validation, FK 및 transaction CRUD,
+  Inbox 이동·Project detach·settings·빈 DB import. 임의 SQL command는 없습니다.
+- `domain/task-groups.ts`: 순수 날짜 그룹/필터/기간 표시/프리셋; 날짜별 판정은 기존
+  `dates.ts`의 taskOnDay를 재사용합니다. UI collapse 설정만 localStorage에 저장합니다.
 
-## 결정
+## Local identity와 쓰기
 
-v0.1에서는 기존 의존성/lockfile을 유지하면서 Supabase의 Auth HTTP API와 PostgREST를 사용합니다. UI는 전송 형식을 직접 호출하지 않습니다. 이후 SDK나 다른 플랫폼의 인증 어댑터를 도입해도 계약 뒤에서 교체할 수 있습니다. 현재 HTTP 인증 어댑터는 이메일/비밀번호와 이메일 확인 링크만 지원하며 OAuth/Password recovery는 후속 범위입니다.
+최초 migration에서 UUID를 생성해 파일에 보관합니다. LocalAuth는 이 UUID를 반환하므로
+Cloud 로그인/토큰 만료가 Desktop 사용을 막지 않습니다. Local 행의 user_id는 native
+계층이 강제합니다. 단일 OS 사용자/로컬 Workspace이며 SQLite에는 Cloud RLS가 없습니다.
 
-Auth 토큰은 프로젝트 URL별 localStorage에 저장하고 비밀번호는 저장하지 않습니다. 복원 시 `/auth/v1/user`로 서버 사용자를 확인합니다. 요청 전에 만료를 확인하고 갱신하며, Data API의 401은 한 번 갱신 후 재시도합니다. 30초 점검과 visibility 복귀 시 만료를 확인합니다. 동시 갱신은 단일 promise와 지원되는 브라우저의 Web Locks로 직렬화합니다. 다른 탭의 저장/로그아웃은 storage event로 반영합니다. 지연된 세션 복원 응답은 더 최근의 로그인이나 로그아웃 상태를 변경하지 않습니다. Web Locks 미지원 브라우저의 동시 탭 사용은 연결 후 추가 검증 대상입니다.
+Create/Update/Delete → SQLite transaction commit → 행 응답 → Provider UI 갱신.
+SQLite는 bundled library, FK ON, WAL, synchronous FULL, busy timeout 5초를 사용합니다.
+Project 삭제 시 관련 행의 project_id만 NULL로 변경합니다. Inbox 이동은 대상 생성과 원본
+삭제를 하나의 transaction으로 묶습니다. 버전/실패 보존 정책은 data-model.md를 참고하세요.
 
-사용자 전환 시 WorkspaceProvider를 user ID로 새로 만들고 이전 데이터·편집 상태를 제거합니다. 오래된 load 응답은 generation 검사로 무시합니다. 생성·수정은 서버가 반환한 행으로 상태를 갱신하며 실패하면 편집기를 닫지 않습니다. 첫 조회 실패는 blocking error로, 이미 로드된 뒤의 재조회 실패는 inline error로 표시하여 편집 중 입력을 보존합니다. Inbox 변환은 RPC 완료 후 재조회합니다. 다른 탭에서 바뀐 데이터는 창 focus/online 복귀 시 재조회합니다. 저장 중에는 이 재조회를 생략합니다. 오프라인 큐/Realtime 동기화는 포함하지 않습니다.
+## Optional Cloud import
 
-RLS가 최종 권한 경계입니다. 클라이언트 user_id 필터는 방어 계층이며 권한 정책을 대체하지 않습니다. JWT user_metadata를 권한 판단에 사용하지 않습니다. FK가 다른 사용자의 프로젝트 연결을 막습니다. SECURITY DEFINER 함수/권한 우회 view는 없습니다.
+`CloudImportPage` → `CloudImportService` → 기존 Supabase Auth/read adapter로
+본인 계정의 모든 page를 조회하고 counts를 표시합니다. 전용 메모리 Storage로 인증한 뒤
+finally에서 signOut/clear합니다. Web 세션 저장소와 로컬 account를 교체하지 않습니다.
 
-## 데이터 규모와 후속 확장
+사용자 확인 → local_import → 빈 DB/이미 가져옴/Cloud owner/ID/날짜/FK 검증 → projects부터
+전체 transaction → 원본 UUID/관계/시각 보존 → Local UUID로 owner 매핑. 실패는 전체
+rollback합니다. 미리보기 이후 로컬 데이터가 생기면 native empty guard가 덮어쓰기를 막습니다.
+Cloud는 여러 REST 조회이므로 동시 수정이 있으면 일관된 Cloud snapshot이 보장되지 않습니다.
+가져오기 중 다른 기기의 편집을 피하고, 관계가 깨진 입력은 전체 거부합니다.
 
-각 테이블은 500개 단위로 조회해 Supabase 기본 1,000행 제한에 의한 누락을 피합니다. Data API max rows는 최소 500으로 설정합니다. 초기 개인 Workspace에 맞춰 모든 객체를 메모리에 유지하므로 큰 데이터의 화면별 서버 필터/페이지네이션은 v0.8에서 개선합니다. 동시에 다른 기기에서 편집할 때는 마지막 저장이 우선이며 충돌 병합은 v0.6 범위입니다.
+자동 pull/push/outbox/conflict resolution은 없습니다. Sync metadata는 로컬 변경/삭제를
+나중에 판단하기 위한 기반으로만 사용합니다. v0.4에서 owner mapping, remote revision,
+충돌·삭제·재시도 계약을 먼저 설계합니다.
 
-`project_id`는 v0.1의 구체적인 관계입니다. 후속 버전의 범용 Relation Engine으로 교체할지 함께 유지할지는 그 버전에서 결정합니다. GitHub 외부 ID와 OAuth 토큰은 내부 UUID를 대체하지 않으며 후속 버전의 별도 integration 계층에서 설계합니다. Windows/Android 런타임과 Storage 버킷은 현재 없습니다.
+## Web 보존과 보안
 
-## 배포 경계 — 2026-10-02
+Web의 Auth HTTP adapter, persistent project-keyed localStorage session, refresh epoch,
+Web Locks, 서버 사용자 확인, RLS/composite FK/Inbox RPC는 유지합니다. 500행 단위 pagination,
+로드된 계정 dataset 검색, profile 설정과 avatar fallback도 유지합니다. Cloud migration을
+추가하거나 운영 데이터에 테스트 fixture를 쓰지 않습니다.
 
-Netlify에서 Vite를 빌드하고 dist를 HTTPS로 제공합니다. Supabase 전용 프로젝트는 서울 리전이며 UI와 서비스 계약은 동일합니다. Netlify Free 플랜에서 build 전용 scope로 변수를 등록할 때 저장되지 않는 문제가 있어 두 공개 VITE 변수를 전체 scope로 등록하고 실제 목록과 빌드 산출물로 확인합니다. 비밀 키나 DB 비밀번호는 사용하지 않습니다. 소스 업로드 배포와 GitHub 자동 배포 연결은 별개이며 후자는 현재 설정되지 않았습니다.
+Tauri main local window에만 capability를 적용합니다. SQL/fs/shell plugin 권한은 없으며
+opener는 http/https URL만 허용합니다. CSP는 self script와 IPC/HTTPS 연결만 허용하고 raw
+Markdown HTML은 실행하지 않습니다. 개발 전용 devCsp는 Vite inline preamble/HMR만 추가 허용하며 production script-src 제한을 완화하지 않습니다. 로컬 DB는 암호화되지 않으며 OS 계정/디스크 보호가
+경계입니다. 저장된 avatar/URL 원격 내용은 오프라인에 캐시하지 않습니다.
 
-## v0.2 decisions
+## 규모와 배포
 
-Profile uses owner-protected workspace_settings fields; nickname signup metadata is
-presentation only. Search is a pure domain function over loaded account data and
-routes by object UUID. UI imports no Supabase transport. Browser Storage is injected
-into Auth adapter at the composition root; future Desktop can replace the adapter.
-Window focus/online are web lifecycle triggers, not offline support. SQLite/Tauri are
-not introduced. Native controls plus src/design primitives avoid a new component library.
-Avatar URL reference has no Storage/file lifecycle promises.
-
-Refresh promises are scoped by authentication epoch. A valid new-account token bypasses
-a previous account Web Lock; old completions cannot clear a newer pending request.
+개인 Workspace 전체 데이터를 메모리에 읽어 UI/search를 공유합니다. 큰 데이터의
+화면별 paging/SQLite FTS는 후속 최적화 대상입니다. native titlebar와 최소 800×600 창을
+사용합니다. Web은 Netlify dist, Desktop은 Windows exe/NSIS이며 배포 경계는 독립입니다.
