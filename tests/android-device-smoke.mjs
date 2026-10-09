@@ -2,29 +2,27 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
-const { chromium } = await import(process.env.TIMORA_PLAYWRIGHT_MODULE ?? 'playwright');
+const { _android } = await import(process.env.TIMORA_PLAYWRIGHT_MODULE ?? 'playwright');
 const appId = 'app.timora.android';
 const adb = (...args) => execFileSync('adb', args, { encoding: 'utf8', timeout: 30_000 }).trim();
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function attach() {
   adb('shell', 'am', 'start', '-n', `${appId}/.MainActivity`);
-  let lastError = '';
-  for (let attempt = 0; attempt < 120; attempt++) {
-    let candidate;
-    try {
-      const pid = adb('shell', 'pidof', appId).split(' ')[0];
-      adb('forward', 'tcp:9222', `localabstract:webview_devtools_remote_${pid}`);
-      const browser = candidate = await chromium.connectOverCDP('http://127.0.0.1:9222', { timeout: 1500 });
-      const page = browser.contexts()[0]?.pages()[0];
-      if (page) { await page.waitForFunction(() => typeof window.__TIMORA_BACK__ === 'function', null, { timeout: 5000 }); return { browser, page }; }
-      await browser.close();
-    } catch (error) { lastError = String(error.message).slice(0, 400); await candidate?.close().catch(() => {}); }
-    await delay(250);
+  let device;
+  try {
+    [device] = await _android.devices();
+    assert.ok(device, 'Dedicated Android emulator must be available');
+    // Desktop connectOverCDP sends Browser.setDownloadBehavior, which WebView
+    // does not support. The Android transport handles WebView's protocol subset.
+    const webview = await device.webView({ pkg: appId }, { timeout: 60_000 });
+    const page = await webview.page();
+    await page.waitForFunction(() => typeof window.__TIMORA_BACK__ === 'function', null, { timeout: 30_000 });
+    return { device, page };
+  } catch (error) {
+    await device?.close().catch(() => {});
+    // Dedicated fresh CI emulator only: no user credentials/workspace in crash diagnostics.
+    console.error(adb('logcat', '-d', '-b', 'crash'));
+    throw error;
   }
-  // Dedicated fresh CI emulator only: crash diagnostics contain no user credentials/workspace.
-  console.error('Last WebView attach error:', lastError);
-  console.error(adb('logcat', '-d', '-b', 'crash'));
-  throw new Error('Android WebView did not start.');
 }
 const apk = process.env.TIMORA_TEST_APK;
 assert.ok(apk, 'TIMORA_TEST_APK must reference the installable x86_64 test APK');
@@ -50,7 +48,7 @@ try {
   });
   assert.equal(result.account.local, true);
   assert.match(result.info.path, /^\/data\/(user\/\d+|data)\/app\.timora\.android\//);
-  await session.browser.close(); session = undefined;
+  await session.device.close(); session = undefined;
   // force-stop kills the process, not just the Activity/WebView.
   adb('shell', 'am', 'force-stop', appId);
   assert.throws(() => adb('shell', 'pidof', appId));
@@ -82,5 +80,5 @@ try {
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/android-emulator-offline.png', fullPage: true });
   console.log('Android emulator: six entities/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
 } finally {
-  await session?.browser.close(); adb('forward', '--remove', 'tcp:9222');
+  await session?.device.close();
 }

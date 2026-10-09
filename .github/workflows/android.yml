@@ -35,7 +35,8 @@ jobs:
           components: rustfmt
           targets: aarch64-linux-android,x86_64-linux-android
       - uses: gradle/actions/setup-gradle@v4
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: native-cache
         with:
           path: src-tauri/target
           key: android-arm64-${{ env.NDK_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
@@ -60,6 +61,19 @@ jobs:
           "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" | head -n 3
       - name: Verify test AAB packaging
         run: npm run android:build -- --aab --debug --target aarch64 --ci
+      # Keep a build candidate/cache available even if later device verification fails.
+      # An artifact alone does not mean the runtime or release gates passed.
+      - uses: actions/cache/save@v4
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: src-tauri/target
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: timora-v0.3-android-arm64-test
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 30
       - name: Install isolated emulator UI test tools
         run: npm install --no-save --package-lock=false playwright@1.51.1
       - name: Enable emulator acceleration
@@ -77,12 +91,6 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: TIMORA_TEST_APK=$(find src-tauri/gen/android/app/build/outputs/apk -name '*x86_64*debug.apk' -print -quit) node tests/android-device-smoke.mjs
-      - uses: actions/upload-artifact@v4
-        with:
-          name: timora-v0.3-android-arm64-test
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
-          retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
