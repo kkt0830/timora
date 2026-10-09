@@ -18,7 +18,7 @@ npm run tauri dev
 npm run desktop:build
 ```
 
-Desktop core에는 `.env`/Supabase 로그인/네트워크가 필요 없습니다.
+Desktop core에는 `.env`/Supabase 로그인/네트워크가 필요 없습니다. 개발 CSP는 Vite inline preamble/HMR을 허용하고 production CSP의 self-only script 정책은 유지합니다.
 SQL migration은 앱이 로컬 DB version을 확인해 transaction으로 실행합니다. Cloud SQL을
 Desktop SQLite에 적용하지 않습니다. `tauri dev`는 Vite 5173을 자동 시작합니다.
 설치된 production exe로 오프라인 수동 합격을 검사하세요.
@@ -66,9 +66,10 @@ Web service tests는 HTTP fixture, Cloud preview tests는 읽기/소유 필터/l
 npm install --no-save --package-lock=false playwright@1.51.1
 npx playwright install chromium
 npm run test:browser
+npm run test:browser:desktop
 ```
 
-별도 Vite 4173 포트를 사용합니다. 다른 서버가 점유하면 먼저 종료합니다.
+Web fixture는 Vite 4173, Desktop-mode IPC fixture는 4175 포트를 사용합니다. 다른 서버가 점유하면 먼저 종료합니다.
 이미 설치된 Chromium을 사용할 때 TIMORA_CHROMIUM_PATH를 지정할 수 있고,
 외부 설치한 Playwright는 TIMORA_PLAYWRIGHT_MODULE에 module 경로를 지정할 수 있습니다.
 CI는 Playwright Chromium을 설치하며 test-results 이미지를 artifact로 남깁니다.

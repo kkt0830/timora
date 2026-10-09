@@ -10,6 +10,7 @@
     "typecheck": "tsc -b",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
+    "test:browser:desktop": "node tests/desktop-ui.mjs",
     "tauri": "tauri",
     "test:local": "cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
     "desktop:build": "tauri build"

@@ -68,7 +68,7 @@ Web Locks, 서버 사용자 확인, RLS/composite FK/Inbox RPC는 유지합니�
 
 Tauri main local window에만 capability를 적용합니다. SQL/fs/shell plugin 권한은 없으며
 opener는 http/https URL만 허용합니다. CSP는 self script와 IPC/HTTPS 연결만 허용하고 raw
-Markdown HTML은 실행하지 않습니다. 로컬 DB는 암호화되지 않으며 OS 계정/디스크 보호가
+Markdown HTML은 실행하지 않습니다. 개발 전용 devCsp는 Vite inline preamble/HMR만 추가 허용하며 production script-src 제한을 완화하지 않습니다. 로컬 DB는 암호화되지 않으며 OS 계정/디스크 보호가
 경계입니다. 저장된 avatar/URL 원격 내용은 오프라인에 캐시하지 않습니다.
 
 ## 규모와 배포
