@@ -12,7 +12,7 @@ Windows PR #7의 main merge 0c1521a 위에서 feature/v0.3-android/PR #8을 검�
 | Web / Windows-mode / Android-mode browser fixture | 로컬 Chromium 성공 |
 | Android ARM64 Rust + bundled rusqlite | 실제 target compile 성공 |
 | Android ARM64 debug APK | 로컬 생성·apksigner verify 성공; app.timora.android / versionCode 3000 / min API 24 / target 37 |
-| Android AAB | 패키징 검증 진행; 최종 결과를 아래 기록에 갱신 |
+| Android AAB | 로컬 ARM64 debug AAB 생성 성공; production signing/Play Store 미검증 |
 | Windows CI | source df7d829의 run 37891475220 성공, exe/NSIS artifact 11598483957 |
 | Android CI / emulator native force-stop | 첫 setup failure 수정 후 최신 run 검증 진행 |
 | Web/Postgres CI | 첫 Android viewport fixture timing failure 수정 후 최신 run 검증 진행 |

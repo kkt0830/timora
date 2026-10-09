@@ -48,11 +48,12 @@ npm run android:apk -- --debug --ci
 
 ```bash
 npm run android:build -- --apk --debug --target aarch64 x86_64 --split-per-abi --ci
-npm run android:build -- --aab --target aarch64 --ci
+npm run android:build -- --aab --debug --target aarch64 --ci
 ```
 
 APK: `src-tauri/gen/android/app/build/outputs/apk/` 하위.
-AAB: `src-tauri/gen/android/app/build/outputs/bundle/` 하위. Release APK/AAB는 signing 설정
+AAB: `src-tauri/gen/android/app/build/outputs/bundle/` 하위. Debug AAB 패키징을 로컬/CI에서 검증합니다.
+실제 release 빌드는 --debug를 생략합니다. Release APK/AAB는 signing 설정
 없이는 배포용 서명 산출물이 아닙니다. Play Console 등록/배포는 이번 범위에 없습니다.
 기존 checkout에는 native project가 이미 있으므로 **android:init을 다시 실행하지 않습니다**.
 이 script는 최초 target 생성용입니다. 다시 초기화하면 사용자 정의 MainActivity/Manifest 등이
@@ -133,3 +134,11 @@ force-stop/relaunch/identity·관계·날짜·Markdown 보존, HashRouter와 sys
 [manual checklist](manual-acceptance-v03-android.md)에 기록합니다.
 자동 Sync/push/widgets/share sheet/background sync/file attachment/Play Store/production signing/
 DB encryption/backup UI는 미구현입니다.
+
+## Production signing 준비 (후속 배포)
+
+production keystore는 repository/PR/Actions artifact에 넣지 않습니다. 별도의 안전한 장소에서
+생성·백업한 뒤 CI 환경을 구성할 경우 base64 keystore와 store/key passwords를 GitHub Secrets에
+등록하고 job의 임시 파일로만 복원합니다. Gradle signingConfigs.release는 environment 또는
+ignored keystore.properties에서 읽도록 구성합니다. log 출력/평문 commit은 금지합니다.
+현재 workflow는 이 release signing 설정을 적용하지 않았고 test APK만 제공합니다.

@@ -50,7 +50,7 @@ Android에 자동으로 나타나지 않습니다. 각 기기에서 Cloud 원본
 ## 실행
 
 Node 22.18 이상(권장 24), React 19, TypeScript, Vite 6, Router 7, Lucide.
-Desktop은 Tauri 2 + Rust + bundled SQLite(`rusqlite`)를 사용합니다.
+Windows/Android Native는 Tauri 2 + Rust + bundled SQLite(`rusqlite`)를 사용합니다.
 
 ```bash
 npm ci

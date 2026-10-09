@@ -9,14 +9,15 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function attach() {
   adb('shell', 'am', 'start', '-n', `${appId}/.MainActivity`);
   for (let attempt = 0; attempt < 120; attempt++) {
+    let candidate;
     try {
       const pid = adb('shell', 'pidof', appId).split(' ')[0];
       adb('forward', 'tcp:9222', `localabstract:webview_devtools_remote_${pid}`);
-      const browser = await chromium.connectOverCDP('http://127.0.0.1:9222', { timeout: 1500 });
+      const browser = candidate = await chromium.connectOverCDP('http://127.0.0.1:9222', { timeout: 1500 });
       const page = browser.contexts()[0]?.pages()[0];
-      if (page) { await page.waitForFunction(() => typeof window.__TIMORA_BACK__ === 'function'); return { browser, page }; }
+      if (page) { await page.waitForFunction(() => typeof window.__TIMORA_BACK__ === 'function', null, { timeout: 5000 }); return { browser, page }; }
       await browser.close();
-    } catch {}
+    } catch { await candidate?.close().catch(() => {}); }
     await delay(250);
   }
   throw new Error('Android WebView did not start; inspect emulator crash logs without personal data.');

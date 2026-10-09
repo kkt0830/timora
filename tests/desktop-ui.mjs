@@ -94,6 +94,8 @@ try {
     await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
     await page.getByRole('link', { name: 'Library', exact: true }).click();
     await page.getByRole('link', { name: /example.com\/android/ }).click();
+    // The click starts a dynamic native module import; await the IPC delivery before asserting.
+    for (let attempt = 0; attempt < 50 && openedUrls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 100));
     assert.deepEqual(openedUrls, ['https://example.com/android']);
     assert.match(new URL(page.url()).hash, /^#\/library/);
     assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), true);
