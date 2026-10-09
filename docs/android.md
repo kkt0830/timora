@@ -76,7 +76,7 @@ Android versionCode는 3000이며 다음 배포에서는 증가시켜야 합니�
 기존 Cargo feature 이름 `desktop`은 역사적 이름이며 Android도 native shell을 포함할 때
 사용합니다. `--no-default-features`는 GUI 없는 SQLite 코어 검사입니다.
 
-Tauri app_data_dir의 `timora.db`를 사용합니다. Android에서 application-private files
+Tauri app_data_dir의 `timora.db`를 사용합니다. Android에서 application-private app data
 영역에 위치하며 public/shared storage를 사용하지 않습니다. 실제 경로는 Settings →
 Cloud 가져오기 / DB 위치에서 조회합니다. 넓은 storage/media permission을 요청하지 않습니다.
 권한은 Cloud import/외부 웹 콘텐츠에 필요한 INTERNET만 선언합니다.

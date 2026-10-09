@@ -80,7 +80,7 @@ DB/WAL/SHM 파일을 명시적으로 제거할 수 있습니다. 이 경우 loca
 
 ## Android 및 기기별 독립성
 
-Android는 app-private files의 같은 SQLite schema와 로컬 identity를 사용합니다.
+Android는 app-private app data의 같은 SQLite schema와 로컬 identity를 사용합니다.
 Windows DB를 Android에 직접 연결하거나 공용 파일을 동시 사용하지 않습니다. 각 Device의
 DB는 독립적이며 online 상태여도 기기 간 데이터가 자동 전송되지 않습니다.
 Cloud import는 초기 한 번이며 자동 Sync/Backup이 아닙니다. Android OS 자동 backup도 끕니다.

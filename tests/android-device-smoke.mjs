@@ -8,6 +8,7 @@ const adb = (...args) => execFileSync('adb', args, { encoding: 'utf8', timeout: 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function attach() {
   adb('shell', 'am', 'start', '-n', `${appId}/.MainActivity`);
+  let lastError = '';
   for (let attempt = 0; attempt < 120; attempt++) {
     let candidate;
     try {
@@ -17,10 +18,13 @@ async function attach() {
       const page = browser.contexts()[0]?.pages()[0];
       if (page) { await page.waitForFunction(() => typeof window.__TIMORA_BACK__ === 'function', null, { timeout: 5000 }); return { browser, page }; }
       await browser.close();
-    } catch { await candidate?.close().catch(() => {}); }
+    } catch (error) { lastError = String(error.message).slice(0, 400); await candidate?.close().catch(() => {}); }
     await delay(250);
   }
-  throw new Error('Android WebView did not start; inspect emulator crash logs without personal data.');
+  // Dedicated fresh CI emulator only: crash diagnostics contain no user credentials/workspace.
+  console.error('Last WebView attach error:', lastError);
+  console.error(adb('logcat', '-d', '-b', 'crash'));
+  throw new Error('Android WebView did not start.');
 }
 const apk = process.env.TIMORA_TEST_APK;
 assert.ok(apk, 'TIMORA_TEST_APK must reference the installable x86_64 test APK');

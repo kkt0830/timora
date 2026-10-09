@@ -113,6 +113,6 @@ DB encryption이 없습니다. 보안·가져오기 제한은 [offline.md](offli
 ## Android expansion
 
 Android는 위 Local schema v1/migration/identity/FK/transaction/metadata/tombstones를 그대로
-사용합니다. schema/column/RLS 변경 없음. app_data_dir는 Android sandbox files 영역이며
+사용합니다. schema/column/RLS 변경 없음. app_data_dir는 Android sandbox app data 영역이며
 Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존한 Entity UUID를 사용합니다.
 Sync는 아직 실행하지 않습니다. Android process termination 확인은 플랫폼별 acceptance입니다.
