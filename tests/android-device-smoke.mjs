@@ -111,8 +111,14 @@ c.execute('PRAGMA user_version=1');c.commit();c.close()`]);
   // Wait for a system Activity instead of sending Back to the Timora route prematurely.
   for(let i=0;;i++){
     const activity=adb('shell','dumpsys','activity','activities');
-    if(/mResumedActivity:.*(photopicker|documentsui|picker)/i.test(activity))break;
-    if(i>30)throw new Error('System image picker did not become visible');
+    // Android releases use different resumed-activity field names; GET_CONTENT
+    // may first display the system resolver when several providers are available.
+    if(/(?:mResumedActivity|topResumedActivity):.*(?:photopicker|documentsui|picker|intentresolver|ResolverActivity)/i.test(activity))break;
+    if(i>30){
+      console.error(activity.split('\n').filter(line=>/resumed|topActivity|realActivity|mActivityComponent/i.test(line)).join('\n'));
+      console.error(adb('logcat','-d','-s','Tauri','DialogPlugin','ActivityTaskManager'));
+      throw new Error('System image picker did not become visible');
+    }
     await new Promise(resolve=>setTimeout(resolve,250));
   }
   adb('shell','input','keyevent','4');
