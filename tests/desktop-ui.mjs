@@ -10,6 +10,7 @@ const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host
 });
 let output = ''; server.stdout.on('data', data => { output += data; }); server.stderr.on('data', data => { output += data; });
 let browser;
+const android = process.env.TIMORA_UI_PLATFORM === 'android';
 try {
   for (let attempt = 0; ; attempt++) {
     try { if ((await fetch('http://127.0.0.1:4175')).ok) break; } catch {}
@@ -17,7 +18,10 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   browser = await chromium.launch({ headless: true, executablePath: process.env.TIMORA_CHROMIUM_PATH || undefined });
-  const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+  const context = await browser.newContext(android ? {
+    viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true,
+    userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140.0.0.0 Mobile Safari/537.36',
+  } : { viewport: { width: 1200, height: 800 } });
   const config = JSON.parse(await readFile('src-tauri/tauri.conf.json', 'utf8'));
   const devCsp = config.app.security.devCsp.replaceAll('localhost:5173', '127.0.0.1:4175');
   const owner = '11111111-1111-4111-8111-111111111111';
@@ -52,8 +56,29 @@ try {
   assert.equal(await page.getByLabel('이메일', { exact: true }).count(), 0);
   openFailure = false; await page.getByRole('button', { name: '다시 시도', exact: true }).click();
   await page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }).waitFor();
+  if (android) {
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.platform), 'android');
+    await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
+    await page.locator('.sidebar-container.open .sidebar').waitFor();
+    assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), true);
+    await page.locator('.sidebar-container.open .sidebar').waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '새 작업', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), true);
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  }
   await page.getByRole('button', { name: '새 작업', exact: true }).click();
   const dialog = page.getByRole('dialog'); await dialog.getByLabel('제목', { exact: true }).fill('로컬 작업');
+  if (android) {
+    assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), true);
+    await dialog.getByText('저장하지 않은 입력이 있습니다.', { exact: false }).waitFor();
+    await dialog.getByRole('button', { name: '계속 편집', exact: true }).click();
+    // A foreground refresh uses the local repository and preserves the unsaved form.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    assert.equal(await dialog.getByLabel('제목', { exact: true }).inputValue(), '로컬 작업');
+    await page.setViewportSize({ width: 393, height: 360 });
+    assert.ok(await dialog.evaluate(el => el.getBoundingClientRect().height <= window.visualViewport.height));
+    await page.setViewportSize({ width: 393, height: 852 });
+  }
   await dialog.getByRole('button', { name: '오늘', exact: true }).click();
   await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.getByRole('alert').waitFor(); assert.equal(await dialog.getByLabel('제목', { exact: true }).inputValue(), '로컬 작업');
@@ -65,6 +90,15 @@ try {
   const search = page.getByRole('searchbox'); await search.fill('로컬');
   await page.getByRole('link', { name: /로컬 작업/ }).waitFor(); assert.match(new URL(page.url()).hash, /^#\/search\?q=/);
   await page.reload(); await search.waitFor(); assert.equal(await search.inputValue(), '로컬');
+  if (android) {
+    // Reload preserves router index. Back returns to Tasks, then Home; root yields to Android.
+    assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), true);
+    await page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }).waitFor();
+    assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), true);
+    await page.getByRole('heading', { name: '오늘도 나의 흐름으로 👋', exact: true, level: 1 }).waitFor();
+    assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), false);
+    await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
+  }
   await page.getByRole('button', { name: '프로필 메뉴', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: '로그아웃', exact: true }).count(), 0);
   await page.getByRole('link', { name: 'Cloud 가져오기', exact: true }).click();
@@ -74,8 +108,8 @@ try {
   await page.getByText('로컬 기록이 있어 가져오기를 사용할 수 없습니다. 기록은 그대로 보관됩니다.', { exact: true }).waitFor();
   assert.deepEqual(externalRequests, []); assert.deepEqual(errors, []);
   assert.ok(commands.includes('local_account') && commands.includes('local_load') && commands.includes('local_save'));
-  await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/desktop-import-empty-config.png', fullPage: true });
-  console.log('Desktop UI fixture passed: empty Cloud config, blocked external network, DB error retry, failed-save draft, local adapter, hash route/reload/search, import entry. Native Windows acceptance remains manual.');
+  await mkdir('test-results', { recursive: true }); await page.screenshot({ path: `test-results/${android ? 'android' : 'desktop'}-import-empty-config.png`, fullPage: true });
+  console.log(`${android ? 'Android' : 'Desktop'} UI fixture passed: empty Cloud config, blocked external network, DB error retry, failed-save draft, local adapter, hash route/reload/search, import entry. Native Windows/Android acceptance remains manual.`);
 } finally {
   await browser?.close();
   if (server.exitCode === null) { const stopped = new Promise(resolve => server.once('exit', resolve)); server.kill('SIGTERM'); await stopped; }

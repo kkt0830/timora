@@ -1,0 +1,85 @@
+name: Timora Android checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: timora-android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NDK_VERSION: 30.0.16248370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/cache@v4
+        with:
+          path: src-tauri/target
+          key: android-arm64-${{ env.NDK_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Install compatible stable SDK and NDK
+        run: |
+          sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;$NDK_VERSION"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
+      # Uses the committed Android project. Do not regenerate/overwrite MainActivity in CI.
+      # --debug packages built frontend assets, not a running Vite dev server.
+      - name: Build installable ARM64 and emulator test APKs without Cloud configuration
+        run: npm run android:build -- --apk --debug --target aarch64 x86_64 --split-per-abi --ci
+      - name: Verify test APK signature and identity
+        run: |
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name '*debug.apk' -print -quit)
+          test -n "$APK"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify "$APK"
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" | head -n 3
+      - name: Install isolated emulator UI test tools
+        run: npm install --no-save --package-lock=false playwright@1.51.1
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Native Android offline/process termination smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: TIMORA_TEST_APK=$(find src-tauri/gen/android/app/build/outputs/apk -name '*x86_64*debug.apk' -print -quit) node tests/android-device-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: timora-v0.3-android-arm64-test
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-review
+          path: test-results/android-emulator-offline.png
+          if-no-files-found: ignore
