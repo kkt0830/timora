@@ -3,9 +3,8 @@
 > «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
 **현재 소스: v0.3 Local-first Application Foundation 검증 후보.**
-Windows 구현은 PR #7로 main에 병합됐고 Android 확장은 `feature/v0.3-android` /
-[PR #8](https://github.com/kkt0830/timora/pull/8)에서 진행합니다. Windows 구현을 삭제하거나
-별도 Android 프로젝트/DB를 만들지 않고 같은 Core를 공유합니다.
+Windows 구현은 PR #7, Android 확장은 [PR #8](https://github.com/kkt0830/timora/pull/8)로
+main에 병합됐습니다. 두 플랫폼은 같은 Core를 공유합니다.
 실제 Windows 및 Android의 오프라인 CRUD → process 종료 → 재실행 보존과 한국어 IME가
 정식 완료 조건입니다. [Windows](docs/manual-acceptance-v03.md) /
 [Android](docs/manual-acceptance-v03-android.md) 합격 기록은 아직 PENDING입니다.
@@ -72,11 +71,43 @@ Windows 산출물: `src-tauri/target/release/timora-desktop.exe`,
 NSIS installer에 WebView2 offline installer를 포함합니다.
 [설치·DB 위치·검증](docs/desktop.md)을 참고하세요.
 
-**Android**: 일반 사용자는 [Android Actions](https://github.com/kkt0830/timora/actions/workflows/android.yml)의
-성공한 실행에서 `timora-v0.3-android-arm64-test` ZIP을 받아 arm64 debug APK를 설치합니다.
-Cloud/.env/개발 서버 없이 Local Workspace를 엽니다. 현재 테스트 서명이며 Play Store 배포와
-기존 APK 업데이트를 보장하지 않습니다. 서명 오류 해결을 위해 개인 기록이 있는 앱을 삭제하지 마세요.
-개발자는 Android Studio, JDK 21, SDK/NDK와 Rust Android target이 필요합니다.
+### 모바일에서 실행 — Android 앱
+
+ARM64 Android 7.0(API 24) 이상 기기용 테스트 APK입니다. Play Store에서 설치하는 버전은
+아니며, APK 다운로드에는 인터넷과 GitHub 로그인이 필요합니다. 설치 후 로컬 사용에는
+인터넷·Cloud 로그인·.env·개발 서버가 필요하지 않습니다.
+
+1. Android 폰의 브라우저에서 [검증된 APK 다운로드](https://github.com/kkt0830/timora/actions/runs/37895917148/artifacts/11600741426)를 열고 GitHub에 로그인합니다.
+2. `timora-v0.3-android-arm64-test` ZIP을 내려받습니다.
+3. 파일 앱에서 ZIP을 압축 해제하고 `arm64/debug/app-arm64-debug.apk`를 엽니다.
+   `x86_64/debug/app-x86_64-debug.apk`는 에뮬레이터용이므로 일반 ARM64 폰에는 설치하지 않습니다.
+4. 설치 허용을 묻는 경우 APK를 여는 브라우저/파일 앱의 **이 출처의 앱 설치 허용**을
+   설정하고 설치합니다. 메뉴 이름은 기기에 따라 다를 수 있습니다.
+5. 설치 화면의 **열기** 또는 홈 화면/앱 목록의 **Timora** 아이콘을 누릅니다.
+   Local Workspace가 열리면 바로 Task·Note·Project 등을 저장할 수 있습니다.
+
+현재 파일은 source `70e1da1`의 검증된 테스트 서명 APK이며 Actions 보관 기간은 30일입니다.
+링크가 만료되면 [Android Actions](https://github.com/kkt0830/timora/actions/workflows/android.yml)의
+최근 성공한 실행에서 같은 이름의 artifact를 받습니다. CI runner마다 debug 인증서가 달라
+기존 APK 업데이트가 거부될 수 있습니다. **개인 기록이 있는 앱을 삭제하거나 데이터 지우기로
+서명 오류를 해결하지 마세요.** 이전 검증 APK를 이미 설치했다면 해당 APK로 테스트를 이어갈 수 있습니다.
+
+#### 설치 후 오프라인 확인
+
+1. 비행기 모드를 켜고 Wi-Fi도 꺼져 있는지 확인한 뒤 Timora를 실행합니다.
+2. Task·Note·Project를 생성·수정하고 저장합니다.
+3. Android **설정 → 앱 → Timora → 강제 종료**로 프로세스를 종료합니다.
+   최근 앱 목록에서 제거하는 것만으로는 완전 종료가 보장되지 않습니다.
+4. 비행기 모드를 유지한 채 Timora 아이콘을 눌러 다시 실행하고 저장한 내용이 남아 있는지 확인합니다.
+5. 한국어 입력·Task 그룹·뒤로가기도 확인하고, 기기 모델/Android 버전/사용한 APK source와 결과를 기록합니다.
+
+저장하지 않은 입력은 프로세스 종료 후 복구하지 않습니다. Windows·Android·웹 사이의
+자동 동기화는 아직 없으므로 웹에서 저장한 기록이 앱에 자동으로 나타나지 않습니다.
+전체 검수 항목은 [Android 실기기 체크리스트](docs/manual-acceptance-v03-android.md)를 참고하세요.
+
+#### Android 개발자 실행
+
+Android Studio, JDK 21, SDK/NDK와 Rust Android target이 필요합니다.
 
 ```bash
 npm run android:dev
@@ -86,7 +117,13 @@ npm run android:apk -- --debug --ci
 기존 checkout에서는 `android:init`을 다시 실행하지 않습니다. 초기화는 custom Activity를
 덮어쓸 수 있습니다. [환경·APK·서명·DB·UX](docs/android.md)를 참고하세요.
 
-**Web**: `.env.example`을 `.env`로 복사하고 `VITE_SUPABASE_URL`,
+### 모바일 브라우저에서 실행 — Web
+
+Android/iPhone/iPad의 브라우저에서 https://timora-sfj2.netlify.app 에 접속하고 기존 Cloud
+계정으로 로그인합니다. 웹은 Supabase에 데이터를 저장하므로 인터넷이 필요하며,
+Android APK의 로컬 Workspace와는 별개입니다. iPhone/iPad용 native 앱은 현재 제공하지 않습니다.
+
+**Web 개발**: `.env.example`을 `.env`로 복사하고 `VITE_SUPABASE_URL`,
 `VITE_SUPABASE_PUBLISHABLE_KEY`를 설정한 뒤 `npm run dev`.
 변수는 공개 설정이며 secret/service_role/DB password를 넣지 않습니다.
 Auth Site URL/Redirect URLs 설정과 Custom SMTP 제한은 [개발 문서](docs/development.md)에 있습니다.
