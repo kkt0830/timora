@@ -10,6 +10,13 @@ main에 병합됐습니다. 두 플랫폼은 같은 Core를 공유합니다.
 새 로그인 유지·오프라인 재실행·로컬 사진과 Windows/Phone 실기기 검수는 아직 필요합니다. [Windows](docs/manual-acceptance-v03.md) /
 [Android](docs/manual-acceptance-v03-android.md) 합격 기록은 아직 PENDING입니다.
 
+source `e0152c6`의 Web/DB, Windows exe·NSIS, Android APK·AAB/에뮬레이터 CI가 모두 통과했습니다.
+Android 에뮬레이터는 기존 데이터 업그레이드, 오프라인 CRUD/강제 종료 후 복구, 시스템 사진
+선택 취소와 Back을 확인했습니다. 실제 Supabase 로그인·사진 파일 선택/복사는 실기기 gate입니다.
+설치 파일: [Android test APK](https://github.com/kkt0830/timora/actions/runs/37960236652/artifacts/11630279456),
+[Windows exe/installer](https://github.com/kkt0830/timora/actions/runs/37960236583/artifacts/11630293980).
+[검증 기록](docs/verification.md)에서 source와 검사 범위를 확인하세요.
+
 **운영 Web: v0.2**, https://timora-sfj2.netlify.app . 이번 개발에서 Netlify production을
 재배포하거나 기존 Supabase DB·RLS·사용자 데이터를 변경하지 않았습니다.
 Issue #4의 버그/UI 수정은 PR #6으로 main에 병합됐습니다. GitHub commit과

@@ -27,7 +27,9 @@ async function attach() {
 }
 const apk = process.env.TIMORA_TEST_APK;
 assert.ok(apk, 'TIMORA_TEST_APK must reference the installable x86_64 test APK');
-adb('install', '-r', apk);
+// Installing the bundled debug APK can exceed 30 seconds on a cold CI emulator.
+// Keep ordinary adb commands bounded; allow three minutes only for installation.
+execFileSync('adb', ['install', '-r', apk], { encoding: 'utf8', timeout: 180_000 });
 adb('shell', 'cmd', 'connectivity', 'airplane-mode', 'enable');
 adb('shell', 'svc', 'wifi', 'disable'); adb('shell', 'svc', 'data', 'disable');
 assert.equal(adb('shell', 'settings', 'get', 'global', 'airplane_mode_on'), '1');
@@ -42,8 +44,12 @@ try {
   // This verifies the real upgrade path without inventing a Cloud authentication success.
   await session.device.close(); session = undefined;
   adb('shell', 'am', 'force-stop', appId);
-  const dbPath=adb('shell','run-as',appId,'find','files','-name','timora.db').split('\n')[0];
-  assert.match(dbPath,/^files\/[A-Za-z0-9_./-]*timora\.db$/);
+  // Tauri Android app_data_dir resolves from activity.dataDir, not filesDir.
+  // Search only this test app's sandbox and require one safe relative DB path.
+  const dbPaths=adb('shell','run-as',appId,'find','.','-type','f','-name','timora.db').split('\n').filter(Boolean);
+  assert.equal(dbPaths.length,1,'Exactly one app-owned workspace DB must exist');
+  const [dbPath]=dbPaths;
+  assert.match(dbPath,/^\.\/(?:[A-Za-z0-9_-]+\/)*timora\.db$/);
   execFileSync('python3',['-c',`import sqlite3,uuid
 c=sqlite3.connect('/tmp/timora-legacy-emulator.db')
 c.executescript(open('src-tauri/migrations/001_initial_local_schema.sql').read())
@@ -105,8 +111,14 @@ c.execute('PRAGMA user_version=1');c.commit();c.close()`]);
   // Wait for a system Activity instead of sending Back to the Timora route prematurely.
   for(let i=0;;i++){
     const activity=adb('shell','dumpsys','activity','activities');
-    if(/mResumedActivity:.*(photopicker|documentsui|picker)/i.test(activity))break;
-    if(i>30)throw new Error('System image picker did not become visible');
+    // Android releases use different resumed-activity field names; GET_CONTENT
+    // may first display the system resolver when several providers are available.
+    if(/(?:mResumedActivity|topResumedActivity|ResumedActivity)\s*[:=].*(?:photopicker|documentsui|picker|intentresolver|ResolverActivity)/i.test(activity))break;
+    if(i>30){
+      console.error(activity.split('\n').filter(line=>/resumed|topActivity|realActivity|mActivityComponent/i.test(line)).join('\n'));
+      console.error(adb('logcat','-d','-s','Tauri','DialogPlugin','ActivityTaskManager'));
+      throw new Error('System image picker did not become visible');
+    }
     await new Promise(resolve=>setTimeout(resolve,250));
   }
   adb('shell','input','keyevent','4');
