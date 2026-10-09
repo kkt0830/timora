@@ -42,7 +42,20 @@ try {
     await call('local_save', { table: 'events', id: null, input: { title: 'Android event', description: 'fixture', start_at: '2026-10-09T09:00:00+09:00', end_at: '2026-10-09T10:00:00+09:00', project_id: project.id } });
     await call('local_save', { table: 'library_items', id: null, input: { title: 'Android resource', description: 'fixture', url: 'https://example.com', type: 'website', project_id: project.id } });
     await call('local_save', { table: 'inbox_items', id: null, input: { content: 'Android inbox', type: 'unclassified' } });
-    const settings = (await call('local_load')).settings;
+    const snapshot = await call('local_load');
+    // Exercise all CRUD commands in the actual Android binary, not an IPC fixture.
+    for (const table of ['projects', 'tasks', 'notes', 'events', 'library_items', 'inbox_items']) {
+      const row = snapshot[table][0];
+      const field = table === 'projects' ? 'name' : table === 'inbox_items' ? 'content' : 'title';
+      const input = { ...row, [field]: `${row[field]} edited` };
+      const updated = await call('local_save', { table, id: row.id, input });
+      if (updated.id !== row.id || updated[field] !== input[field]) throw new Error(`${table}: update failed`);
+      const disposable = await call('local_save', { table, id: null, input });
+      await call('local_remove', { table, id: disposable.id });
+      const remaining = (await call('local_load'))[table];
+      if (remaining.length !== 1 || remaining[0].id !== row.id) throw new Error(`${table}: delete/read failed`);
+    }
+    const settings = snapshot.settings;
     await call('local_settings', { input: { ...settings, workspace_name: 'Android offline fixture' } });
     return { account, info, taskId: task.id, projectId: project.id };
   });
@@ -78,7 +91,7 @@ try {
   assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), false);
   assert.equal(adb('shell', 'settings', 'get', 'global', 'airplane_mode_on'), '1');
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/android-emulator-offline.png', fullPage: true });
-  console.log('Android emulator: six entities/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
+  console.log('Android emulator: six-entity CRUD/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
 } finally {
   await session?.device.close();
 }
