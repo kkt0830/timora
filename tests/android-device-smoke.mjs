@@ -44,8 +44,12 @@ try {
   // This verifies the real upgrade path without inventing a Cloud authentication success.
   await session.device.close(); session = undefined;
   adb('shell', 'am', 'force-stop', appId);
-  const dbPath=adb('shell','run-as',appId,'find','files','-name','timora.db').split('\n')[0];
-  assert.match(dbPath,/^files\/[A-Za-z0-9_./-]*timora\.db$/);
+  // Tauri Android app_data_dir resolves from activity.dataDir, not filesDir.
+  // Search only this test app's sandbox and require one safe relative DB path.
+  const dbPaths=adb('shell','run-as',appId,'find','.','-type','f','-name','timora.db').split('\n').filter(Boolean);
+  assert.equal(dbPaths.length,1,'Exactly one app-owned workspace DB must exist');
+  const [dbPath]=dbPaths;
+  assert.match(dbPath,/^\.\/(?:[A-Za-z0-9_-]+\/)*timora\.db$/);
   execFileSync('python3',['-c',`import sqlite3,uuid
 c=sqlite3.connect('/tmp/timora-legacy-emulator.db')
 c.executescript(open('src-tauri/migrations/001_initial_local_schema.sql').read())
