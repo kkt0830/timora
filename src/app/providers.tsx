@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Account } from '../services/contracts';
+import { NativeProfileProvider } from './NativeProfileProvider';
 import { createBackend } from '../services/backend';
 import { emptyWorkspace } from '../domain/models';
 import type { EntityInput, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models';
@@ -30,8 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { active = false; unsubscribe(); };
   }, [attempt]);
   useEffect(() => {
-    if (!account || account.local || !backend.auth) return;
-    const refresh = () => { if (document.visibilityState === 'visible') void backend.auth!.token().catch(e => setError(messageOf(e))); };
+    if (!account || account.local_only || !backend.auth) return;
+    const refresh = () => { if (document.visibilityState === 'visible') void backend.auth!.token().catch(e => { if (!account.local) setError(messageOf(e)); }); };
     const interval = window.setInterval(refresh, 30000);
     document.addEventListener('visibilitychange', refresh);
     return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
@@ -40,7 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     account, loading, error, configured: Boolean(backend.auth), retry: () => setAttempt(v => v + 1),
     signIn: async (email, password) => { if (!backend.auth) throw new Error(backend.error); await backend.auth.signIn(email, password); },
     signUp: async (email, password, nickname) => { if (!backend.auth) throw new Error(backend.error); return backend.auth.signUp(email, password, nickname); },
-    signOut: async () => { try { await backend.auth?.signOut(); } catch { setError('이 기기에서 로그아웃했습니다. 서버 세션 해제는 네트워크 연결 후 다시 확인해 주세요.'); } },
+    signOut: async () => {
+      if (account?.local && !window.confirm('로그아웃할까요? 이 기기의 기록과 사진은 그대로 보관됩니다. 다시 열려면 같은 계정으로 인터넷에 연결하여 로그인해야 합니다. 다른 계정으로는 이 Workspace를 열 수 없습니다.')) return;
+      try { await backend.auth?.signOut(); } catch (e) { setError(messageOf(e)); }
+    },
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -74,7 +78,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
     catch (e) { if (mounted.current && version === generation.current) setError(messageOf(e)); }
     finally { if (mounted.current && version === generation.current) setLoading(false); }
   }, [account.id, account.user_metadata?.display_name, repository]);
-  useEffect(() => { mounted.current = true; void reload(); return () => { mounted.current = false; generation.current++; }; }, [reload]);
+  useEffect(() => { mounted.current = true; void reload(); return () => { mounted.current = false; generation.current++; }; }, [reload, account.cloud_user_id, account.email, account.local_only]);
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === 'visible' && !lock.current) void reload(false); };
     window.addEventListener('focus', refresh); window.addEventListener('online', refresh);
@@ -116,6 +120,6 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
     update(); media.addEventListener('change', update);
     return () => { media.removeEventListener('change', update); delete document.documentElement.dataset.theme; };
   }, [data.settings.appearance]);
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
+  return <WorkspaceContext.Provider value={value}><NativeProfileProvider account={account}>{children}</NativeProfileProvider></WorkspaceContext.Provider>;
 }
 export function useWorkspace() { const value = useContext(WorkspaceContext); if (!value) throw new Error('WorkspaceProvider required'); return value; }

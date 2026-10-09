@@ -3,14 +3,17 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { safeAvatarUrl } from '../domain/identity';
 import { isAndroid } from '../services/runtime';
 import { registerBackHandler } from '../services/native-back';
+import { useNativeProfile } from '../app/NativeProfileProvider';
 export function Button({ variant = 'secondary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' }) {
   return <button type="button" {...props} className={`${variant === 'primary' ? 'primary-button' : variant === 'danger' ? 'danger-button' : ''} ${className}`} />;
 }
 export function IconButton(props: ButtonHTMLAttributes<HTMLButtonElement> & { 'aria-label': string }) { return <Button {...props} className={`icon-button ${props.className ?? ''}`} />; }
 export function Avatar({ name, url }: { name: string; url?: string | null }) {
-  const [failed, setFailed] = useState(false); useEffect(() => setFailed(false), [url]);
-  const src = url && safeAvatarUrl(url);
-  return <span className="avatar">{src && !failed ? <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : name.trim().slice(0, 1).toLocaleUpperCase() || 'T'}</span>;
+  const local = useNativeProfile()?.source;
+  const [failed, setFailed] = useState<string[]>([]); useEffect(() => setFailed([]), [local, url]);
+  const remote = url && safeAvatarUrl(url);
+  const src = local && !failed.includes(local) ? local : remote && !failed.includes(remote) ? remote : null;
+  return <span className="avatar">{src ? <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setFailed(previous => [...previous, src])} /> : name.trim().slice(0, 1).toLocaleUpperCase() || 'T'}</span>;
 }
 export function Popover({ label, trigger, children }: { label: string; trigger: ReactNode; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false); const root = useRef<HTMLDivElement>(null); const button = useRef<HTMLButtonElement>(null);
