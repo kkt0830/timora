@@ -30,6 +30,8 @@ jobs:
         timeout-minutes: 5
       - run: npm run test:browser:android
         timeout-minutes: 5
+      - run: npm run test:browser:native-account
+        timeout-minutes: 5
       - name: Browser review images
         if: always()
         uses: actions/upload-artifact@v4

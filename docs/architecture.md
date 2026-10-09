@@ -8,7 +8,7 @@ Shared React UI / domain / providers
 AuthService / WorkspaceRepository
        ↙                    ↘
 Web                       Native (Windows / Android)
-SupabaseAuth              LocalAuth (stable local UUID)
+SupabaseAuth              LocalAuth (persisted identity + memory-only Cloud session)
 SupabaseRepository        LocalWorkspaceRepository
        ↓                    ↓ Tauri IPC
 PostgREST / Auth           Rust Database / rusqlite
@@ -17,13 +17,13 @@ PostgreSQL + RLS           SQLite app data file
 
 ## Composition 및 경계
 
-- `services/backend.ts`: Tauri runtime 존재 여부로 adapter 선택. Native 분기는 VITE
-  Cloud 변수 검사보다 먼저 실행해 Cloud 설정 없는 시작을 보장합니다.
+- `services/backend.ts`: Tauri runtime 존재 여부로 adapter 선택. Native는 SQLite repository를 선택하고 공개 빌드 설정이 있을 때만
+  메모리 SupabaseAuth를 추가합니다. 기존 Local Identity 복원은 설정/Cloud 응답 없이 가능합니다.
 - `main.tsx`: Web BrowserRouter / Native HashRouter. Native deep-link 새로고침은
   bundled index.html을 유지하고 Search/편집기 query는 Router 계약을 공유합니다.
 - `app/providers.tsx`: account별 Workspace, generation guard, mutation lock,
-  load/error/retry/empty 상태. 저장 완료 응답으로 UI를 갱신합니다. Native은 Cloud token
-  timer 없이 local DB만 읽습니다. focus/online 재조회 역시 선택된 repository를 사용합니다.
+  load/error/retry/empty 상태. 저장 완료 응답으로 UI를 갱신합니다. Native startup은 local DB만 읽습니다. 실행 중 Cloud token 검사는
+  background이며 실패해도 Local Identity를 해제하지 않습니다. focus/online 재조회 역시 선택된 repository를 사용합니다.
 - `data/local-repository.ts`: typed IPC adapter, 에러 정규화. 화면에서 SQL을 실행하지 않습니다.
 - `src-tauri/src/runtime.rs`: worker에서 실행하는 단일 Mutex connection과 lazy open. 파일 IO/잠금 대기가 native UI event loop를 막지 않도록 spawn_blocking을 사용합니다. DB 열기/migration 오류를
   UI로 반환하며 자동 삭제하지 않습니다. DB 생성 위치는 app_data_dir/timora.db입니다.
@@ -35,7 +35,9 @@ PostgreSQL + RLS           SQLite app data file
 ## Local identity와 쓰기
 
 최초 migration에서 UUID를 생성해 파일에 보관합니다. LocalAuth는 이 UUID를 반환하므로
-Cloud 로그인/토큰 만료가 Native 사용을 막지 않습니다. Local 행의 user_id는 native
+첫 로그인은 native build의 서버에서 /auth/v1/user로 확인하고 singleton에 Cloud ID/email을 연결합니다.
+토큰 만료는 Native 사용을 막지 않습니다. signed_out/new 상태는 모든 Workspace IPC를 거부합니다.
+Cloud ID 및 서버가 다르면 연결을 거부합니다. Local UUID/Entity ownership은 그대로입니다. Local 행의 user_id는 native
 계층이 강제합니다. 단일 OS 사용자/로컬 Workspace이며 SQLite에는 Cloud RLS가 없습니다.
 
 Create/Update/Delete → SQLite transaction commit → 행 응답 → Provider UI 갱신.
@@ -66,10 +68,18 @@ Web Locks, 서버 사용자 확인, RLS/composite FK/Inbox RPC는 유지합니�
 로드된 계정 dataset 검색, profile 설정과 avatar fallback도 유지합니다. Cloud migration을
 추가하거나 운영 데이터에 테스트 fixture를 쓰지 않습니다.
 
-Tauri main local window에만 capability를 적용합니다. SQL/fs/shell plugin 권한은 없으며
+Tauri main local window에만 capability를 적용합니다. dialog/fs plugin은 Rust 내부의
+시스템 선택 결과 읽기에만 사용하고 JavaScript에 범용 fs/dialog/shell/SQL 권한을 주지 않습니다.
+local_pick_avatar에는 경로 인자가 없고 local_avatar는 DB가 소유한 private 파일만 읽습니다.
+사진 디코딩/크기 제한/PNG 축소/저장은 profile.rs, 표시 상태는 NativeProfileProvider가 담당합니다.
+Native binding은 reqwest의 HTTPS/timeout/redirect 금지와 build-configured endpoint로 검증하고
+UI가 전달한 사용자 ID/email/endpoint를 인증 근거로 사용하지 않습니다.
+명시적 logout epoch는 진행 중 binding이 로그아웃 후 완료되어 잠금을 풀지 못하게 합니다.
+Cloud session은 메모리 fallback으로 profile/offline 문서의 security tradeoff를 적용합니다.
+
 opener는 http/https URL만 허용합니다. CSP는 self script와 IPC/HTTPS 연결만 허용하고 raw
 Markdown HTML은 실행하지 않습니다. 개발 전용 devCsp는 Vite inline preamble/HMR만 추가 허용하며 production script-src 제한을 완화하지 않습니다. 로컬 DB는 암호화되지 않으며 OS 계정/디스크 보호가
-경계입니다. 저장된 avatar/URL 원격 내용은 오프라인에 캐시하지 않습니다.
+경계입니다. 로컬 프로필 사진은 private 복사본입니다. 외부 HTTPS avatar/URL 원격 본문은 오프라인에 캐시하지 않습니다.
 
 ## 규모와 배포
 

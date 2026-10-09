@@ -1,7 +1,7 @@
 name: Timora Desktop checks
 on:
   push:
-    branches: [main]
+    branches: [main, version/v0.3]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -20,6 +20,9 @@ jobs:
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
   windows:
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -34,10 +37,11 @@ jobs:
         with:
           path: src-tauri/target
           key: ${{ runner.os }}-timora-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - run: node scripts/validate-native-config.mjs
       - run: npm ci
       - run: npm test
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
-      # No Supabase secrets/configuration: local startup must be independent.
+      # Public settings enable first login; restoring local identity is network-independent.
       - run: npm run desktop:build -- --ci -- --locked
       - name: Windows executable and offline-capable NSIS installer
         uses: actions/upload-artifact@v4

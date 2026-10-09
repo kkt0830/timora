@@ -33,6 +33,28 @@ assert.equal(adb('shell', 'settings', 'get', 'global', 'airplane_mode_on'), '1')
 let session;
 try {
   session = await attach(); let { page } = session;
+  // A new installation must show shared Auth UI and deny IPC access offline.
+  await page.getByRole('button', { name: '로그인', exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => navigator.onLine), false);
+  assert.equal(await page.evaluate(() => window.__TAURI_INTERNALS__.invoke('local_account')), null);
+  assert.equal(await page.evaluate(async () => { try { await window.__TAURI_INTERNALS__.invoke('local_load'); return false; } catch { return true; } }), true);
+  // Seed an old anonymous schema-v1 DB ONLY in this dedicated fresh emulator.
+  // This verifies the real upgrade path without inventing a Cloud authentication success.
+  await session.device.close(); session = undefined;
+  adb('shell', 'am', 'force-stop', appId);
+  const dbPath=adb('shell','run-as',appId,'find','files','-name','timora.db').split('\n')[0];
+  assert.match(dbPath,/^files\/.*timora\.db$/);
+  execFileSync('python3',['-c',`import sqlite3,uuid
+c=sqlite3.connect('/tmp/timora-legacy-emulator.db')
+c.executescript(open('src-tauri/migrations/001_initial_local_schema.sql').read())
+id=str(uuid.uuid4());c.execute('INSERT INTO local_identity(singleton,id) VALUES(1,?)',(id,))
+c.execute("INSERT INTO workspace_settings VALUES(?,'Local Workspace','system','',NULL,'2026-01-01T00:00:00Z')",(id,))
+c.execute('PRAGMA user_version=1');c.commit();c.close()`]);
+  adb('push','/tmp/timora-legacy-emulator.db','/data/local/tmp/timora-legacy-emulator.db');
+  adb('shell','chmod','644','/data/local/tmp/timora-legacy-emulator.db');
+  adb('shell','run-as',appId,'rm','-f',dbPath,`${dbPath}-wal`,`${dbPath}-shm`);
+  adb('shell','run-as',appId,'cp','/data/local/tmp/timora-legacy-emulator.db',dbPath);
+  session=await attach();page=session.page;
   const result = await page.evaluate(async () => {
     const call = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
     const account = await call('local_account'); const info = await call('local_info');
@@ -77,6 +99,23 @@ try {
   assert.equal(restored.data.notes[0].content, '# 안녕하세요\n**offline**');
   assert.equal(restored.data.settings.workspace_name, 'Android offline fixture');
   await page.reload(); await page.getByRole('heading', { name: '오늘도 나의 흐름으로 👋' }).waitFor();
+  // Cancel the actual Android system picker; cancellation must preserve the workspace.
+  await page.evaluate(() => { location.hash='/profile'; });
+  await page.getByRole('button',{name:'사진 선택',exact:true}).waitFor();
+  await page.getByRole('button',{name:'사진 선택',exact:true}).click();
+  // Wait for a system Activity instead of sending Back to the Timora route prematurely.
+  for(let i=0;;i++){
+    const activity=adb('shell','dumpsys','activity','activities');
+    if(/mResumedActivity:.*(photopicker|documentsui|picker)/i.test(activity))break;
+    if(i>30)throw new Error('System image picker did not become visible');
+    await new Promise(resolve=>setTimeout(resolve,250));
+  }
+  adb('shell','input','keyevent','4');
+  await page.getByRole('button',{name:'사진 선택',exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_avatar')),null);
+  await page.evaluate(() => { location.hash='/'; });
+  await page.getByRole('heading',{name:'오늘도 나의 흐름으로 👋'}).waitFor();
+
   await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   await page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }).waitFor();
@@ -94,7 +133,7 @@ try {
   // repeat compositor tiles in WebView and does not represent the visible device.
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/android-emulator-offline.png', execFileSync('adb', ['exec-out', 'screencap', '-p'], { timeout: 30_000 }));
-  console.log('Android emulator: six-entity CRUD/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
+  console.log('Android emulator: fresh Auth/locked IPC and legacy-v1 upgrade passed; six-entity CRUD/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
 } finally {
   await session?.device.close();
 }

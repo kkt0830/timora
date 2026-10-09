@@ -1,3 +1,39 @@
+# Native Account / Local Profile 개선 — 2026-10-09 KST
+
+이번 변경은 사용자 요청으로 새 PR 없이 version/v0.3에 직접 반영합니다.
+운영 Supabase schema/RLS/사용자 데이터/Netlify production은 이번 작업에서 변경하지 않습니다.
+
+| 검사 | 이번 개선 결과 / 범위 |
+| --- | --- |
+| TypeScript / production Web build | 로컬 통과 |
+| Node domain/service | 42개 통과. Native local restore, 메모리 세션, Cloud refresh 실패, logout/read race, A/B/import 차단, signup Site URL |
+| 실제 SQLite file | 12개 통과. fresh account gate, v1→v2 보존/rollback, logout 후 IPC 대상 API 거부, A 복구/B·다른 서버 거부, private photo source 삭제/reopen/손상·크기 제한 |
+| Web browser | 기존 Auth/CRUD/Profile URL/회귀 통과, 실제 운영 서버 인증과 구분 |
+| Desktop / Phone-size UI | 기존 fixture의 local-only/DB error/save error/HashRouter/search/Back 통과 |
+| 새 Native account/profile UI | first Auth/signup, offline restore/photo, logout 후 자료 보관, B 비노출/A 복구 통과. mocked IPC/Auth + explicit offline signal이며 OS 검증 아님 |
+| Android ARM64 APK | 공개 build config 포함 로컬 빌드 성공, system dialog/fs plugin 포함. 이 환경의 emulator는 KVM 없어 실행 gate 미검증 |
+| Windows exe / NSIS | 새 source CI 결과 확인 필요; 기존 v0.3 합격 이력은 아래 보존 |
+| Android device CI | 새 source에서 fresh Login/locked IPC → seeded legacy-v1 upgrade → real offline CRUD/force-stop/Back/시스템 picker 취소를 검사. 실제 Cloud login은 seed로 대체하지 않음 |
+| 실제 Tablet | 사용자 보고: 기존 APK 실행/기본 UI·Workspace에 특별한 문제 없음. 모델/OS/상세 테스트 미제공 |
+| 새 Auth/avatar 실기기 | Tablet/Phone/Windows PENDING. 실제 가입/로그인→restart→offline→restart, picker→원본 삭제→restart→offline은 manual acceptance로 확인 |
+
+Rust 검사는 서버에서 검증한 user payload를 core에 전달하는 fixture이며 인증 proof HTTP를
+mock으로 성공했다고 기록하지 않습니다. 실제 Native binding은 build-configured Supabase의
+/auth/v1/user가 확인한 ID/email만 받습니다. 비밀번호/토큰은 SQLite/localStorage/log에 저장하지 않습니다.
+Tauri Stronghold 검토 후 vault key/OS credential store 연동이 없는 현 단계에서는 요구사항 §15의
+메모리 fallback을 채택합니다. OS secure session restore는 미구현이고 재시작 후 Cloud만 재인증합니다.
+
+Linux host full-GUI cargo check는 glib/GTK 개발 라이브러리 부족으로 실행하지 못했습니다.
+core Rust 테스트 및 실제 Android cross-build는 통과했으며 Windows target은 CI로 확인합니다.
+CI Native 배포에는 Repository variables 두 공개 설정이 필요하고 누락하면 실패시켜
+first login이 불가능한 설치 파일을 성공 artifact로 안내하지 않습니다.
+
+새 기능 manual gates: [Android](manual-acceptance-v03-android.md#j--native-account--private-photo-새-개선-필수-gate),
+[Windows](manual-acceptance-v03.md). 테스트 서명 불일치를 해결하기 위해 사용자 앱을 삭제하지 않습니다.
+Keystore/Windows vault, DB encryption, stable release signing/updater, HEIC/GIF/SVG, 자동 Sync/Cloud avatar upload는 미구현입니다.
+
+---
+
 # Verification — v0.3 Android Expansion (2026-10-09)
 
 Windows PR #7의 main merge 0c1521a 위에서 feature/v0.3-android/PR #8을 검증합니다.
