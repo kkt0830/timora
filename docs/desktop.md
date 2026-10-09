@@ -6,7 +6,7 @@ Windows 10 실제 호환 확인은 아직 하지 않았습니다. macOS/Linux �
 ## 설치 및 실행
 
 [Desktop Actions](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)의 성공한
-`version/v0.3` 실행 → Artifacts → `timora-v0.3-windows-x64`를 다운로드/압축 해제합니다.
+`version/v0.3` 실행 → Artifacts → `timora-v0.3-windows-x64`를 다운로드/압축 해제합니다. 검수용 source bc90a62의 [성공한 artifact](https://github.com/kkt0830/timora/actions/runs/37880376091/artifacts/11594795491)가 생성됐습니다.
 `Timora_0.3.0_x64-setup.exe`(실제 파일명은 artifact 안에서 확인)로 설치하거나
 WebView2가 설치된 PC에서 `timora-desktop.exe`를 실행합니다.
 

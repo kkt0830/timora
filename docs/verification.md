@@ -13,8 +13,8 @@
 | Desktop-mode UI | IPC fixture + dev CSP: Cloud config 없이 시작, 외부 HTTP 차단, DB error retry/failed-save draft/hash reload/search, 기존 로컬 import 시작 차단 통과. 실제 native/Windows 검사 아님 |
 | SQLite core | 실제 temporary 파일 테스트 8개 통과; Linux, cargo test --locked --no-default-features |
 | Rust format | cargo fmt --check 성공 |
-| Remote schema / RLS regression | [CI 37878349039](https://github.com/kkt0830/timora/actions/runs/37878349039) web/database 성공; 격리 Postgres 16, 운영 DB 변경 없음 |
-| Windows exe / NSIS | [CI 37878349046](https://github.com/kkt0830/timora/actions/runs/37878349046) 성공, 2b3f0a6 artifact 생성; 최신 worker 수정의 재빌드 대기 |
+| Remote schema / RLS regression | [CI 37880376118](https://github.com/kkt0830/timora/actions/runs/37880376118) web/database 성공; 격리 Postgres 16, 운영 DB 변경 없음 |
+| Windows exe / NSIS | [CI 37880376091](https://github.com/kkt0830/timora/actions/runs/37880376091) 성공, bc90a62 Windows exe/NSIS 및 SQLite tests/format 통과 |
 | lint | 별도 lint 설정 없음; strict TS/Rust format 검사 |
 | 실제 Windows offline restart / IME | 미실행; 필수 수동 release gate |
 | Netlify / Supabase production | 이번 개발에서 재배포·schema/data/RLS 변경 없음 |
@@ -48,9 +48,21 @@ fetch 호출 0회를 검사합니다. Cloud preview tests는 mock Auth/read data
 - Windows native UI thread가 SQLite IO/busy wait에 막히지 않도록 worker에서 직렬 실행.
 - devCsp를 분리해 Vite inline preamble/HMR을 허용하고 production script CSP는 제한 유지.
 - 로컬 기록이 있으면 Cloud 로그인 전에 가져오기 불가 안내/비활성화. Native empty guard도 유지.
+- 앱 데이터 디렉터리 생성도 lazy DB open에서 수행해 디렉터리/권한 오류가 앱 시작을 종료하지 않고 Retry UI로 전달되도록 보완. 기존 파일 보존 테스트 통과.
 
 첫 Windows CI [37878113958](https://github.com/kkt0830/timora/actions/runs/37878113958)는
-옵션 전달 오류로 실패했고 성공으로 기록하지 않습니다. 이후 Windows 결과는 아래에 갱신합니다.
+옵션 전달 오류로 실패했고 성공으로 기록하지 않습니다. 최종 코드 bc90a62의 Windows CI는 성공했습니다.
+
+## Windows 산출물 — source bc90a62
+
+[Artifact 11594795491](https://github.com/kkt0830/timora/actions/runs/37880376091/artifacts/11594795491),
+`timora-v0.3-windows-x64`, zip 약 224 MB(223,835,610 bytes), exe/NSIS 포함.
+WebView2 offline installer를 포함해 크기가 큽니다. 이 기록 이후 문서만 갱신하며 실행 코드와
+빌드 설정은 위 source commit과 동일합니다. 사용자에게 이 artifact의 실제 Windows 검수를
+요청했으며 결과는 아직 PENDING입니다.
+
+CodeRabbit은 Draft PR 기본 정책에 따라 자동 review를 **건너뛰었습니다**.
+PR check의 표시가 pass여도 실제 CodeRabbit 코드 리뷰 완료를 의미하지 않습니다.
 
 ## 수동 합격 및 알려진 제한
 
