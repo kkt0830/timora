@@ -68,6 +68,7 @@ fn local_info(state: tauri::State<LocalState>) -> Result<Value, String> {
 }
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;

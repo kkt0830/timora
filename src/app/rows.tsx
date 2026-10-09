@@ -7,6 +7,7 @@ import { safeUrl } from '../domain/validation';
 import { messageOf, useWorkspace } from './providers';
 import type { EditorTarget } from './EntityEditor';
 import { Empty } from './components';
+import { ExternalLink } from './ExternalLink';
 
 export type OpenEditor = (target: EditorTarget) => void;
 export function ProjectLabel({ id }: { id: string | null }) {
@@ -30,5 +31,5 @@ export function NoteList({ notes, open }: { notes: Note[]; open: OpenEditor }) {
   return notes.length ? <div className="notes-grid">{notes.map(note => <article className="card note-card" key={note.id}><div className="note-actions"><span className="note-symbol"><FileText size={19} /></span><button type="button" className="text-link" aria-label={`${note.title} 수정 / 삭제`} onClick={() => open({ table: 'notes', item: note })}>수정 / 삭제</button></div><h2><button type="button" className="row-title" onClick={() => open({ table: 'notes', item: note })}>{note.title}</button></h2><p className="note-excerpt">{note.content.slice(0, 160) || '내용을 기록해 보세요.'}</p><div className="note-footer"><ProjectLabel id={note.project_id} /><time dateTime={note.updated_at}>{new Date(note.updated_at).toLocaleDateString('ko-KR')}</time></div></article>)}</div> : <Empty />;
 }
 export function LibraryList({ items, open }: { items: LibraryItem[]; open: OpenEditor }) {
-  return items.length ? <div>{items.map(item => <div className="list-row" key={item.id}><div><button type="button" className="row-title" onClick={() => open({ table: 'library_items', item })}>{item.title}</button><small>{item.description}</small><small><ProjectLabel id={item.project_id} /></small>{safeUrl(item.url) && <a className="resource-url" href={safeUrl(item.url)!} target="_blank" rel="noopener noreferrer">{item.url} ↗</a>}</div><span className="row-tag">{item.type}</span></div>)}</div> : <Empty />;
+  return items.length ? <div>{items.map(item => <div className="list-row" key={item.id}><div><button type="button" className="row-title" onClick={() => open({ table: 'library_items', item })}>{item.title}</button><small>{item.description}</small><small><ProjectLabel id={item.project_id} /></small>{safeUrl(item.url) && <ExternalLink className="resource-url" href={item.url}>{item.url} ↗</ExternalLink>}</div><span className="row-tag">{item.type}</span></div>)}</div> : <Empty />;
 }

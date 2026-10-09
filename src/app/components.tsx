@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 import { ArrowRight, Plus, X } from 'lucide-react';
 import { Button, IconButton } from '../design/components';
 import { safeUrl } from '../domain/validation';
+import { ExternalLink } from './ExternalLink';
 
 export function PageTitle({ eyebrow, title, description, action, onAction }: { eyebrow: string; title: string; description: string; action?: string; onAction?: () => void }) {
   return <div className="page-title"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action && <Button variant="primary" onClick={onAction}><Plus size={17} /><span>{action}</span></Button>}</div>;
@@ -27,7 +28,7 @@ function inline(text: string): ReactNode[] {
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
     if (part.startsWith('`') && part.endsWith('`')) return <code key={index}>{part.slice(1, -1)}</code>;
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (link && safeUrl(link[2])) return <a key={index} href={safeUrl(link[2])!} target="_blank" rel="noopener noreferrer">{link[1]}</a>;
+    if (link && safeUrl(link[2])) return <ExternalLink key={index} href={link[2]}>{link[1]}</ExternalLink>;
     return part;
   });
 }
