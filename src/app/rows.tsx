@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Check, FileText } from 'lucide-react';
 import type { CalendarEvent, LibraryItem, Note, Task } from '../domain/models';
 import { dateKey, formatInstant } from '../domain/dates';
+import { taskRangeLabel } from '../domain/task-groups';
 import { safeUrl } from '../domain/validation';
 import { messageOf, useWorkspace } from './providers';
 import type { EditorTarget } from './EntityEditor';
@@ -21,7 +22,7 @@ export function TaskRow({ task, open }: { task: Task; open: OpenEditor }) {
     const { id, user_id: _user, created_at: _created, updated_at: _updated, ...input } = task;
     try { await save('tasks', { ...input, status: task.status === 'done' ? 'todo' : 'done' }, id); } catch (e) { setError(messageOf(e)); }
   }
-  return <><div className="task-row"><button type="button" className={`checkbox-mock${task.status === 'done' ? ' checked' : ''}`} aria-label={`${task.title} ${task.status === 'done' ? '미완료로' : '완료로'} 변경`} aria-pressed={task.status === 'done'} disabled={busy} onClick={() => void toggle()}>{task.status === 'done' && <Check size={13} />}</button><div className="task-main"><button type="button" className={`row-title${task.status === 'done' ? ' done-text' : ''}`} onClick={() => open({ table: 'tasks', item: task })}>{task.title}</button><small><ProjectLabel id={task.project_id} />{task.status === 'in_progress' && ' · 진행 중'}</small></div><span className={`priority ${task.priority}`}>{task.priority === 'high' ? '중요' : task.priority === 'medium' ? '보통' : '낮음'}</span><time className={`task-date${task.status !== 'done' && task.due_date && task.due_date < dateKey() ? ' overdue' : ''}`} dateTime={task.due_date ?? undefined}>{task.status !== 'done' && task.due_date && task.due_date < dateKey() ? '기한 지남 · ' : ''}{task.due_date ?? '날짜 없음'}</time></div>{error && <p className="error" role="alert">{error}</p>}</>;
+  return <><div className="task-row"><button type="button" className={`checkbox-mock${task.status === 'done' ? ' checked' : ''}`} aria-label={`${task.title} ${task.status === 'done' ? '미완료로' : '완료로'} 변경`} aria-pressed={task.status === 'done'} disabled={busy} onClick={() => void toggle()}>{task.status === 'done' && <Check size={13} />}</button><div className="task-main"><button type="button" className={`row-title${task.status === 'done' ? ' done-text' : ''}`} onClick={() => open({ table: 'tasks', item: task })}>{task.title}</button><small><ProjectLabel id={task.project_id} />{task.status === 'in_progress' && ' · 진행 중'}</small><small>{taskRangeLabel(task, dateKey())}</small></div><span className={`priority ${task.priority}`}>{task.priority === 'high' ? '중요' : task.priority === 'medium' ? '보통' : '낮음'}</span><time className={`task-date${task.status !== 'done' && task.due_date && task.due_date < dateKey() ? ' overdue' : ''}`} dateTime={task.due_date ?? undefined}>{task.status !== 'done' && task.due_date && task.due_date < dateKey() ? '기한 지남 · ' : ''}{task.due_date ?? '날짜 없음'}</time></div>{error && <p className="error" role="alert">{error}</p>}</>;
 }
 export function TaskList({ tasks, open }: { tasks: Task[]; open: OpenEditor }) { return tasks.length ? <div>{tasks.map(task => <TaskRow key={task.id} task={task} open={open} />)}</div> : <Empty />; }
 export function EventList({ events, open }: { events: CalendarEvent[]; open: OpenEditor }) {

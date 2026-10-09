@@ -1230,3 +1230,8 @@ strong {
 .popover-workspace { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .popover-workspace small, .popover-workspace strong { display: block; }
 .note-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.task-groups { display: grid; gap: 16px; }
+.group-heading { width: 100%; display: flex; align-items: center; gap: 12px; justify-content: flex-start; margin-bottom: 8px; }
+.period-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.period-filters .selected { background: var(--accent); color: var(--on-accent); }

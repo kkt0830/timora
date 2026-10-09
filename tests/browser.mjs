@@ -17,7 +17,7 @@ try {
     if (attempt > 100) throw new Error(`Vite did not start: ${output}`);
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, executablePath: process.env.TIMORA_CHROMIUM_PATH || undefined });
   const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
   const tables = ['tasks', 'notes', 'projects', 'events', 'library_items', 'inbox_items'];
   const stores = { a: Object.fromEntries(tables.map(table => [table, []])), b: Object.fromEntries(tables.map(table => [table, []])) };
@@ -107,10 +107,22 @@ try {
   for (const name of ['Tasks (0)', 'Notes (0)', 'Events (0)', 'Library (0)', 'Overview']) await page.getByRole('button', { name, exact: true }).click();
   await nav('Tasks');
   await create('새 작업', 'Task A', async dialog => {
-    await dialog.getByLabel('마감일', { exact: true }).fill(new Date().toLocaleDateString('en-CA'));
+    await dialog.getByRole('button', { name: '오늘', exact: true }).click();
+    assert.equal(await dialog.getByLabel('시작일', { exact: true }).inputValue(), new Date().toLocaleDateString('en-CA'));
+    assert.equal(await dialog.getByLabel('마감일', { exact: true }).inputValue(), new Date().toLocaleDateString('en-CA'));
     await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' });
     await dialog.getByLabel('우선순위', { exact: true }).selectOption('high');
   });
+  const group = page.locator('.group-heading').first();
+  assert.match(await group.innerText(), /오늘\s*1/);
+  await group.click(); assert.equal(await group.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.getByRole('button', { name: 'Task A', exact: true }).isVisible(), false);
+  await page.reload(); await visible(page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }));
+  assert.equal(await group.getAttribute('aria-expanded'), 'false');
+  await group.click(); await visible(page.getByRole('button', { name: 'Task A', exact: true }));
+  await page.locator('.period-filters').getByRole('button', { name: '오늘', exact: true }).click();
+  await visible(page.getByRole('button', { name: 'Task A', exact: true }));
+  await page.locator('.period-filters').getByRole('button', { name: '전체', exact: true }).click();
   await page.getByRole('button', { name: 'Task A 완료로 변경' }).click();
   await visible(page.getByRole('button', { name: 'Task A 미완료로 변경' }));
   await page.getByRole('button', { name: 'Task A', exact: true }).click();
