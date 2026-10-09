@@ -11,7 +11,12 @@ playwright-report/
 deploy-*.zip
 
 src-tauri/target/
-src-tauri/gen/
+src-tauri/gen/*
+!src-tauri/gen/android/
+*.apk
+*.aab
+*.jks
+*.keystore
 *.db
 *.db-wal
 *.db-shm

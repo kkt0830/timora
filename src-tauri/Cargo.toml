@@ -5,6 +5,7 @@ edition = "2021"
 
 [lib]
 name = "timora_local"
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
 name = "timora-desktop"
@@ -22,11 +23,11 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 url = "2"
-tauri = { version = "2", optional = true }
+tauri = { version = "2", optional = true , features = [] }
 tauri-plugin-opener = { version = "2", optional = true }
 
 [build-dependencies]
-tauri-build = { version = "2", optional = true }
+tauri-build = { version = "2", optional = true , features = [] }
 
 [dev-dependencies]
 tempfile = "3"

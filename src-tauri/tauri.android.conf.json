@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "app.timora.android",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Timora"
+      }
+    ]
+  },
+  "bundle": {
+    "targets": "all",
+    "android": {
+      "minSdkVersion": 24,
+      "versionCode": 3000
+    }
+  }
+}
