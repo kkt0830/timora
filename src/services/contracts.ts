@@ -1,6 +1,6 @@
 import type { EntityInput, EntityMap, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models.ts';
 
-export interface Account { id: string; email?: string; user_metadata?: { display_name?: string } }
+export interface Account { id: string; email?: string; local?: boolean; user_metadata?: { display_name?: string } }
 export interface AuthService {
   restore(): Promise<Account | null>;
   subscribe(listener: (account: Account | null) => void): () => void;

@@ -9,3 +9,10 @@ test-results/
 playwright-report/
 .netlify/
 deploy-*.zip
+
+src-tauri/target/
+src-tauri/gen/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
