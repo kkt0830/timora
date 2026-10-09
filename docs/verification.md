@@ -13,9 +13,9 @@ Windows PR #7의 main merge 0c1521a 위에서 feature/v0.3-android/PR #8을 검�
 | Android ARM64 Rust + bundled rusqlite | 실제 target compile 성공 |
 | Android ARM64 debug APK | 로컬 생성·apksigner verify 성공; app.timora.android / versionCode 3000 / min API 24 / target 37 |
 | Android AAB | 로컬 ARM64 debug AAB 생성 성공; production signing/Play Store 미검증 |
-| Windows CI | source df7d829의 run 37891475220 성공, exe/NSIS artifact 11598483957 |
-| Android CI / emulator native force-stop | 첫 setup failure 수정 후 최신 run 검증 진행 |
-| Web/Postgres CI | 첫 Android viewport fixture timing failure 수정 후 최신 run 검증 진행 |
+| Windows CI | source 321cc44의 [run 37894689481](https://github.com/kkt0830/timora/actions/runs/37894689481) 성공, exe/NSIS [artifact 11600036347](https://github.com/kkt0830/timora/actions/runs/37894689481/artifacts/11600036347) |
+| Android CI / emulator native force-stop | source 321cc44의 [run 37894689356](https://github.com/kkt0830/timora/actions/runs/37894689356) 성공: 비행기 모드에서 실제 IPC/SQLite 6개 Entity/settings 저장·강제 종료·재실행·identity/관계/날짜/Markdown 보존·HashRouter/system Back |
+| Web/Postgres CI | source f83d647의 [run 37895317119](https://github.com/kkt0830/timora/actions/runs/37895317119) 성공: Web/desktop-mode/Android-mode fixture와 격리 Postgres RLS |
 | 실제 Android 기기 | 미실행; 설치/비행기 모드/CRUD/process 종료/보존/Task groups/IME/모바일 UX gate PENDING |
 | 실제 Windows PC | 기존 수동 gate PENDING 기록 유지 |
 | Cloud import 실제 사용자/외부 browser intent | shared 구현/모의 service 검사; 실제 Android 계정·기기 확인 대기 |
@@ -25,9 +25,28 @@ setup package/현재 command-line tools 및 dialog 높이/resize 대기 검사�
 로컬 환경은 JRE만 있어 JDK 21 설치가 필요했고 JVM 프록시/CA 설정을 환경 안에서
 설정했습니다. 이 환경 설정/credentials/keystore를 repository에 포함하지 않습니다.
 
-Browser fixture는 IPC 모형이며 native Android SQLite 검사가 아닙니다. android-device-smoke는
-API 36 emulator의 실제 Tauri IPC/SQLite와 6개 Entity/settings/identity/관계/날짜/Markdown을
-force-stop 뒤 검사하도록 구성합니다. 이 검사도 실제 Samsung Keyboard/Gboard를 대체하지 않습니다.
+처음의 native smoke 연결 실패는 Android WebView에 desktop connectOverCDP를 사용해
+`Browser.setDownloadBehavior: Browser context management is not supported`가 발생한 것이었습니다.
+Crash log와 마지막 연결 오류로 확인했고, Playwright Android 전용 WebView transport로 수정해
+위 run이 통과했습니다. 실패한 run 37892128822/37892517095/37893231237은 성공 기록에 포함하지 않습니다.
+
+Browser fixture는 IPC 모형이며 native Android SQLite 검사가 아닙니다. API 36 emulator의
+실제 Tauri IPC/SQLite 검사는 위 별도 run에서 수행했습니다. 이 검사도 실제 Samsung
+Keyboard/Gboard를 대체하지 않습니다. 이후 f83d647에서 각 Entity의 수정·조회·임시 항목 삭제를
+추가한 native CRUD 검사 결과도 별도로 확인합니다. Android screenshot은 CDP fullPage 대신
+adb screencap으로 OS bars를 포함한 실제 화면을 캡처합니다.
+
+## 설치 가능한 APK 후보 — source 321cc44
+
+[Artifact 11600246288](https://github.com/kkt0830/timora/actions/runs/37894689356/artifacts/11600246288),
+`timora-v0.3-android-arm64-test`, ZIP 75,958,094 bytes, 30일 보관.
+`arm64/debug/app-arm64-debug.apk`는 실제 ARM64 기기용이며
+`x86_64/debug/app-x86_64-debug.apk`는 에뮬레이터용입니다.
+두 파일을 내려받아 apksigner 검증을 다시 통과했고 aapt로 architecture/application ID/
+versionName 0.3.0/versionCode 3000/min API 24/target 37을 확인했습니다.
+ZIP SHA-256: `a01f773768fefa8bb5113f6e0054c254e528fcee8cda87fee199e3978ff032bc`.
+이후 변경은 테스트/문서이며 제품 runtime/schema는 이 APK와 동일합니다.
+Debug 서명/업데이트 제한과 설치 전 개인 데이터 보존 주의는 [android.md](android.md)를 따릅니다.
 
 [Android 환경/기술 질문](android.md), [Android manual acceptance](manual-acceptance-v03-android.md),
 [Windows manual acceptance](manual-acceptance-v03.md), [PR #8 checks](https://github.com/kkt0830/timora/pull/8/checks).

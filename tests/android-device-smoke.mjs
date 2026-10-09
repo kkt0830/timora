@@ -1,7 +1,7 @@
 // Real Android emulator/native IPC/SQLite check; physical device/IME acceptance is separate.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 const { _android } = await import(process.env.TIMORA_PLAYWRIGHT_MODULE ?? 'playwright');
 const appId = 'app.timora.android';
 const adb = (...args) => execFileSync('adb', args, { encoding: 'utf8', timeout: 30_000 }).trim();
@@ -90,7 +90,10 @@ try {
   await page.getByRole('heading', { name: '오늘도 나의 흐름으로 👋' }).waitFor();
   assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), false);
   assert.equal(adb('shell', 'settings', 'get', 'global', 'airplane_mode_on'), '1');
-  await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/android-emulator-offline.png', fullPage: true });
+  // Capture the actual Android screen, including bars. CDP fullPage capture can
+  // repeat compositor tiles in WebView and does not represent the visible device.
+  await mkdir('test-results', { recursive: true });
+  await writeFile('test-results/android-emulator-offline.png', execFileSync('adb', ['exec-out', 'screencap', '-p'], { timeout: 30_000 }));
   console.log('Android emulator: six-entity CRUD/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
 } finally {
   await session?.device.close();
