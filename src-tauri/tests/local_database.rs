@@ -253,6 +253,10 @@ fn import_never_overwrites_an_existing_local_workspace() {
 #[test]
 fn future_versions_corruption_and_failed_migrations_are_never_reset() {
     let dir = tempdir().unwrap();
+    let blocked = dir.path().join("blocked-directory");
+    std::fs::write(&blocked, b"keep existing file").unwrap();
+    assert!(Database::open(&blocked.join("timora.db")).is_err());
+    assert_eq!(std::fs::read(&blocked).unwrap(), b"keep existing file");
     let path = dir.path().join("future.db");
     let conn = Connection::open(&path).unwrap();
     conn.execute_batch("CREATE TABLE precious (content TEXT); INSERT INTO precious VALUES('keep'); PRAGMA user_version=99;").unwrap();

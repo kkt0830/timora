@@ -205,6 +205,9 @@ pub struct Database {
 }
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("Local DB 디렉터리를 열 수 없습니다: {e}. 기존 파일을 보존하고 접근 권한을 확인해 주세요."))?;
+        }
         let mut conn = Connection::open(path).map_err(sql_error)?;
         conn.busy_timeout(Duration::from_secs(5))
             .map_err(sql_error)?;
