@@ -72,9 +72,10 @@ fixtures를 모두 rollback했습니다. 작은 settings table의 현재 migrati
 두 CHECK를 즉시 검증합니다. lock_timeout 5초를 두며, 큰 테이블에 배포할
 경우 NOT VALID 추가와 별도 검증 transaction으로 분리하는 개선을 검토합니다.
 
-## v0.3 Local SQLite schema v1
+## v0.3 Local SQLite schema v2
 
-실행 기준: `src-tauri/migrations/001_initial_local_schema.sql`, native validator
+실행 기준: `src-tauri/migrations/001_initial_local_schema.sql` +
+`002_local_account_profile.sql`, native validator
 `src-tauri/src/lib.rs`. Cloud 테이블/정책/migration 변경은 없습니다.
 
 6개 Entity의 위 필드는 그대로 사용하지만 UUID/date/instant는 SQLite TEXT로 저장합니다.
@@ -84,7 +85,7 @@ UUID/created_at/updated_at/date-only/RFC3339/관계/내용을 그대로 보존�
 
 | 구조 | 주요 필드/규칙 |
 | --- | --- |
-| local_identity | singleton=1 PK, id unique, cloud_user_id nullable, imported_at nullable |
+| local_identity | singleton=1 PK, id unique, cloud_user_id/imported_at nullable, access_state, email, cloud_project_url, last_authenticated_at, created_at, local_avatar |
 | 6개 Entity | id PK, user_id, created_at, updated_at, remote_updated_at nullable, sync_state(local/imported/modified) + 기존 필드 |
 | workspace_settings | user_id PK, workspace_name, appearance, display_name, avatar_url nullable, updated_at |
 | tombstones | (entity_table,id) PK, remote_updated_at, deleted_at |
@@ -95,13 +96,20 @@ updated_at 정렬 index 및 project_id FK index를 포함합니다. 제목·내�
 SQL CHECK와 native validator로 보호합니다. RFC3339/정확한 date/HTTP(S) URL/UUID 검증은
 native 계층에서 수행합니다. UI 검증을 우회한 IPC에도 적용합니다.
 
-FK ON, WAL, synchronous FULL. `PRAGMA user_version`으로 version을 확인한 뒤 v0→v1
-migration+local UUID+default settings를 하나의 transaction으로 적용합니다.
-버전>1은 변경하지 않고 거부하며, migration/손상 오류는 reset하지 않습니다.
-향후 v2 migration은 별도 SQL/순서 분기로 추가하고 기존 데이터를 보존해야 합니다.
+FK ON, WAL, synchronous FULL. `PRAGMA user_version=2`.
+새 DB는 001+002+UUID/settings를 한 transaction으로 만들고 access_state=new로 시작합니다.
+기존 v1은 002를 한 transaction으로 적용하며 access_state=local_only로 기록/UUID를 보존합니다.
+버전>2는 변경하지 않고 거부합니다. migration 실패/손상은 reset하지 않습니다.
 
-local_identity.cloud_user_id는 원본 Cloud owner 매핑이며 local 계정을 대체하지 않습니다.
-행 user_id를 local UUID로 바꾸는 이유는 토큰/Cloud 계정 없이 로컬 작업을 유지하기 위해서입니다.
+access_state: new / local_only / signed_in / signed_out. signed_in은 Cloud token 유효 여부가
+아닌 로컬 사용 자격입니다. Native runtime이 build-configured Auth 서버에서 검증한
+Cloud 계정을 연결할 때만 signed_in으로 바꿉니다. signed_out/new는 데이터 IPC가 거부됩니다.
+email/cloud_project_url/last_authenticated_at은 마지막 서버 인증 결과입니다. created_at은
+새 Identity 생성 시각이며 v1 migration에서는 원래 생성 시각이 없어서 migration 시각을 기록합니다.
+닉네임과 Cloud avatar URL은 기존 workspace_settings 필드를 재사용해 중복 Identity column을 피합니다.
+local_avatar는 private PNG filename UUID.png뿐이며 절대 경로/content URI/토큰/비밀번호가 아닙니다.
+Cloud ID가 이미 연결되었거나 기존 import mapping이 있으면 다른 계정으로 변경할 수 없습니다.
+
 개별 Entity remote_updated_at은 import 기준값이며 로컬 수정 뒤에도 유지합니다.
 imported 행 삭제에만 tombstone을 남깁니다. local-only 행 삭제는 물리 삭제입니다.
 원자적 Inbox 이동/Project detach/import rollback을 실제 파일 tests로 검증합니다.
@@ -112,7 +120,7 @@ DB encryption이 없습니다. 보안·가져오기 제한은 [offline.md](offli
 
 ## Android expansion
 
-Android는 위 Local schema v1/migration/identity/FK/transaction/metadata/tombstones를 그대로
-사용합니다. schema/column/RLS 변경 없음. app_data_dir는 Android sandbox app data 영역이며
+Android와 Windows는 같은 Local schema v2/migration/identity/FK/transaction/metadata/tombstones를
+사용합니다. Android 전용 schema와 Cloud schema/RLS 변경은 없습니다. app_data_dir는 Android sandbox app data 영역이며
 Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존한 Entity UUID를 사용합니다.
 Sync는 아직 실행하지 않습니다. Android process termination 확인은 플랫폼별 acceptance입니다.

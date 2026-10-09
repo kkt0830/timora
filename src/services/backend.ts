@@ -4,10 +4,9 @@ import { desktopInvoke, LocalAuth, LocalWorkspaceRepository } from '../data/loca
 import { isNative } from './runtime';
 
 export function createBackend() {
-  if (isNative) return { error: '', auth: new LocalAuth(desktopInvoke), repository: new LocalWorkspaceRepository(desktopInvoke) };
   const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '');
   const publishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '').trim();
-  if (!url || !publishableKey) return { error: 'Supabase 연결 설정이 필요합니다. PC에서 .env를 설정한 뒤 다시 실행해 주세요.', auth: null, repository: null };
+  if (!url || !publishableKey) return isNative ? { error: '', auth: new LocalAuth(desktopInvoke), repository: new LocalWorkspaceRepository(desktopInvoke) } : { error: 'Supabase 연결 설정이 필요합니다. PC에서 .env를 설정한 뒤 다시 실행해 주세요.', auth: null, repository: null };
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname))) throw new Error('URL');
@@ -18,7 +17,8 @@ export function createBackend() {
       if (payload.role !== 'anon') throw new Error('Key');
     } else if (!publishableKey.startsWith('sb_publishable_')) throw new Error('Key');
     const config = { url, publishableKey };
+    if (isNative) return { error: '', auth: new LocalAuth(desktopInvoke, config), repository: new LocalWorkspaceRepository(desktopInvoke) };
     const auth = new SupabaseAuth(config, localStorage);
     return { error: '', auth, repository: new SupabaseRepository(config, auth) };
-  } catch { return { error: 'Supabase URL 또는 공개 키 설정을 확인해 주세요. Secret/service_role 키는 브라우저에 사용할 수 없습니다.', auth: null, repository: null }; }
+  } catch { return isNative ? { error: '', auth: new LocalAuth(desktopInvoke), repository: new LocalWorkspaceRepository(desktopInvoke) } : { error: 'Supabase URL 또는 공개 키 설정을 확인해 주세요. Secret/service_role 키는 브라우저에 사용할 수 없습니다.', auth: null, repository: null }; }
 }

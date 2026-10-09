@@ -39,7 +39,8 @@ try {
   });
   await context.exposeBinding('fixtureInvoke', async (_source, command, args) => {
     commands.push(command);
-    if (command === 'local_account') { if (openFailure) throw new Error('Local migration 실패 (fixture)'); return { id: owner, local: true }; }
+    if (command === 'local_account') { if (openFailure) throw new Error('Local migration 실패 (fixture)'); return { id: owner, local: true, local_only: true }; }
+    if (command === 'local_avatar') return null;
     if (command === 'local_load') return data;
     if (command === 'local_info') return { id: owner, cloud_user_id: null, imported_at: null, path: 'fixture/timora.db' };
     if (command === 'plugin:opener|open_url') { openedUrls.push(args.url); return null; }

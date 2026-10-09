@@ -18,7 +18,8 @@
     "android:dev": "tauri android dev",
     "android:build": "tauri android build",
     "android:apk": "tauri android build --apk --target aarch64",
-    "test:browser:android": "node tests/android-ui.mjs"
+    "test:browser:android": "node tests/android-ui.mjs",
+    "test:browser:native-account": "node tests/native-account-ui.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.2",

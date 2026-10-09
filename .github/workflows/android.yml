@@ -1,7 +1,7 @@
 name: Timora Android checks
 on:
   push:
-    branches: [main]
+    branches: [main, version/v0.3]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       NDK_VERSION: 30.0.16248370
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +46,7 @@ jobs:
         run: |
           sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;$NDK_VERSION"
           echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - run: node scripts/validate-native-config.mjs
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
@@ -51,7 +54,7 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
       # Uses the committed Android project. Do not regenerate/overwrite MainActivity in CI.
       # --debug packages built frontend assets, not a running Vite dev server.
-      - name: Build installable ARM64 and emulator test APKs without Cloud configuration
+      - name: Build installable ARM64 and emulator test APKs with public Cloud configuration
         run: npm run android:build -- --apk --debug --target aarch64 x86_64 --split-per-abi --ci
       - name: Verify test APK signature and identity
         run: |

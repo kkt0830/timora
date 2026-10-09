@@ -55,3 +55,15 @@ WebView2 버전 / 성공 또는 오류 메시지. 비밀번호·인증 링크·�
 
 Windows 10, 실제 사용자 Cloud import, 설치/업데이트 후 데이터 보존은 별도 결과를 기록한다.
 모든 필수 A~E를 확인한 뒤 verification/README 및 PR Manual Verification을 실제 결과로 갱신한다.
+
+## Native account/profile 개선 — 추가 실기기 gate
+
+- [ ] 공개 설정을 포함한 같은 서명 installer에서 새 회원가입/로그인 → 로컬 기록 저장.
+- [ ] 인터넷 차단 → 실제 Windows process 종료 → 재실행: 계정/기록 유지.
+- [ ] Cloud 세션 재인증 필요/장애가 로컬 CRUD를 막지 않음.
+- [ ] 명시적 logout은 기록/사진 보관, 같은 계정 재로그인 복원, B 접근/import 거부.
+- [ ] v1 anonymous DB 업데이트: UUID/자료/설정 보관 및 optional 연결.
+- [ ] Windows native 사진 선택 → private copy → 원본 삭제 → process 종료 → offline 재실행 보존.
+- [ ] 선택 취소/손상/10 MB 초과 오류는 기존 사진 보존. 기존 IME/Back/WebView2 회귀.
+
+새 개선의 Windows 실기기 결과는 PENDING입니다. Windows compile/NSIS 생성만으로 체크하지 않습니다.

@@ -1,6 +1,8 @@
 # v0.3 Android Manual Acceptance
 
-현재 실제 기기 결과: **PENDING**. CI/에뮬레이터/브라우저 fixture로 체크하지 않습니다.
+기존 Android Tablet basic smoke: **사용자 보고로 앱 실행·기본 UI/Workspace에 특별한 문제 없음 확인**.
+모델/Android/WebView/상세 CRUD 범위는 미제공이며 포괄적 PASS를 의미하지 않습니다.
+이번 계정 유지·사진·Phone 실기기 결과: **PENDING**. CI/에뮬레이터/브라우저 fixture로 체크하지 않습니다.
 Windows 합격 기록은 기존 [manual-acceptance-v03.md](manual-acceptance-v03.md)를 유지합니다.
 
 기록: tester / 날짜 / 기기 모델 / Android 버전 / WebView 버전 / keyboard 이름·버전 /
@@ -10,10 +12,10 @@ artifact commit SHA / application ID / app version / 각 항목 PASS 또는 오�
 ## A — Install
 
 - [ ] 성공한 Android Actions의 arm64 debug APK를 비어 있는 테스트 프로필에 설치한다.
-- [ ] Cloud 설정 없이 Timora가 실행되며 crash/과도한 permission 요청이 없다.
+- [ ] 새 설치는 공유 로그인/가입 화면, 로그인 후 Local Workspace. 과도한 permission/crash 없음.
 - [ ] Local Workspace와 DB 위치가 열리고 app-private sandbox 경로다.
 
-## B — Offline launch
+## B — Offline launch (첫 온라인 로그인 후)
 
 - [ ] 앱을 완전히 종료하고 비행기 모드를 켠다. Wi-Fi도 꺼져 있는지 확인한다.
 - [ ] 설치 APK로 실행한다. 개발 Vite 서버나 Cloud 연결 대기 없이 열린다.
@@ -70,11 +72,34 @@ artifact commit SHA / application ID / app version / 각 항목 PASS 또는 오�
 
 별도의 **빈 테스트 Workspace**에서만 검사합니다. 개인 로컬 기록을 지우지 않습니다.
 
-- [ ] Network ON → Cloud login → counts preview → 확인 → import.
+- [ ] Network ON → 같은 계정 연결 → Cloud login → counts preview → 확인 → import.
 - [ ] 원본 ID/관계/날짜/원문/시각 보존 및 Cloud 내용 불변 확인.
 - [ ] Network OFF → local edit → force-stop/relaunch → 보존.
 - [ ] 기존 로컬 자료/반복 import를 덮어쓰지 않음. password/token 미저장 정책 확인.
 
 필수 A~H가 실제 기기에서 PASS여야 Android 완료로 표시합니다.
 I를 생략했다면 실제 사용자 Cloud import는 Needs verification으로 남깁니다.
-APK/CI만 PASS인 경우 release candidate와 Draft PR 상태를 유지합니다.
+APK/CI만 PASS인 경우 검증 후보 상태를 유지합니다. 이번 변경은 새 PR 없이 version/v0.3에 반영합니다.
+
+## J — Native account / private photo (새 개선 필수 gate)
+
+아래는 기존 Tablet smoke와 별도로 **새 source APK**에서 실제 확인합니다. 개인 기록이 있는
+앱을 삭제하지 말고 같은 서명 업데이트 또는 비어 있는 별도 기기 테스트 프로필을 사용합니다.
+
+- [ ] 새 설치: 로그인/회원가입 UI → 실제 계정 A 인증 → Home. 메일 확인 뒤 앱 재로그인 가능.
+- [ ] Task/Note 저장 → 강제 종료 → 재실행: 같은 계정/로컬 기록.
+- [ ] 비행기 모드/Wi-Fi OFF → 강제 종료 → 재실행: 로그인 화면 없이 로컬 CRUD 가능.
+- [ ] Supabase 연결 실패/Cloud session 만료에서도 로컬 기록 보존/사용 가능.
+- [ ] Profile Cloud 재인증 필요 상태 → 네트워크 복귀 → A 재인증, local UUID/기록 불변.
+- [ ] Logout 확인 취소는 기록을 계속 사용, 승인은 Login UI. 강제 종료 후에도 Login UI.
+- [ ] Logout 후 A 재로그인으로 자료 복원. B 로그인/가져오기 거부, A 기록 비노출·보존.
+- [ ] 기존 v1 업데이트: UUID/자료/설정 유지, 연결/Later 안내, 연결 시 기존 기록 보관.
+- [ ] Profile PNG/JPEG/WebP 선택 → 실제 Android picker → 사진 저장. broad media 권한 없음.
+- [ ] 시스템 picker 취소/읽기 불가/10 MB 초과/손상 파일은 기존 사진을 보존하고 오류 안내.
+- [ ] 원본 gallery 파일 삭제 → 강제 종료 → 재실행 → 사진/닉네임 유지.
+- [ ] 오프라인 → 강제 종료 → 재실행 → 사진 유지. Profile와 sidebar 같은 사진.
+- [ ] 사진 제거/닉네임 수정 → 재실행/offline 유지. Cloud 업로드/자동 sync 없음.
+- [ ] Tablet과 별도로 Phone portrait/landscape/키보드/Back를 확인. 미수행은 PENDING.
+
+상태: 위 J 전체 PENDING. CI의 mocked Auth/IPC, seed한 anonymous DB, SQLite reopen은
+실제 Supabase 첫 로그인→Native process restart를 대체하지 않습니다.

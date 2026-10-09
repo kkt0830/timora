@@ -1,14 +1,15 @@
 # Requirements — Timora v0.3
 
 기존 v0.2 UI/서비스와 main에 병합된 Windows v0.3(PR #7)을 보존하며
-feature/v0.3-android에서 Android를 확장합니다. 각 플랫폼 실제 오프라인 재실행·IME
+이번 계정/사진 개선은 version/v0.3에 새 PR 없이 직접 반영합니다. 각 플랫폼 실제 오프라인 재실행·IME
 합격이 정식 완료 조건입니다. Windows 구현 이력을 삭제하지 않습니다.
 
 ## 필수 범위
 
 - Tauri 2, Windows 11 우선, 재사용하는 React UI/디자인/9개 화면/Profile/Search.
 - 실제 SQLite 파일, 앱 데이터 디렉터리, 안정된 로컬 UUID, versioned transaction migration.
-- Cloud 로그인/환경 변수/네트워크 없이 Desktop 시작 및 핵심 CRUD·검색·설정 저장.
+- 새 Native 설치는 공유 회원가입/로그인으로 시작. 첫 로그인 후 Local Identity를 보존하고
+  재실행/오프라인/Cloud 오류·만료에서 핵심 CRUD·검색·설정 사용 유지. 기존 익명 DB는 보존.
 - 6개 Entity CRUD, Task 완료/priority/start/due/Project, Markdown, Calendar,
   Project 상세, Inbox 원자적 Task/Note 변환. Project 삭제는 연결만 해제합니다.
 - 명시적 Cloud → Local 최초 가져오기: 로그인·미리보기·확인, 빈 로컬만 허용,
@@ -21,7 +22,8 @@ feature/v0.3-android에서 Android를 확장합니다. 각 플랫폼 실제 오�
 ## 구현 결정
 
 - `WorkspaceRepository`를 Local/Supabase 두 adapter로 구현합니다. LocalAuth는
-  SQLite identity를 반환하며 Supabase Auth와 연결하지 않습니다. Web은 기존 인증 유지.
+  SQLite identity를 반환하며 첫 로그인/재인증에 메모리 Supabase Auth를 사용합니다.
+  Cloud user proof는 Native에서 다시 확인합니다. Web은 기존 인증 유지.
 - plugin에 임의 SQL/파일/쉘 권한을 주지 않고 allowlist CRUD command를 사용합니다.
   HTTP(S) 외부 링크만 scoped opener로 기본 브라우저에 엽니다.
 - Local schema v1에 `remote_updated_at`, `sync_state`, imported 행 삭제 tombstone을
@@ -31,8 +33,8 @@ feature/v0.3-android에서 Android를 확장합니다. 각 플랫폼 실제 오�
 - Task date-only / Event RFC3339 instant / Today day-overlap 규칙을 공유합니다.
   주는 월~일, 장기는 시작~마감 차이 90일 이상. 과거 완료 기록 그룹을 추가해
   완료 작업이 기한 지남·미래 할 일로 보이는 것을 방지합니다.
-- DB 암호화·OS credential vault는 이번에 구현하지 않습니다. Desktop Cloud 로그인은
-  가져오기 동안만 메모리에 유지하고 비밀번호/토큰을 SQLite/localStorage에 저장하지 않습니다.
+- DB 암호화·OS credential vault는 이번에 구현하지 않습니다. Native Cloud 세션은
+  프로세스 메모리에만 유지하고 비밀번호/토큰을 SQLite/localStorage에 저장하지 않습니다.
 - Desktop HashRouter, Web BrowserRouter. Custom titlebar 대신 native window를 유지합니다.
 
 ## 제외 및 release gate
@@ -59,3 +61,13 @@ Issue #4를 전체 close하지 않으며 Issue #5와 관련된 실제 구현/검
 - APK는 debug test signing; Store/production signing/update/notifications/widgets/share sheet 제외.
 - Android CI compile/APK/signature/emulator offline IPC/process termination; Windows exe/NSIS와 Web/RLS 회귀 유지.
 - 실제 기기 A~H gate는 docs/manual-acceptance-v03-android.md. CI/fixture로 수동 PASS를 대신하지 않음.
+
+## Native account/profile 개선
+
+- 기존 singleton local_identity를 schema v2로 transaction migration, UUID/기록/소유권 보존.
+- Identity와 Cloud 세션 분리; Local-only/온라인/오프라인/Cloud 재인증 상태.
+- 명시적 Logout 후 local IPC 잠금, 데이터/사진 보존, 같은 계정 복구, 다른 계정 연결/import 거부.
+- Native 시스템 사진 선택→타입/용량/디코딩 검증→private PNG 복사; 오프라인/원본 삭제 보존.
+- 닉네임 offline 저장; Web HTTPS URL 프로필 회귀 보존. 사진 Cloud Storage 업로드 제외.
+- 안전한 공통 OS credential store를 도입하지 않고 요구사항 §15의 메모리 fallback을 선택.
+- 사용자 보고 Tablet basic smoke만 확인. 새 계정 유지/사진/Phone/Windows 실제 gate는 별도 대기.

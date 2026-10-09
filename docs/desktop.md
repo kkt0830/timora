@@ -15,7 +15,8 @@ WebView2를 다운로드할 필요를 줄입니다. 개발/CI build 자체에는
 installer 다운로드를 위한 인터넷이 필요합니다. unsigned 검증용 빌드이며 code signing과
 자동 updater는 아직 없습니다. 빌드 완료와 실제 PC 합격은 구분합니다.
 
-Cloud 계정이나 `.env` 없이 Local Workspace로 시작합니다. 네트워크 없이도 Task/Note/
+새 설치는 공개 Supabase build 설정과 온라인 첫 로그인이 필요합니다. 로그인 후에는
+Cloud 계정 확인을 기다리지 않고 Local Workspace로 시작합니다. 기존 v1 익명 DB는 그대로 열립니다. 네트워크 없이도 Task/Note/
 Project/Event/Library URL metadata/Inbox/설정 생성·편집·삭제·검색이 가능합니다.
 외부 웹사이트·avatar 이미지를 오프라인에서 다운로드하거나 캐시하지 않습니다.
 
@@ -55,7 +56,7 @@ Settings → Cloud 가져오기 / DB 위치에서 확인합니다.
 UI 백업/복원 기능은 없습니다. 문제 해결을 위해 DB를 삭제하거나 schema version을 임의로
 바꾸지 마세요. 오류 메시지·앱 버전·경로를 기록하고 원본을 보존해 진단합니다.
 
-`PRAGMA user_version=1` migration은 transaction이며 실패하면 rollback합니다.
+`PRAGMA user_version=2` migration은 transaction이며 실패하면 rollback합니다.
 더 최신 버전의 DB나 손상된 DB는 오류/Retry를 표시하고 자동 초기화하지 않습니다.
 앱 identifier를 유지해 재설치/업데이트 후 같은 DB를 사용하도록 합니다.
 이 버전은 단일 로컬 Workspace이며 여러 OS 사용자/다른 PC DB를 자동 통합하지 않습니다.
@@ -76,3 +77,6 @@ Windows PR #7은 main에 병합됐고 Android 확장은 PR #8에서 같은 Datab
 Windows identifier/설치/DB 경로는 유지합니다. src/main.rs는 shared runtime.rs의 run 함수를 호출합니다.
 Android 프로젝트 추가 후에도 desktop.yml이 exe/NSIS를 다시 빌드합니다. 실제 PC 합격 결과는
 기존 Windows checklist를 유지하며 자동 CI를 수동 PASS로 바꾸지 않습니다.
+
+계정 연결/로그아웃/메모리 Cloud 세션과 private 사진 복사는 [offline.md](offline.md)를 참고하세요.
+이번 개선은 version/v0.3에 직접 반영하며 기존 Windows CI 합격과 새 실기기 합격을 구분합니다.

@@ -57,8 +57,10 @@ features retain CRUD, filters, Project context and readable empty/loading/error 
 ## v0.3 Desktop 및 Task 기간 UX
 
 Windows/Android Native는 같은 경로를 `/#/tasks`, `/#/search?q=...`처럼 HashRouter로 사용합니다.
-Cloud Auth 화면 대신 Local Workspace 초기화/오류 Retry를 표시합니다. Settings/프로필 메뉴의
-로그아웃은 Web에만 있고 Desktop에는 Cloud 가져오기/DB 위치가 있습니다.
+새 설치/명시적 로그아웃 후에는 공유 AuthPage를 표시합니다. 저장한 Identity/기존 익명 DB가
+있으면 Local Workspace를 바로 열고 DB 오류는 Retry로 처리합니다. Native /account에서
+기존 기록 연결 확인/나중에/Cloud 재인증을 제공합니다. 연결한 계정에는 데이터 보관 안내와
+확인 후 로그아웃을 제공합니다. 익명 Workspace는 연결 전 로그아웃을 표시하지 않습니다.
 `/cloud-import`는 Native local account에서만 접근할 수 있습니다. 로컬 시작 링크,
 URL/public key/Cloud 로그인, counts 미리보기, 취소·확인·오류·완료 상태를 제공합니다.
 
@@ -83,3 +85,8 @@ Desktop native titlebar/최소 800×600 창을 사용하고 외부 자료/Markdo
 미저장 Entity 폼 확인, root OS behavior. WebView는 system bars/cutout/IME inset으로 resize하고
 editor는 visualViewport 높이 안에서 스크롤합니다. 실제 Korean IME/portrait/landscape/
 외부 브라우저 전환은 Android manual acceptance에서 확인합니다. 새로운 Bottom navigation 없음.
+
+Native Profile은 계정 email/작은 Cloud 상태/닉네임/시스템 사진 선택·제거/로컬 저장 안내를
+표시합니다. UUID·DB 경로·import source ID는 primary Profile에 노출하지 않습니다. 사진은
+선택 즉시 private-copy 저장, 닉네임은 저장 버튼입니다. Sidebar도 같은 로컬 사진을 사용하고
+Web은 기존 HTTPS avatar URL 입력을 유지합니다.

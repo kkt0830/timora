@@ -214,7 +214,7 @@ impl Database {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(sql_error)?;
-        if version > 1 {
+        if version > 2 {
             return Err(
                 "이 DB는 더 새로운 Timora 버전에서 생성됐습니다. 업데이트한 앱으로 열어 주세요."
                     .into(),
@@ -231,9 +231,11 @@ impl Database {
                     "Local migration 실패. 기존 DB를 삭제하지 말고 진단 문서를 확인하세요."
                         .to_string()
                 })?;
+            tx.execute_batch(include_str!("../migrations/002_local_account_profile.sql"))
+                .map_err(sql_error)?;
             let id = Uuid::new_v4().to_string();
             tx.execute(
-                "INSERT INTO local_identity(singleton,id) VALUES(1,?1)",
+                "INSERT INTO local_identity(singleton,id,access_state,created_at) VALUES(1,?1,'new',strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
                 [&id],
             )
             .map_err(sql_error)?;
@@ -242,7 +244,18 @@ impl Database {
                 params![id, now()],
             )
             .map_err(sql_error)?;
-            tx.pragma_update(None, "user_version", 1)
+            tx.pragma_update(None, "user_version", 2)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version == 1 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/002_local_account_profile.sql"))
+                .map_err(|_| {
+                    "Local account migration 실패. 기존 DB를 보존하고 다시 시도해 주세요."
+                        .to_string()
+                })?;
+            tx.pragma_update(None, "user_version", 2)
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
@@ -260,9 +273,106 @@ impl Database {
             .map_err(sql_error)
     }
     pub fn account(&self) -> Result<Value> {
-        Ok(json!({"id":self.owner()?,"local":true}))
+        let identity = self.identity()?;
+        if !matches!(
+            identity["access_state"].as_str(),
+            Some("local_only" | "signed_in")
+        ) {
+            return Ok(Value::Null);
+        }
+        Ok(
+            json!({"id":self.owner()?,"local":true,"email":identity["email"],"cloud_user_id":identity["cloud_user_id"],"local_only":identity["access_state"] == "local_only"}),
+        )
+    }
+    fn identity(&self) -> Result<Value> {
+        Ok(json_rows(
+            &self.conn,
+            "SELECT id,cloud_user_id,imported_at,access_state,email,cloud_project_url,last_authenticated_at,created_at,local_avatar FROM local_identity WHERE singleton=1",
+            &[],
+        )?
+        .remove(0))
+    }
+    pub fn require_workspace(&self) -> Result<()> {
+        if self.account()?.is_null() {
+            return Err(
+                "이 기기의 Workspace 계정으로 로그인해 주세요. 로컬 기록은 보관되어 있습니다."
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+    /// Only the native runtime may call this after checking /auth/v1/user with its build-configured server.
+    pub fn bind_verified_account(&mut self, user: &Value, project_url: &str) -> Result<Value> {
+        let cloud_id = text(user, "id")?;
+        Uuid::parse_str(cloud_id).map_err(|_| "Cloud 계정 응답 오류")?;
+        let email = text(user, "email")?;
+        if email.is_empty() || email.len() > 320 {
+            return Err("Cloud 이메일 응답 오류".into());
+        }
+        let before = self.identity()?;
+        if before["cloud_user_id"]
+            .as_str()
+            .is_some_and(|id| id != cloud_id)
+            || before["cloud_project_url"]
+                .as_str()
+                .is_some_and(|url| url != project_url)
+        {
+            return Err("이 Workspace는 다른 계정에 연결되어 있습니다. 원래 계정으로 로그인해 주세요. 기록은 변경하지 않았습니다.".into());
+        }
+        let tx = self.conn.transaction().map_err(sql_error)?;
+        tx.execute("UPDATE local_identity SET cloud_user_id=?1,email=?2,cloud_project_url=?3,access_state='signed_in',last_authenticated_at=?4 WHERE singleton=1",params![cloud_id,email,project_url,now()]).map_err(sql_error)?;
+        if let Some(name) = user["user_metadata"]["display_name"]
+            .as_str()
+            .filter(|n| !n.trim().is_empty() && n.chars().count() <= 64)
+        {
+            tx.execute(
+                "UPDATE workspace_settings SET display_name=?1,updated_at=?2 WHERE display_name=''",
+                params![name.trim(), now()],
+            )
+            .map_err(sql_error)?;
+        }
+        tx.commit().map_err(sql_error)?;
+        self.account()
+    }
+    pub fn sign_out(&mut self) -> Result<()> {
+        if self.identity()?["cloud_user_id"].is_null() {
+            return Err(
+                "먼저 로컬 기록을 계정에 연결해 주세요. 연결 전 기록은 그대로 보관됩니다.".into(),
+            );
+        }
+        self.conn
+            .execute(
+                "UPDATE local_identity SET access_state='signed_out' WHERE singleton=1",
+                [],
+            )
+            .map_err(sql_error)?;
+        Ok(())
+    }
+    pub fn avatar_name(&self) -> Result<Option<String>> {
+        self.require_workspace()?;
+        self.conn
+            .query_row(
+                "SELECT local_avatar FROM local_identity WHERE singleton=1",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(sql_error)
+    }
+    pub fn set_avatar_name(&mut self, name: Option<&str>) -> Result<()> {
+        self.require_workspace()?;
+        if name.is_some_and(|n| !valid_avatar_name(n)) {
+            return Err("프로필 사진 경로 오류".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE local_identity SET local_avatar=?1 WHERE singleton=1",
+                [name],
+            )
+            .map_err(sql_error)?;
+        Ok(())
     }
     pub fn load(&self) -> Result<Value> {
+        self.require_workspace()?;
         let mut data = Map::new();
         for table in TABLES {
             data.insert(
@@ -373,6 +483,7 @@ impl Database {
         .ok_or("저장 응답이 없습니다.".into())
     }
     pub fn save(&mut self, table: &str, input: Value, id: Option<String>) -> Result<Value> {
+        self.require_workspace()?;
         let owner = self.owner()?;
         let update = id.is_some();
         let id = id.unwrap_or_else(|| Uuid::new_v4().to_string());
@@ -408,11 +519,13 @@ impl Database {
         Ok(())
     }
     pub fn remove(&mut self, table: &str, id: &str) -> Result<()> {
+        self.require_workspace()?;
         let tx = self.conn.transaction().map_err(sql_error)?;
         Self::delete(&tx, table, id)?;
         tx.commit().map_err(sql_error)
     }
     pub fn convert(&mut self, id: &str, target: &str) -> Result<()> {
+        self.require_workspace()?;
         let owner = self.owner()?;
         let tx = self.conn.transaction().map_err(sql_error)?;
         let source = json_rows(
@@ -464,6 +577,7 @@ impl Database {
             .ok_or("설정 저장 실패".into())
     }
     pub fn save_settings(&mut self, input: Value) -> Result<Value> {
+        self.require_workspace()?;
         let owner = self.owner()?;
         let tx = self.conn.transaction().map_err(sql_error)?;
         let row = Self::settings(&tx, &owner, &input, false)?;
@@ -471,7 +585,11 @@ impl Database {
         Ok(row)
     }
     pub fn import(&mut self, cloud_user_id: &str, snapshot: Value) -> Result<()> {
+        self.require_workspace()?;
         Uuid::parse_str(cloud_user_id).map_err(|_| "Cloud 사용자 ID 오류")?;
+        if self.identity()?["cloud_user_id"].as_str() != Some(cloud_user_id) {
+            return Err("이 Workspace에 연결한 계정의 기록만 가져올 수 있습니다. 먼저 원래 계정으로 연결해 주세요.".into());
+        }
         let owner = self.owner()?;
         let tx = self.conn.transaction().map_err(sql_error)?;
         let imported: Option<String> = tx
@@ -519,6 +637,7 @@ impl Database {
         tx.commit().map_err(sql_error)
     }
     pub fn info(&self) -> Result<Value> {
+        self.require_workspace()?;
         Ok(json_rows(
             &self.conn,
             "SELECT id,cloud_user_id,imported_at FROM local_identity",
@@ -527,6 +646,14 @@ impl Database {
         .remove(0))
     }
 }
+
+pub fn valid_avatar_name(name: &str) -> bool {
+    name.strip_suffix(".png")
+        .is_some_and(|id| Uuid::parse_str(id).is_ok() && id.len() == 36)
+}
+
+mod profile;
+pub use profile::{normalize_avatar, AVATAR_INPUT_LIMIT};
 
 // Optional native shell; core-only SQLite tests stay independent of GUI dependencies.
 #[cfg(feature = "desktop")]

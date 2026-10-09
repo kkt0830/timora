@@ -1,6 +1,6 @@
 # Android — Timora v0.3 Local-first Application Foundation
 
-기존 Windows v0.3(PR #7) 위에 `feature/v0.3-android`로 Android를 추가합니다.
+Windows(PR #7)/Android(PR #8) 구현 위에 계정/로컬 사진 개선을 `version/v0.3`에 직접 반영합니다.
 동일한 React UI/domain/repository/Rust Database를 사용합니다. Android 전용 schema는 없습니다.
 실제 Galaxy 기기의 합격 여부는 [Android manual acceptance](manual-acceptance-v03-android.md)에
 기록합니다. CI/에뮬레이터 성공만으로 실제 기기 지원 완료를 선언하지 않습니다.
@@ -10,8 +10,9 @@
 [Android Actions](https://github.com/kkt0830/timora/actions/workflows/android.yml)의 성공한 실행에서
 `timora-v0.3-android-arm64-test` ZIP을 내려받아 압축을 풀고 **arm64 debug APK**를 설치합니다.
 Galaxy 등 ARM64 기기용이며 x86_64 APK는 CI 에뮬레이터용입니다. 필요 시 브라우저/파일 앱의
-'이 출처의 앱 설치 허용'을 설정합니다. 설치된 Timora는 .env/Cloud 로그인/Vite 서버 없이
-실행합니다. APK에 프론트엔드 assets와 bundled SQLite를 포함합니다.
+'이 출처의 앱 설치 허용'을 설정합니다. 새 설치는 온라인 회원가입/로그인으로 시작하고
+그 뒤 저장된 계정과 Workspace는 재실행/오프라인에서 유지됩니다. 기존 v1 익명 기록은
+그대로 열리고 Profile에서 나중에 계정을 연결할 수 있습니다. 일반 사용자는 .env/Vite 서버가 필요하지 않습니다. APK에 프론트엔드 assets와 bundled SQLite를 포함합니다.
 
 현재 APK는 **개발 테스트 서명**입니다. Play Store 배포/production signing/업데이트 보장은
 없습니다. CI runner별 debug 인증서가 달라 재설치 업데이트가 거부될 수 있습니다.
@@ -142,3 +143,21 @@ production keystore는 repository/PR/Actions artifact에 넣지 않습니다. �
 등록하고 job의 임시 파일로만 복원합니다. Gradle signingConfigs.release는 environment 또는
 ignored keystore.properties에서 읽도록 구성합니다. log 출력/평문 commit은 금지합니다.
 현재 workflow는 이 release signing 설정을 적용하지 않았고 test APK만 제공합니다.
+
+## Native account / photo build 설정
+
+개발 환경의 .env 또는 process environment에 VITE_SUPABASE_URL /
+VITE_SUPABASE_PUBLISHABLE_KEY를 설정합니다. Rust와 Vite는 같은 공개 설정을 읽습니다.
+Native는 HTTPS URL과 sb_publishable_ 키를 사용합니다. GitHub Actions에서는 Repository
+Variables의 같은 이름을 사용하며 배포 빌드는 누락/privileged key를 먼저 거부합니다.
+비밀번호/secret/service_role/signing key는 .env.example/Repository에 넣지 않습니다.
+
+Application ID는 app.timora.android, versionCode는 3001입니다. ID나 app data 경로를
+바꾸지 않았습니다. 같은 서명 APK 업데이트일 때 SQLite v1→v2로 보존합니다. debug runner
+서명은 여전히 배포마다 달라질 수 있으며 signing/updater를 구현한 것으로 표시하지 않습니다.
+
+사진 선택은 Tauri dialog의 Android 시스템 GET_CONTENT(image/*) 선택기입니다. Android
+ContentResolver를 통해 선택한 URI를 최대 10 MB+1까지 읽어 검증하고 profile/UUID.png로
+복사합니다. READ_MEDIA_IMAGES/READ_EXTERNAL_STORAGE 같은 broad permission을 추가하지 않습니다.
+Windows도 같은 private-copy 처리와 native 파일 선택기를 사용합니다. HEIC/GIF/SVG는 미지원입니다.
+계정/사진은 [offline](offline.md), 새로운 실기기 검수는 [manual acceptance](manual-acceptance-v03-android.md)를 참고합니다.

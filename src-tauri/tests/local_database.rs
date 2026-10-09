@@ -6,6 +6,17 @@ use uuid::Uuid;
 
 const CLOUD: &str = "11111111-1111-4111-8111-111111111111";
 const STAMP: &str = "2026-01-01T09:00:00+09:00";
+fn open_fixture(path: &std::path::Path) -> Database {
+    let mut db = Database::open(path).unwrap();
+    if db.account().unwrap().is_null() {
+        db.bind_verified_account(
+            &json!({"id":CLOUD,"email":"fixture@example.com"}),
+            "https://test.supabase.co",
+        )
+        .unwrap();
+    }
+    db
+}
 fn input(table: &str, project: Option<&str>) -> Value {
     match table {
         "projects" => {
@@ -52,7 +63,7 @@ fn all_entities_and_identity_persist_after_closing_the_real_file() {
     let path = dir.path().join("timora.db");
     let (owner, saved);
     {
-        let mut db = Database::open(&path).unwrap();
+        let mut db = open_fixture(&path);
         owner = db.owner().unwrap();
         assert!(db.account().unwrap()["local"].as_bool().unwrap());
         let project = db.save("projects", input("projects", None), None).unwrap();
@@ -77,7 +88,7 @@ fn all_entities_and_identity_persist_after_closing_the_real_file() {
         db.save_settings(json!({"workspace_name":"내 공간","appearance":"dark","display_name":"이름","avatar_url":null})).unwrap();
         saved = db.load().unwrap();
     }
-    let mut reopened = Database::open(&path).unwrap();
+    let mut reopened = open_fixture(&path);
     assert_eq!(reopened.owner().unwrap(), owner);
     assert_eq!(reopened.load().unwrap(), saved);
     for table in TABLES {
@@ -86,7 +97,7 @@ fn all_entities_and_identity_persist_after_closing_the_real_file() {
             .unwrap();
     }
     drop(reopened);
-    let db = Database::open(&path).unwrap();
+    let db = open_fixture(&path);
     for table in TABLES {
         assert!(db.load().unwrap()[table].as_array().unwrap().is_empty());
     }
@@ -96,7 +107,7 @@ fn all_entities_and_identity_persist_after_closing_the_real_file() {
 #[test]
 fn native_validation_and_foreign_keys_prevent_invalid_writes() {
     let dir = tempdir().unwrap();
-    let mut db = Database::open(&dir.path().join("db")).unwrap();
+    let mut db = open_fixture(&dir.path().join("db"));
     let mut task = input("tasks", None);
     task["due_date"] = json!("2026-02-30");
     assert!(db.save("tasks", task.clone(), None).is_err());
@@ -125,7 +136,7 @@ fn native_validation_and_foreign_keys_prevent_invalid_writes() {
 #[test]
 fn project_deletion_detaches_children_instead_of_losing_them() {
     let dir = tempdir().unwrap();
-    let mut db = Database::open(&dir.path().join("db")).unwrap();
+    let mut db = open_fixture(&dir.path().join("db"));
     let project = db.save("projects", input("projects", None), None).unwrap();
     for table in ["tasks", "notes", "events", "library_items"] {
         db.save(table, input(table, project["id"].as_str()), None)
@@ -143,7 +154,7 @@ fn project_deletion_detaches_children_instead_of_losing_them() {
 #[test]
 fn inbox_conversion_is_atomic_and_cannot_be_repeated() {
     let dir = tempdir().unwrap();
-    let mut db = Database::open(&dir.path().join("db")).unwrap();
+    let mut db = open_fixture(&dir.path().join("db"));
     for target in ["task", "note"] {
         let inbox = db
             .save("inbox_items", input("inbox_items", None), None)
@@ -168,11 +179,11 @@ fn import_preserves_ids_dates_relations_and_metadata_across_restart() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("db");
     let source = snapshot();
-    let mut db = Database::open(&path).unwrap();
+    let mut db = open_fixture(&path);
     let owner = db.owner().unwrap();
     db.import(CLOUD, source.clone()).unwrap();
     drop(db);
-    let mut db = Database::open(&path).unwrap();
+    let mut db = open_fixture(&path);
     let saved = db.load().unwrap();
     for table in TABLES {
         let original = &source[table][0];
@@ -211,14 +222,14 @@ fn import_preserves_ids_dates_relations_and_metadata_across_restart() {
         .query_row("SELECT count(*) FROM tombstones", [], |r| r.get(0))
         .unwrap();
     assert_eq!(count, 2);
-    let db = Database::open(&path).unwrap();
+    let db = open_fixture(&path);
     assert!(db.load().unwrap()["notes"].as_array().unwrap().is_empty());
 }
 
 #[test]
 fn invalid_import_rolls_back_all_tables_settings_and_import_marker() {
     let dir = tempdir().unwrap();
-    let mut db = Database::open(&dir.path().join("db")).unwrap();
+    let mut db = open_fixture(&dir.path().join("db"));
     let before = db.load().unwrap();
     for failure in ["owner", "relation", "duplicate", "settings", "date"] {
         let mut source = snapshot();
@@ -243,7 +254,7 @@ fn invalid_import_rolls_back_all_tables_settings_and_import_marker() {
 #[test]
 fn import_never_overwrites_an_existing_local_workspace() {
     let dir = tempdir().unwrap();
-    let mut db = Database::open(&dir.path().join("db")).unwrap();
+    let mut db = open_fixture(&dir.path().join("db"));
     db.save("notes", input("notes", None), None).unwrap();
     let before = db.load().unwrap();
     assert!(db.import(CLOUD, snapshot()).is_err());
