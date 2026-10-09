@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { active = false; unsubscribe(); };
   }, [attempt]);
   useEffect(() => {
-    if (!account || !backend.auth) return;
+    if (!account || account.local || !backend.auth) return;
     const refresh = () => { if (document.visibilityState === 'visible') void backend.auth!.token().catch(e => setError(messageOf(e))); };
     const interval = window.setInterval(refresh, 30000);
     document.addEventListener('visibilitychange', refresh);

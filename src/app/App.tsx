@@ -4,6 +4,8 @@ import { BookOpen, CalendarDays, FileText, FolderKanban, Home, Inbox, LayoutGrid
 import type { LucideIcon } from 'lucide-react';
 import { Avatar, Popover } from '../design/components';
 import { ProfilePage } from './ProfilePage';
+import { isDesktop } from '../services/backend';
+import { CloudImportPage } from './CloudImportPage';
 import { SearchPage } from './SearchPage';
 import { AuthPage } from './AuthPage';
 import { AuthProvider, WorkspaceProvider, useAuth, useWorkspace } from './providers';
@@ -37,14 +39,14 @@ function Sidebar({ close }: { close: () => void }) {
   return <aside className="sidebar">
     <div className="brand"><div className="brand-symbol" aria-hidden="true">t</div><div><strong>timora</strong><small>your personal space</small></div></div>
     <nav aria-label="주 메뉴"><div className="nav-label">WORKSPACE</div>{list(primary.map(item => item.path === '/inbox' ? { ...item, count: data.inbox_items.length } : item))}<div className="nav-label nav-section">ORGANIZE</div>{list(secondary)}</nav>
-    <div className="sidebar-bottom"><div className="profile"><Avatar name={data.settings.display_name || account?.email || 'Timora'} url={data.settings.avatar_url} /><span><strong>{data.settings.display_name || account?.email || 'Workspace User'}</strong><small>Personal Workspace</small></span><Popover label="프로필 메뉴" trigger={<MoreHorizontal size={18} />}>{dismiss => <><div className="popover-workspace"><small>Workspace</small><strong>{workspaceName}</strong></div><NavLink to="/profile" onClick={() => { dismiss(); close(); }}>Profile</NavLink><NavLink to="/settings" onClick={() => { dismiss(); close(); }}>Settings</NavLink><button type="button" className="danger-button" disabled={busy} onClick={() => { dismiss(); void auth.signOut(); }}>로그아웃</button></>}</Popover></div></div>
+    <div className="sidebar-bottom"><div className="profile"><Avatar name={data.settings.display_name || account?.email || 'Timora'} url={data.settings.avatar_url} /><span><strong>{data.settings.display_name || account?.email || 'Workspace User'}</strong><small>Personal Workspace</small></span><Popover label="프로필 메뉴" trigger={<MoreHorizontal size={18} />}>{dismiss => <><div className="popover-workspace"><small>Workspace</small><strong>{workspaceName}</strong></div><NavLink to="/profile" onClick={() => { dismiss(); close(); }}>Profile</NavLink><NavLink to="/settings" onClick={() => { dismiss(); close(); }}>Settings</NavLink><>{account?.local ? <NavLink to="/cloud-import" onClick={() => { dismiss(); close(); }}>Cloud 가져오기</NavLink> : <button type="button" className="danger-button" disabled={busy} onClick={() => { dismiss(); void auth.signOut(); }}>로그아웃</button>}</></>}</Popover></div></div>
   </aside>;
 }
 
 function Header({ openSidebar }: { openSidebar: () => void }) {
   const location = useLocation();
-  const item = [...primary, ...secondary, { label: 'Settings', path: '/settings' }, { label: 'Profile', path: '/profile' }, { label: 'Search', path: '/search' }].find(v => v.path === location.pathname || (v.path === '/projects' && location.pathname.startsWith('/projects/')));
-  return <header className="topbar"><div className="breadcrumbs"><button type="button" className="mobile-menu icon-button" onClick={openSidebar} aria-label="메뉴 열기"><Menu size={21} /></button><strong>{item?.label ?? 'Home'}</strong></div><div className="header-actions"><span className="sample-pill">v0.2</span><NavLink className="search-trigger" to="/search" aria-label="Workspace 검색"><Search size={18} /><span>검색</span></NavLink></div></header>;
+  const item = [...primary, ...secondary, { label: 'Settings', path: '/settings' }, { label: 'Profile', path: '/profile' }, { label: 'Search', path: '/search' }, { label: 'Cloud 가져오기', path: '/cloud-import' }].find(v => v.path === location.pathname || (v.path === '/projects' && location.pathname.startsWith('/projects/')));
+  return <header className="topbar"><div className="breadcrumbs"><button type="button" className="mobile-menu icon-button" onClick={openSidebar} aria-label="메뉴 열기"><Menu size={21} /></button><strong>{item?.label ?? 'Home'}</strong></div><div className="header-actions"><span className="sample-pill">v0.3</span><NavLink className="search-trigger" to="/search" aria-label="Workspace 검색"><Search size={18} /><span>검색</span></NavLink></div></header>;
 }
 
 function Shell() {
@@ -70,12 +72,13 @@ function Shell() {
 function WorkspaceContent() {
   const { loading, loaded, error, reload } = useWorkspace(); const auth = useAuth();
   if (loading) return <div className="card" role="status" aria-live="polite">Workspace를 불러오는 중…</div>;
-  if (error && !loaded) return <div className="card error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>다시 시도</button><button type="button" onClick={() => void auth.signOut()}>로그아웃</button></div>;
-  return <>{error && <div className="error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>다시 시도</button></div>}{auth.error && <p className="error" role="alert">{auth.error}</p>}<Routes><Route path="/" element={<HomePage />} /><Route path="/today" element={<TodayPage />} /><Route path="/inbox" element={<InboxPage />} /><Route path="/tasks" element={<TasksPage />} /><Route path="/notes" element={<NotesPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/projects" element={<ProjectsPage />} /><Route path="/projects/:id" element={<ProjectDetailPage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/profile" element={<ProfilePage />} /><Route path="/search" element={<SearchPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
+  if (error && !loaded) return <div className="card error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>다시 시도</button>{!auth.account?.local && <button type="button" onClick={() => void auth.signOut()}>로그아웃</button>}</div>;
+  return <>{error && <div className="error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>다시 시도</button></div>}{auth.error && <p className="error" role="alert">{auth.error}</p>}<Routes><Route path="/" element={<HomePage />} /><Route path="/today" element={<TodayPage />} /><Route path="/inbox" element={<InboxPage />} /><Route path="/tasks" element={<TasksPage />} /><Route path="/notes" element={<NotesPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/projects" element={<ProjectsPage />} /><Route path="/projects/:id" element={<ProjectDetailPage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/profile" element={<ProfilePage />} /><Route path="/search" element={<SearchPage />} /><Route path="/cloud-import" element={auth.account?.local ? <CloudImportPage /> : <Navigate to="/" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
 }
 function AuthGate() {
   const auth = useAuth();
-  if (auth.loading) return <main className="auth-screen"><div className="card" role="status">로그인 상태를 확인하는 중…</div></main>;
+  if (auth.loading) return <main className="auth-screen"><div className="card" role="status">{isDesktop ? 'Local Workspace를 여는 중…' : '로그인 상태를 확인하는 중…'}</div></main>;
+  if (!auth.account && isDesktop && auth.error) return <main className="auth-screen"><div className="card" role="alert"><p>{auth.error}</p><button onClick={auth.retry}>다시 시도</button></div></main>;
   if (!auth.account) return <AuthPage />;
   return <WorkspaceProvider key={auth.account.id} account={auth.account}><Shell /></WorkspaceProvider>;
 }
