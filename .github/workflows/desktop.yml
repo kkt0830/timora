@@ -1,7 +1,7 @@
 name: Timora Desktop checks
 on:
   push:
-    branches: [main, 'version/v0.3']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -29,6 +29,11 @@ jobs:
           node-version: '24'
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+      - name: Cache Windows Rust build output
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target
+          key: ${{ runner.os }}-timora-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
       - run: npm ci
       - run: npm test
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
