@@ -15,9 +15,10 @@ export class CloudImportService {
   private repository: SupabaseRepository;
   constructor(config: BackendConfig) {
     // Reuse the public key security boundary; never accept admin credentials.
-    const url = new URL(config.url);
+    const normalized = { ...config, url: config.url.trim().replace(/\/+$/, '') };
+    const url = new URL(normalized.url);
     if (url.protocol !== 'https:' || !config.publishableKey.startsWith('sb_publishable_')) throw new Error('Supabase HTTPS URL과 Publishable key가 필요합니다.');
-    this.auth = new SupabaseAuth(config, this.storage); this.repository = new SupabaseRepository(config, this.auth);
+    this.auth = new SupabaseAuth(normalized, this.storage); this.repository = new SupabaseRepository(normalized, this.auth);
   }
   async preview(email: string, password: string): Promise<{ userId: string; data: WorkspaceData }> {
     try {

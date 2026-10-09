@@ -86,7 +86,7 @@ npm run test:local
 
 `test:local`에는 Rust가 필요합니다. 별도 lint 설정은 없으며 TypeScript와
 `cargo fmt --check`를 사용합니다. 실제 SQLite 파일 테스트 8개, Node 테스트 32개,
-Web 브라우저 회귀 검사를 통과했습니다. Windows exe/NSIS CI도 통과했습니다. [검수용 설치 파일](https://github.com/kkt0830/timora/actions/runs/37880376091/artifacts/11594795491)을 받을 수 있습니다. 수동 결과와 검사 범위는
+Web 브라우저 회귀 검사를 통과했습니다. Windows exe/NSIS CI도 통과했습니다. [설치 파일](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)을 받을 수 있습니다. 수동 결과와 검사 범위는
 [verification](docs/verification.md)에 기록합니다. 브라우저 fixture나 SQLite 단위 검사는
 실제 Windows Desktop 재실행·OS IME·운영 Supabase 계정 확인을 대체하지 않습니다.
 

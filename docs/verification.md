@@ -48,17 +48,17 @@ fetch 호출 0회를 검사합니다. Cloud preview tests는 mock Auth/read data
 - Windows native UI thread가 SQLite IO/busy wait에 막히지 않도록 worker에서 직렬 실행.
 - devCsp를 분리해 Vite inline preamble/HMR을 허용하고 production script CSP는 제한 유지.
 - 로컬 기록이 있으면 Cloud 로그인 전에 가져오기 불가 안내/비활성화. Native empty guard도 유지.
+- Cloud import URL 끝 슬래시를 정규화해 중복 API 경로를 방지; read-only/owner filter/logout 테스트에서 정상 경로를 확인.
 - 앱 데이터 디렉터리 생성도 lazy DB open에서 수행해 디렉터리/권한 오류가 앱 시작을 종료하지 않고 Retry UI로 전달되도록 보완. 기존 파일 보존 테스트 통과.
 
 첫 Windows CI [37878113958](https://github.com/kkt0830/timora/actions/runs/37878113958)는
-옵션 전달 오류로 실패했고 성공으로 기록하지 않습니다. 최종 코드 bc90a62의 Windows CI는 성공했습니다.
+옵션 전달 오류로 실패했고 성공으로 기록하지 않습니다. 실행 코드 bc90a62의 Windows CI는 성공했습니다. 이후 Cloud import URL 끝 슬래시 정규화와 회귀 assertion을 추가했습니다. 최신 검사/산출물은 [PR #7 checks](https://github.com/kkt0830/timora/pull/7/checks)에서도 확인합니다.
 
 ## Windows 산출물 — source bc90a62
 
 [Artifact 11594795491](https://github.com/kkt0830/timora/actions/runs/37880376091/artifacts/11594795491),
 `timora-v0.3-windows-x64`, zip 약 224 MB(223,835,610 bytes), exe/NSIS 포함.
-WebView2 offline installer를 포함해 크기가 큽니다. 이 기록 이후 문서만 갱신하며 실행 코드와
-빌드 설정은 위 source commit과 동일합니다. 사용자에게 이 artifact의 실제 Windows 검수를
+WebView2 offline installer를 포함해 크기가 큽니다. 이 artifact 이후 Cloud import URL 정규화를 보완했습니다. Native SQLite/IPC/오프라인 CRUD 코드는 위 source commit과 동일하며, PC 검수 기록은 사용한 artifact commit으로 구분합니다. 사용자에게 이 artifact의 실제 Windows 검수를
 요청했으며 결과는 아직 PENDING입니다.
 
 CodeRabbit은 Draft PR 기본 정책에 따라 자동 review를 **건너뛰었습니다**.

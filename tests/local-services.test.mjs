@@ -37,13 +37,14 @@ test('Cloud preview reads owner-filtered data and logs out; it never writes enti
     return response([]);
   });
   try {
-    const service = new CloudImportService(config); const result = await service.preview(user.email, 'fixture-only');
+    const service = new CloudImportService({ ...config, url: `${config.url}/` }); const result = await service.preview(user.email, 'fixture-only');
     assert.equal(result.userId, user.id); assert.equal(result.data.settings.user_id, user.id);
     assert.ok(result.data.settings.updated_at);
     const rest = calls.filter(row => row.url.includes('/rest/v1/'));
     assert.equal(rest.length, 7);
     assert.ok(rest.every(row => row.method === 'GET' && row.url.includes(`user_id=eq.${user.id}`)));
     assert.ok(calls.some(row => row.url.includes('/logout')));
+    assert.ok(calls.every(row => !new URL(row.url).pathname.includes('//')));
   } finally { mock.mock.restore(); }
 });
 
