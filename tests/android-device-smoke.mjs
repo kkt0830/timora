@@ -66,6 +66,9 @@ try {
   await page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }).waitFor();
   await page.getByRole('button', { name: '새 작업', exact: true }).click();
   adb('shell', 'input', 'keyevent', '4');
+  // Android may first consume Back to dismiss the IME before dispatching app navigation.
+  try { await page.getByRole('dialog').waitFor({ state: 'hidden', timeout: 2000 }); }
+  catch { adb('shell', 'input', 'keyevent', '4'); }
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   adb('shell', 'input', 'keyevent', '4');
   await page.getByRole('heading', { name: '오늘도 나의 흐름으로 👋' }).waitFor();

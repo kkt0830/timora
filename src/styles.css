@@ -1234,7 +1234,7 @@ html[data-platform="android"] .sidebar {
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 html[data-platform="android"] .editor-dialog {
-  max-height: calc(var(--visual-viewport-height, 100dvh) - 24px);
+  max-height: calc(min(100dvh, var(--visual-viewport-height, 100dvh)) - 24px);
   overscroll-behavior: contain;
 }
 html[data-platform="android"] .topbar {

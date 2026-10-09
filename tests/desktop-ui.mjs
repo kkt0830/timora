@@ -26,7 +26,7 @@ try {
   const devCsp = config.app.security.devCsp.replaceAll('localhost:5173', '127.0.0.1:4175');
   const owner = '11111111-1111-4111-8111-111111111111';
   const data = emptyWorkspace(owner); data.settings.updated_at = new Date().toISOString();
-  let openFailure = true, saveFailure = true; const commands = [], externalRequests = [], errors = [];
+  let openFailure = true, saveFailure = true; const commands = [], openedUrls = [], externalRequests = [], errors = [];
   await context.route('**/*', async route => {
     if (new URL(route.request().url()).hostname === '127.0.0.1') {
       if (route.request().resourceType() === 'document') {
@@ -42,6 +42,7 @@ try {
     if (command === 'local_account') { if (openFailure) throw new Error('Local migration 실패 (fixture)'); return { id: owner, local: true }; }
     if (command === 'local_load') return data;
     if (command === 'local_info') return { id: owner, cloud_user_id: null, imported_at: null, path: 'fixture/timora.db' };
+    if (command === 'plugin:opener|open_url') { openedUrls.push(args.url); return null; }
     if (command === 'local_save') {
       if (saveFailure) throw new Error('Local DB 저장 실패 (fixture)');
       const row = { ...args.input, id: crypto.randomUUID(), user_id: owner, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -76,6 +77,7 @@ try {
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     assert.equal(await dialog.getByLabel('제목', { exact: true }).inputValue(), '로컬 작업');
     await page.setViewportSize({ width: 393, height: 360 });
+    await page.waitForFunction(() => document.querySelector('dialog').getBoundingClientRect().height <= window.visualViewport.height);
     assert.ok(await dialog.evaluate(el => el.getBoundingClientRect().height <= window.visualViewport.height));
     await page.setViewportSize({ width: 393, height: 852 });
   }
@@ -86,6 +88,17 @@ try {
   saveFailure = false; await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' }); await page.getByRole('button', { name: '로컬 작업', exact: true }).waitFor();
   await page.reload(); await page.getByRole('button', { name: '로컬 작업', exact: true }).waitFor();
+  if (android) {
+    data.library_items.push({ id: crypto.randomUUID(), user_id: owner, title: 'Android 자료', description: '', url: 'https://example.com/android', type: 'website', project_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    await page.reload();
+    await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
+    await page.getByRole('link', { name: 'Library', exact: true }).click();
+    await page.getByRole('link', { name: /example.com\/android/ }).click();
+    assert.deepEqual(openedUrls, ['https://example.com/android']);
+    assert.match(new URL(page.url()).hash, /^#\/library/);
+    assert.equal(await page.evaluate(() => window.__TIMORA_BACK__()), true);
+    await page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }).waitFor();
+  }
   await page.getByRole('link', { name: 'Workspace 검색', exact: true }).click();
   const search = page.getByRole('searchbox'); await search.fill('로컬');
   await page.getByRole('link', { name: /로컬 작업/ }).waitFor(); assert.match(new URL(page.url()).hash, /^#\/search\?q=/);
