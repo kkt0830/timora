@@ -1222,6 +1222,25 @@ strong {
 .task-date.overdue {
   color: var(--warning);
 }
+
+/* Android native insets resize the WebView; CSS also supports WebView safe-area values. */
+html[data-platform="android"] .content {
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+html[data-platform="android"] .sidebar {
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+html[data-platform="android"] .editor-dialog {
+  max-height: calc(min(100dvh, var(--visual-viewport-height, 100dvh)) - 24px);
+  overscroll-behavior: contain;
+}
+html[data-platform="android"] .topbar {
+  padding-top: env(safe-area-inset-top);
+  height: calc(64px + env(safe-area-inset-top));
+}
 .count-badge {
   color: var(--muted);
   font-size: 13px;

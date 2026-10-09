@@ -2,13 +2,13 @@
 
 ## 지원 범위
 
-Desktop 핵심 Workspace는 SQLite working store입니다. 네트워크나 Supabase 로그인/토큰이
+Windows/Android 핵심 Workspace는 SQLite working store입니다. 네트워크나 Supabase 로그인/토큰이
 없어도 local identity와 저장된 데이터를 열고 CRUD·완료·날짜/Project 필터·검색·설정을
 사용합니다. UI는 native transaction 완료 뒤 갱신되며 실패한 입력은 편집기에 남습니다.
 
 Library는 URL과 metadata만 저장합니다. 외부 웹사이트/PDF/Video의 본문·파일·avatar를
 오프라인에 캐시하지 않습니다. Web은 기존 Supabase adapter이며 Web 자체의 오프라인 편집
-또는 PWA cache를 구현하지 않았습니다. 브라우저 새로고침과 Desktop 앱 재시작은 다른 검사입니다.
+또는 PWA cache를 구현하지 않았습니다. 브라우저 새로고침과 Native 앱 재시작은 다른 검사입니다.
 
 ## Local 저장과 identity
 
@@ -77,3 +77,14 @@ DB/WAL/SHM 파일을 명시적으로 제거할 수 있습니다. 이 경우 loca
 사라지고 다음 시작은 새 Workspace가 됩니다. Cloud 자료는 삭제되지 않습니다.
 이것은 사용자가 선택하는 삭제 절차이며 오류 복구/일반 테스트를 위해 자동 실행하지 않습니다.
 앱은 workspace 내용·비밀번호·토큰을 log에 출력하지 않으며 native SQL 오류만 UI로 반환합니다.
+
+## Android 및 기기별 독립성
+
+Android는 app-private app data의 같은 SQLite schema와 로컬 identity를 사용합니다.
+Windows DB를 Android에 직접 연결하거나 공용 파일을 동시 사용하지 않습니다. 각 Device의
+DB는 독립적이며 online 상태여도 기기 간 데이터가 자동 전송되지 않습니다.
+Cloud import는 초기 한 번이며 자동 Sync/Backup이 아닙니다. Android OS 자동 backup도 끕니다.
+
+Background/foreground는 기존 draft 메모리를 유지하며 Local repository를 재조회합니다.
+process kill 후 복구하는 것은 commit된 DB 기록입니다. 미저장 draft 자동 복구는 없습니다.
+Android permission/Signing/Back/IME 및 실제 기기 gate는 android.md와 manual-acceptance-v03-android.md를 참고합니다.

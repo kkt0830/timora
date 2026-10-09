@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { ArrowRight, Plus, X } from 'lucide-react';
 import { Button, IconButton } from '../design/components';
 import { safeUrl } from '../domain/validation';
 import { ExternalLink } from './ExternalLink';
+import { isAndroid } from '../services/runtime';
+import { registerBackHandler } from '../services/native-back';
 
 export function PageTitle({ eyebrow, title, description, action, onAction }: { eyebrow: string; title: string; description: string; action?: string; onAction?: () => void }) {
   return <div className="page-title"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action && <Button variant="primary" onClick={onAction}><Plus size={17} /><span>{action}</span></Button>}</div>;
@@ -16,12 +18,28 @@ export function Empty({ children = '아직 항목이 없습니다. 새 항목을
 export function Dialog({ title, children, onClose, busy }: { title: string; children: ReactNode; onClose: () => void; busy: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const initialForm = useRef(''); const [discardPrompt, setDiscardPrompt] = useState(false);
+  const formSnapshot = () => {
+    const form = ref.current?.querySelector('form');
+    return form ? JSON.stringify([...new FormData(form)]) : '';
+  };
   useEffect(() => {
     opener.current = document.activeElement as HTMLElement;
     const dialog = ref.current!; dialog.showModal();
+    initialForm.current = formSnapshot();
     return () => { dialog.close(); opener.current?.focus(); };
   }, []);
-  return <dialog ref={ref} className="editor-dialog" aria-labelledby="editor-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}><div className="dialog-heading"><h2 id="editor-title">{title}</h2><IconButton disabled={busy} onClick={onClose} aria-label="닫기"><X size={20} /></IconButton></div>{children}</dialog>;
+  useEffect(() => {
+    if (!isAndroid) return;
+    // Busy mutations consume Back without discarding the form. Cancel shares the existing close path.
+    return registerBackHandler(100, () => {
+      if (busy) return true;
+      if (formSnapshot() !== initialForm.current) { setDiscardPrompt(true); return true; }
+      ref.current?.dispatchEvent(new Event('cancel', { cancelable: true }));
+      return true;
+    });
+  }, [busy, onClose]);
+  return <dialog ref={ref} className="editor-dialog" aria-labelledby="editor-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}><div className="dialog-heading"><h2 id="editor-title">{title}</h2><IconButton disabled={busy} onClick={onClose} aria-label="닫기"><X size={20} /></IconButton></div>{discardPrompt && <div className="notice" role="alert"><p>저장하지 않은 입력이 있습니다. 닫으면 이 입력은 사라집니다.</p><button type="button" onClick={() => setDiscardPrompt(false)}>계속 편집</button><button type="button" disabled={busy} className="danger-button" onClick={onClose}>입력 버리고 닫기</button></div>}{children}</dialog>;
 }
 function inline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).map((part, index) => {

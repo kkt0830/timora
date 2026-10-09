@@ -527,3 +527,9 @@ impl Database {
         .remove(0))
     }
 }
+
+// Optional native shell; core-only SQLite tests stay independent of GUI dependencies.
+#[cfg(feature = "desktop")]
+mod runtime;
+#[cfg(feature = "desktop")]
+pub use runtime::run;

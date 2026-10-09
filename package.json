@@ -13,7 +13,12 @@
     "test:browser:desktop": "node tests/desktop-ui.mjs",
     "tauri": "tauri",
     "test:local": "cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "android:init": "tauri android init",
+    "android:dev": "tauri android dev",
+    "android:build": "tauri android build",
+    "android:apk": "tauri android build --apk --target aarch64",
+    "test:browser:android": "node tests/android-ui.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.2",

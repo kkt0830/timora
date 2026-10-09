@@ -51,3 +51,10 @@ schema/data/RLS를 이번에 변경하지 않았습니다. Web build 설정은 �
 installer에 WebView2 offline installer를 포함하며 build 다운로드는 온라인에서 수행합니다.
 Windows 실제 offline CRUD/완전 종료/재실행/IME 합격은 manual-acceptance-v03.md에 기록합니다.
 코드 commit·Actions artifact·검토 PR은 공식 production release와 구분합니다.
+
+## Android artifacts
+
+Android는 Netlify 배포 대상이 아닙니다. android.yml에서 ARM64 테스트 APK 및 emulator 검증을
+수행하고 Actions artifact로 제공합니다. application ID app.timora.android, debug test signing.
+Release APK/AAB와 keystore/Secrets 구조는 docs/android.md를 참고합니다. production signing,
+Store 배포, 자동 업데이트는 미구현입니다. 실제 기기 gate 전에는 candidate로 표시합니다.

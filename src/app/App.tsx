@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, CalendarDays, FileText, FolderKanban, Home, Inbox, LayoutGrid, ListTodo, Menu, MoreHorizontal, Search, } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Avatar, Popover } from '../design/components';
 import { ProfilePage } from './ProfilePage';
-import { isDesktop } from '../services/backend';
+import { isAndroid, isNative } from '../services/runtime';
+import { registerBackHandler } from '../services/native-back';
 import { CloudImportPage } from './CloudImportPage';
 import { SearchPage } from './SearchPage';
 import { AuthPage } from './AuthPage';
@@ -51,6 +52,20 @@ function Header({ openSidebar }: { openSidebar: () => void }) {
 
 function Shell() {
   const [menuOpen, setMenuOpen] = useState(false); const drawer = useRef<HTMLDivElement>(null); const opener = useRef<HTMLElement | null>(null);
+  const location = useLocation(); const navigate = useNavigate();
+  useEffect(() => {
+    if (!isAndroid) return;
+    return registerBackHandler(10, () => {
+      if (location.pathname === '/') return false;
+      if (Number(window.history.state?.idx) > 0) navigate(-1);
+      else navigate('/', { replace: true });
+      return true;
+    });
+  }, [location.pathname, navigate]);
+  useEffect(() => {
+    if (!isAndroid || !menuOpen) return;
+    return registerBackHandler(50, () => { setMenuOpen(false); return true; });
+  }, [menuOpen]);
   useEffect(() => {
     if (!menuOpen) return;
     opener.current = document.activeElement as HTMLElement;
@@ -77,8 +92,8 @@ function WorkspaceContent() {
 }
 function AuthGate() {
   const auth = useAuth();
-  if (auth.loading) return <main className="auth-screen"><div className="card" role="status">{isDesktop ? 'Local Workspace를 여는 중…' : '로그인 상태를 확인하는 중…'}</div></main>;
-  if (!auth.account && isDesktop && auth.error) return <main className="auth-screen"><div className="card" role="alert"><p>{auth.error}</p><button onClick={auth.retry}>다시 시도</button></div></main>;
+  if (auth.loading) return <main className="auth-screen"><div className="card" role="status">{isNative ? 'Local Workspace를 여는 중…' : '로그인 상태를 확인하는 중…'}</div></main>;
+  if (!auth.account && isNative && auth.error) return <main className="auth-screen"><div className="card" role="alert"><p>{auth.error}</p><button onClick={auth.retry}>다시 시도</button></div></main>;
   if (!auth.account) return <AuthPage />;
   return <WorkspaceProvider key={auth.account.id} account={auth.account}><Shell /></WorkspaceProvider>;
 }

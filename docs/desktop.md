@@ -69,3 +69,10 @@ UI 백업/복원 기능은 없습니다. 문제 해결을 위해 DB를 삭제하
 
 실제 Wi-Fi 차단/완전 종료/재실행/IME 검사 및 기록은
 [manual-acceptance-v03.md](manual-acceptance-v03.md)를 따릅니다.
+
+## Android 확장 이후
+
+Windows PR #7은 main에 병합됐고 Android 확장은 PR #8에서 같은 Database/runtime을 사용합니다.
+Windows identifier/설치/DB 경로는 유지합니다. src/main.rs는 shared runtime.rs의 run 함수를 호출합니다.
+Android 프로젝트 추가 후에도 desktop.yml이 exe/NSIS를 다시 빌드합니다. 실제 PC 합격 결과는
+기존 Windows checklist를 유지하며 자동 CI를 수동 PASS로 바꾸지 않습니다.

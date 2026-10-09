@@ -1,7 +1,8 @@
 # Requirements — Timora v0.3
 
-기존 v0.2 UI와 서비스 계약을 보존하며 `version/v0.3`에서 Windows Desktop과
-오프라인 저장을 개발합니다. 실제 Windows 오프라인 재실행 합격이 정식 완료 조건입니다.
+기존 v0.2 UI/서비스와 main에 병합된 Windows v0.3(PR #7)을 보존하며
+feature/v0.3-android에서 Android를 확장합니다. 각 플랫폼 실제 오프라인 재실행·IME
+합격이 정식 완료 조건입니다. Windows 구현 이력을 삭제하지 않습니다.
 
 ## 필수 범위
 
@@ -44,3 +45,17 @@ Web 오프라인 편집, DB encryption, updater/code signing, macOS/Linux packag
 [Manual acceptance](docs/manual-acceptance-v03.md)의 A~E 및 Windows build가 합격해야
 정식 v0.3 완료로 표시합니다. 미완료이면 검증 후보/Draft PR로 유지하고 한계를 공개합니다.
 Issue #4를 전체 close하지 않으며 Issue #5와 관련된 실제 구현/검증 범위만 보고합니다.
+
+## Android 확장 결정
+
+- Tauri 2 Android / application ID app.timora.android / minimum API 24 / ARM64 테스트 APK.
+- Shared React/domain/contracts/repository/Rust SQLite/migration/metadata. Android 전용 schema 없음.
+- Native runtime 감지/capability 경계, shared HashRouter/HTTP(S) opener. Web Supabase adapter 보존.
+- MainActivity에서 system Back과 system bars/cutout/IME resize. 기존 44px Drawer UI 유지.
+- 미저장 Entity 폼 Back 확인. background/foreground draft는 유지, process kill draft 복구 미구현.
+- app_data_dir sandbox에 DB 저장, INTERNET 외 broad storage permission 없음, DB 암호화 없음.
+- Windows/Android DB 독립, 자동 Sync 없음, 동일한 빈 DB 최초 import/메모리 인증 정책.
+- 재현 가능한 generated native 소스/Gradle wrapper commit, cache/.so/secrets/keystore 제외.
+- APK는 debug test signing; Store/production signing/update/notifications/widgets/share sheet 제외.
+- Android CI compile/APK/signature/emulator offline IPC/process termination; Windows exe/NSIS와 Web/RLS 회귀 유지.
+- 실제 기기 A~H gate는 docs/manual-acceptance-v03-android.md. CI/fixture로 수동 PASS를 대신하지 않음.
