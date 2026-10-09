@@ -113,7 +113,7 @@ c.execute('PRAGMA user_version=1');c.commit();c.close()`]);
     const activity=adb('shell','dumpsys','activity','activities');
     // Android releases use different resumed-activity field names; GET_CONTENT
     // may first display the system resolver when several providers are available.
-    if(/(?:mResumedActivity|topResumedActivity):.*(?:photopicker|documentsui|picker|intentresolver|ResolverActivity)/i.test(activity))break;
+    if(/(?:mResumedActivity|topResumedActivity|ResumedActivity)\s*[:=].*(?:photopicker|documentsui|picker|intentresolver|ResolverActivity)/i.test(activity))break;
     if(i>30){
       console.error(activity.split('\n').filter(line=>/resumed|topActivity|realActivity|mActivityComponent/i.test(line)).join('\n'));
       console.error(adb('logcat','-d','-s','Tauri','DialogPlugin','ActivityTaskManager'));
