@@ -33,7 +33,7 @@
 
 Desktop/Tablet은 232px Sidebar를 사용합니다. 760px 이하에서 264px Drawer와 배경 닫기를 제공하고, 520px 이하 폼/카드는 한 열로 전환합니다. 폼은 작은 화면에서 한 열이 되고 Modal은 viewport 높이 안에서 스크롤합니다. Calendar는 7열을 유지하고 작은 셀에는 제한된 항목만 표시하며 전체 목록은 날짜 상세 영역에서 조회합니다. 터치/키보드 입력과 focus-visible을 제공합니다.
 
-Android/Tablet 전용 앱은 v1.0에서 개발합니다. 현재는 모바일 브라우저에서 사용 가능한 웹 Layout입니다. 전역 Command Palette/단축키 시스템은 후속 버전 범위입니다.
+Android v0.3는 같은 반응형 Layout을 Tauri WebView에서 재사용합니다. 실제 기기 검수는 별도이며 v1.0은 안정적인 Mobile/Multi-device release입니다. 전역 Command Palette/단축키 시스템은 후속 버전 범위입니다.
 
 ## v0.2 navigation and design
 
@@ -56,10 +56,10 @@ features retain CRUD, filters, Project context and readable empty/loading/error 
 
 ## v0.3 Desktop 및 Task 기간 UX
 
-Desktop은 같은 경로를 `/#/tasks`, `/#/search?q=...`처럼 HashRouter로 사용합니다.
+Windows/Android Native는 같은 경로를 `/#/tasks`, `/#/search?q=...`처럼 HashRouter로 사용합니다.
 Cloud Auth 화면 대신 Local Workspace 초기화/오류 Retry를 표시합니다. Settings/프로필 메뉴의
 로그아웃은 Web에만 있고 Desktop에는 Cloud 가져오기/DB 위치가 있습니다.
-`/cloud-import`는 Desktop local account에서만 접근할 수 있습니다. 로컬 시작 링크,
+`/cloud-import`는 Native local account에서만 접근할 수 있습니다. 로컬 시작 링크,
 URL/public key/Cloud 로그인, counts 미리보기, 취소·확인·오류·완료 상태를 제공합니다.
 
 Tasks는 필터를 적용한 결과를 상호 배타적인 그룹으로 표시합니다. 개수는 현재 필터 결과이며
@@ -76,3 +76,10 @@ Today/오늘 필터에 나타납니다. 완료한 과거 기록은 별도 그룹
 
 Desktop native titlebar/최소 800×600 창을 사용하고 외부 자료/Markdown 링크는 기본 브라우저를
 엽니다. Web responsive UI 및 기존 IME composition 보호는 그대로 유지합니다.
+
+## Android UX
+
+기존 Drawer/Calendar/Task groups 유지. MainActivity Back → Dialog/Popover/Drawer/route,
+미저장 Entity 폼 확인, root OS behavior. WebView는 system bars/cutout/IME inset으로 resize하고
+editor는 visualViewport 높이 안에서 스크롤합니다. 실제 Korean IME/portrait/landscape/
+외부 브라우저 전환은 Android manual acceptance에서 확인합니다. 새로운 Bottom navigation 없음.

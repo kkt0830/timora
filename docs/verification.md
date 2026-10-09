@@ -1,3 +1,39 @@
+# Verification — v0.3 Android Expansion (2026-10-09)
+
+Windows PR #7의 main merge 0c1521a 위에서 feature/v0.3-android/PR #8을 검증합니다.
+기존 Windows/v0.2/v0.1 기록은 아래에 그대로 보존합니다. 실제 Android와 Windows gate는
+각 manual checklist에서 PENDING이며 빌드/fixture로 완료했다고 추정하지 않습니다.
+
+| 검사 | 현재 결과 |
+| --- | --- |
+| npm ci / TypeScript / production frontend build | 로컬 성공 |
+| Node domain/services/runtime/back | 34개 성공 |
+| 실제 SQLite file transactions/reopen | 기존 8개 성공; schema 변경 없음 |
+| Web / Windows-mode / Android-mode browser fixture | 로컬 Chromium 성공 |
+| Android ARM64 Rust + bundled rusqlite | 실제 target compile 성공 |
+| Android ARM64 debug APK | 로컬 생성·apksigner verify 성공; app.timora.android / versionCode 3000 / min API 24 / target 37 |
+| Android AAB | 패키징 검증 진행; 최종 결과를 아래 기록에 갱신 |
+| Windows CI | source df7d829의 run 37891475220 성공, exe/NSIS artifact 11598483957 |
+| Android CI / emulator native force-stop | 첫 setup failure 수정 후 최신 run 검증 진행 |
+| Web/Postgres CI | 첫 Android viewport fixture timing failure 수정 후 최신 run 검증 진행 |
+| 실제 Android 기기 | 미실행; 설치/비행기 모드/CRUD/process 종료/보존/Task groups/IME/모바일 UX gate PENDING |
+| 실제 Windows PC | 기존 수동 gate PENDING 기록 유지 |
+| Cloud import 실제 사용자/외부 browser intent | shared 구현/모의 service 검사; 실제 Android 계정·기기 확인 대기 |
+
+Android SDK CLI bootstrap의 'tools' 제거와 viewport resize 이벤트 timing 문제를 발견해
+setup package/현재 command-line tools 및 dialog 높이/resize 대기 검사를 수정했습니다.
+로컬 환경은 JRE만 있어 JDK 21 설치가 필요했고 JVM 프록시/CA 설정을 환경 안에서
+설정했습니다. 이 환경 설정/credentials/keystore를 repository에 포함하지 않습니다.
+
+Browser fixture는 IPC 모형이며 native Android SQLite 검사가 아닙니다. android-device-smoke는
+API 36 emulator의 실제 Tauri IPC/SQLite와 6개 Entity/settings/identity/관계/날짜/Markdown을
+force-stop 뒤 검사하도록 구성합니다. 이 검사도 실제 Samsung Keyboard/Gboard를 대체하지 않습니다.
+
+[Android 환경/기술 질문](android.md), [Android manual acceptance](manual-acceptance-v03-android.md),
+[Windows manual acceptance](manual-acceptance-v03.md), [PR #8 checks](https://github.com/kkt0830/timora/pull/8/checks).
+
+---
+
 # Verification — Timora v0.3 Candidate
 
 2026-10-09: branch `version/v0.3`, base main `576db72` (PR #6 merged).

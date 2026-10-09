@@ -1,6 +1,7 @@
 # Development / PC setup — v0.3
 
-`version/v0.3`의 검증 후보와 main/운영 v0.2 Web을 구분합니다.
+Windows v0.3(PR #7)은 main에 병합됐으며 Android 확장은 feature/v0.3-android(PR #8)입니다.
+운영 Netlify v0.2 Web과 native 검증 후보를 구분합니다.
 [desktop.md](desktop.md), [offline.md](offline.md), [verification.md](verification.md)를 참고하세요.
 
 ## 공통 준비
@@ -101,3 +102,11 @@ main → version/v0.x → tests → PR → review → merge 절차를 유지합�
 기기 timezone, 기본 Markdown 부분집합, 전 객체 in-memory 검색. Desktop 외부 자료 파일은
 캐시하지 않습니다. Web 오프라인 편집, 자동 sync/conflict, DB encryption/백업 UI,
 password recovery/계정 삭제 UI, 여러 로컬 Workspace는 아직 없습니다.
+
+## v0.3 Android
+
+Android native checkout은 feature/v0.3-android/PR #8입니다. 기존 Web/Windows commands 유지.
+JDK 21/SDK/NDK/Rust targets 준비 후 npm run android:dev 또는 android:apk -- --debug --ci.
+기존 generated project에 android:init을 재실행하지 않습니다. docs/android.md의 툴 버전/빌드
+경로/서명/재현 정책을 참고합니다. Android UI fixture는 npm run test:browser:android,
+실제 에뮬레이터 smoke는 tests/android-device-smoke.mjs이며 기기 IME 검수를 대체하지 않습니다.

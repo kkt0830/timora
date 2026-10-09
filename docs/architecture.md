@@ -7,7 +7,7 @@ Shared React UI / domain / providers
              ↓
 AuthService / WorkspaceRepository
        ↙                    ↘
-Web                       Desktop
+Web                       Native (Windows / Android)
 SupabaseAuth              LocalAuth (stable local UUID)
 SupabaseRepository        LocalWorkspaceRepository
        ↓                    ↓ Tauri IPC
@@ -17,15 +17,15 @@ PostgreSQL + RLS           SQLite app data file
 
 ## Composition 및 경계
 
-- `services/backend.ts`: Tauri runtime 존재 여부로 adapter 선택. Desktop 분기는 VITE
+- `services/backend.ts`: Tauri runtime 존재 여부로 adapter 선택. Native 분기는 VITE
   Cloud 변수 검사보다 먼저 실행해 Cloud 설정 없는 시작을 보장합니다.
-- `main.tsx`: Web BrowserRouter / Desktop HashRouter. Desktop deep-link 새로고침은
+- `main.tsx`: Web BrowserRouter / Native HashRouter. Native deep-link 새로고침은
   bundled index.html을 유지하고 Search/편집기 query는 Router 계약을 공유합니다.
 - `app/providers.tsx`: account별 Workspace, generation guard, mutation lock,
-  load/error/retry/empty 상태. 저장 완료 응답으로 UI를 갱신합니다. Desktop은 Cloud token
+  load/error/retry/empty 상태. 저장 완료 응답으로 UI를 갱신합니다. Native은 Cloud token
   timer 없이 local DB만 읽습니다. focus/online 재조회 역시 선택된 repository를 사용합니다.
 - `data/local-repository.ts`: typed IPC adapter, 에러 정규화. 화면에서 SQL을 실행하지 않습니다.
-- `src-tauri/src/main.rs`: worker에서 실행하는 단일 Mutex connection과 lazy open. 파일 IO/잠금 대기가 native UI event loop를 막지 않도록 spawn_blocking을 사용합니다. DB 열기/migration 오류를
+- `src-tauri/src/runtime.rs`: worker에서 실행하는 단일 Mutex connection과 lazy open. 파일 IO/잠금 대기가 native UI event loop를 막지 않도록 spawn_blocking을 사용합니다. DB 열기/migration 오류를
   UI로 반환하며 자동 삭제하지 않습니다. DB 생성 위치는 app_data_dir/timora.db입니다.
 - `src-tauri/src/lib.rs`: 허용된 entity/필드, native validation, FK 및 transaction CRUD,
   Inbox 이동·Project detach·settings·빈 DB import. 임의 SQL command는 없습니다.
@@ -35,7 +35,7 @@ PostgreSQL + RLS           SQLite app data file
 ## Local identity와 쓰기
 
 최초 migration에서 UUID를 생성해 파일에 보관합니다. LocalAuth는 이 UUID를 반환하므로
-Cloud 로그인/토큰 만료가 Desktop 사용을 막지 않습니다. Local 행의 user_id는 native
+Cloud 로그인/토큰 만료가 Native 사용을 막지 않습니다. Local 행의 user_id는 native
 계층이 강제합니다. 단일 OS 사용자/로컬 Workspace이며 SQLite에는 Cloud RLS가 없습니다.
 
 Create/Update/Delete → SQLite transaction commit → 행 응답 → Provider UI 갱신.
@@ -75,4 +75,19 @@ Markdown HTML은 실행하지 않습니다. 개발 전용 devCsp는 Vite inline 
 
 개인 Workspace 전체 데이터를 메모리에 읽어 UI/search를 공유합니다. 큰 데이터의
 화면별 paging/SQLite FTS는 후속 최적화 대상입니다. native titlebar와 최소 800×600 창을
-사용합니다. Web은 Netlify dist, Desktop은 Windows exe/NSIS이며 배포 경계는 독립입니다.
+사용합니다. Web은 Netlify dist, Native은 Windows exe/NSIS이며 배포 경계는 독립입니다.
+
+## Android platform boundary
+
+PR #7의 Windows native 명령/setup을 runtime.rs로 옮겨 `mobile_entry_point`를 제공합니다.
+main.rs는 같은 run 함수를 호출하고 lib.rs의 실제 Database 구현은 그대로 유지합니다.
+Cargo cdylib/staticlib/rlib은 Android JNI library와 host core 검사를 함께 지원합니다.
+
+services/runtime.ts가 native/Android/Windows를 감지하고 backend/router/opener가 사용합니다.
+Android MainActivity → __TIMORA_BACK__ → priority handler registry → overlay/React Router.
+Root는 Android dispatcher에 반환합니다. Insets는 Wry view 부착 후 native parent에 적용하며
+JS visualViewport가 dialog 높이를 보조합니다. 공유 DB/domain을 플랫폼별로 복제하지 않습니다.
+
+Windows app.timora.desktop과 Android app.timora.android의 app_data_dir 파일은 독립적입니다.
+현재 remote_id 별도 column은 없고 보존한 Entity UUID가 원격 ID 역할을 합니다.
+remote_updated_at/sync_state/tombstones는 같은 schema이며 자동 Sync는 v0.4입니다.

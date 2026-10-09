@@ -109,3 +109,10 @@ imported 행 삭제에만 tombstone을 남깁니다. local-only 행 삭제는 �
 settings에는 이번 버전에서 sync_state/tombstone을 두지 않습니다. 아직 자동 sync가 없으며
 v0.4 settings sync 계약에 포함해야 합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
 DB encryption이 없습니다. 보안·가져오기 제한은 [offline.md](offline.md)를 참고하세요.
+
+## Android expansion
+
+Android는 위 Local schema v1/migration/identity/FK/transaction/metadata/tombstones를 그대로
+사용합니다. schema/column/RLS 변경 없음. app_data_dir는 Android sandbox files 영역이며
+Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존한 Entity UUID를 사용합니다.
+Sync는 아직 실행하지 않습니다. Android process termination 확인은 플랫폼별 acceptance입니다.
