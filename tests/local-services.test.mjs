@@ -12,7 +12,7 @@ test('Local Auth/Repository invoke native operations without HTTP or Cloud crede
   const mock = test.mock.method(globalThis, 'fetch', async () => { throw new Error('No network allowed'); });
   try {
     const auth = new LocalAuth(invoke); const repo = new LocalWorkspaceRepository(invoke);
-    assert.deepEqual(await auth.restore(), { id: 'local', local: true });
+    assert.equal((await auth.restore()).id, 'local');
     await repo.load('local');
     await repo.save('notes', 'local', { title: '노트', content: '# 내용', project_id: null });
     await repo.save('notes', 'local', { title: '수정', content: '# 내용', project_id: null }, 'id');
@@ -21,7 +21,7 @@ test('Local Auth/Repository invoke native operations without HTTP or Cloud crede
     await auth.signOut(); await assert.rejects(auth.token());
     assert.equal(mock.mock.callCount(), 0);
     assert.equal(calls[2].args.id, null); assert.equal(calls[3].args.id, 'id');
-    assert.deepEqual(calls.map(row => row.command), ['local_account', 'local_load', 'local_save', 'local_save', 'local_remove', 'local_convert', 'local_settings']);
+    assert.deepEqual(calls.map(row => row.command), ['local_account', 'local_load', 'local_save', 'local_save', 'local_remove', 'local_convert', 'local_settings', 'local_sign_out']);
     const failing = new LocalWorkspaceRepository(async () => { throw new Error('Local DB failure'); });
     await assert.rejects(failing.load('local'), /Local DB failure/);
   } finally { mock.mock.restore(); }

@@ -15,9 +15,11 @@ export class SupabaseAuth implements AuthService {
   private epoch = 0;
   private listeners = new Set<(account: Account | null) => void>();
   private refreshing: { epoch: number; promise: Promise<string> } | null = null;
+  private useSiteUrl: boolean;
 
-  constructor(config: BackendConfig, storage: Storage) {
+  constructor(config: BackendConfig, storage: Storage, options: { useSiteUrl?: boolean } = {}) {
     this.config = config; this.storage = storage; this.key = `timora.auth.${config.url}`;
+    this.useSiteUrl = options.useSiteUrl ?? false;
   }
   private read(): Session | null {
     try {
@@ -82,7 +84,7 @@ export class SupabaseAuth implements AuthService {
   }
   async signUp(email: string, password: string, nickname?: string): Promise<boolean> {
     const version = ++this.epoch;
-    const redirect = typeof location === 'undefined' ? '' : `?redirect_to=${encodeURIComponent(location.origin)}`;
+    const redirect = this.useSiteUrl || typeof location === 'undefined' ? '' : `?redirect_to=${encodeURIComponent(location.origin)}`;
     const data = await apiRequest<Partial<TokenResponse>>(this.config, `/auth/v1/signup${redirect}`, { method: 'POST', body: JSON.stringify({ email, password, ...(nickname ? { data: { display_name: displayName(nickname) } } : {}) }) });
     if (data.access_token && version === this.epoch) { this.accept(data as TokenResponse); return true; }
     return false;
