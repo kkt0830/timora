@@ -1,4 +1,4 @@
-# UI structure — Timora v0.2 (v0.1 foundation)
+# UI structure — Timora v0.3
 
 기존 Sidebar의 Workspace/Organize 그룹, 하단 Profile 메뉴, Header, 화면 구조를 유지하고 DESIGN.md 기반의 색상·간격·타이포그래피를 적용합니다. 현재 계정의 Workspace 이름·Inbox 개수·실제 데이터를 표시합니다. 기본 Search를 제공하고 미구현 알림 버튼은 표시하지 않습니다.
 
@@ -37,7 +37,7 @@ Android/Tablet 전용 앱은 v1.0에서 개발합니다. 현재는 모바일 브
 
 ## v0.2 navigation and design
 
-Issue #4 검토 후보: Sidebar user area의 ⋯ → 현재 Workspace 이름, Profile,
+PR #6으로 반영한 Issue #4 UI: Sidebar user area의 ⋯ → 현재 Workspace 이름, Profile,
 Settings, Logout. Workspace 이름 관리는 기존 Settings에서 한다. 가짜 전환 selector와
 header의 중복 Workspace 이름을 제거하고 현재 화면명만 표시한다.
 로고는 단일 t 노드를 중앙 정렬한다. NoteList의 `수정 / 삭제`는 기존 EntityEditor를
@@ -53,3 +53,26 @@ light/dark/system. Shared native fields, Button/IconButton, Popover, Avatar and 
 use 44px actions, focus-visible and Escape. Mobile drawer contains focus and makes
 content inert. Error Retry remains; Header Refresh is removed. All nine original
 features retain CRUD, filters, Project context and readable empty/loading/error states.
+
+## v0.3 Desktop 및 Task 기간 UX
+
+Desktop은 같은 경로를 `/#/tasks`, `/#/search?q=...`처럼 HashRouter로 사용합니다.
+Cloud Auth 화면 대신 Local Workspace 초기화/오류 Retry를 표시합니다. Settings/프로필 메뉴의
+로그아웃은 Web에만 있고 Desktop에는 Cloud 가져오기/DB 위치가 있습니다.
+`/cloud-import`는 Desktop local account에서만 접근할 수 있습니다. 로컬 시작 링크,
+URL/public key/Cloud 로그인, counts 미리보기, 취소·확인·오류·완료 상태를 제공합니다.
+
+Tasks는 필터를 적용한 결과를 상호 배타적인 그룹으로 표시합니다. 개수는 현재 필터 결과이며
+빈 그룹은 표시하지 않습니다. 모든 결과가 비면 기존 Empty 상태를 표시합니다.
+그룹 heading은 키보드 button/aria-expanded/aria-controls이며 접힌 결과는 hidden입니다.
+접기 preference는 account별 localStorage에 보관하고 실제 객체 데이터는 DB에만 저장합니다.
+
+분류 우선순위: 무날짜 → 과거 완료 → 기한 지난 미완료 → 90일 이상 장기 → 오늘/활성 범위
+→ 이번 주(월~일, 오늘 제외) → 이번 달 → 나중에. 그룹은 하나지만 장기 활성 작업도
+Today/오늘 필터에 나타납니다. 완료한 과거 기록은 별도 그룹에서 볼 수 있습니다.
+주/월 필터는 해당 기간 날짜/현재 활성 범위/미완료 overdue를 포함합니다.
+기간 프리셋은 date-only 값을 설정하고 수동 입력은 항상 가능합니다.
+짧은 기간은 일수, 긴 기간은 약 개월/년과 정확한 일수, 미완료는 남은 일수/기한 지남을 표시합니다.
+
+Desktop native titlebar/최소 800×600 창을 사용하고 외부 자료/Markdown 링크는 기본 브라우저를
+엽니다. Web responsive UI 및 기존 IME composition 보호는 그대로 유지합니다.

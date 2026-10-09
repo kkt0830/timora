@@ -1,4 +1,4 @@
-# Data model — Timora v0.2 (v0.1 foundation)
+# Data model — Timora v0.3 (Cloud v0.1/v0.2 preserved)
 
 실행 가능한 SQL의 기준은 `db/schema.sql` 및 파일명 순서대로 적용하는 `db/migrations/*.sql`, TypeScript 계약은 `src/domain/models.ts`입니다. `auth.users`는 Supabase Auth가 관리합니다. 사용자당 하나의 개인 Workspace이며 공유 공간은 없습니다.
 
@@ -41,7 +41,7 @@ user_id/updated_at, Task due_date/start_date/project_id, Event start/end/project
 - Inbox processed 대신 미분류/분류 type을 사용합니다. 이동 성공 시 원본을 삭제해 중복 처리를 막습니다.
 - Workspace 설정은 인증 user metadata에 섞지 않고 별도 소유 테이블에 저장합니다.
 
-ObjectRelation 타입은 후속 버전의 계약 초안으로 남겼습니다. 범용 relations 테이블, GitHub FK, Storage 메타데이터, offline tombstone/version은 이번 SQL에 포함하지 않습니다. 이후 DB 변경은 별도 SQL migration으로 남겨 기존 데이터에 적용하며 bootstrap을 재실행하지 않습니다.
+ObjectRelation 타입은 후속 버전의 계약 초안으로 남겼습니다. 범용 relations 테이블, GitHub FK, Storage 메타데이터, offline tombstone/version은 Cloud SQL에 포함하지 않습니다. Local schema v1에는 아래와 같이 추가합니다. 이후 DB 변경은 별도 SQL migration으로 남겨 기존 데이터에 적용하며 bootstrap을 재실행하지 않습니다.
 
 ## Hosted DB 적용 — 2026-10-02
 
@@ -71,3 +71,41 @@ Production migration was applied on 2026-10-04; no production reset/data removal
 fixtures를 모두 rollback했습니다. 작은 settings table의 현재 migration은
 두 CHECK를 즉시 검증합니다. lock_timeout 5초를 두며, 큰 테이블에 배포할
 경우 NOT VALID 추가와 별도 검증 transaction으로 분리하는 개선을 검토합니다.
+
+## v0.3 Local SQLite schema v1
+
+실행 기준: `src-tauri/migrations/001_initial_local_schema.sql`, native validator
+`src-tauri/src/lib.rs`. Cloud 테이블/정책/migration 변경은 없습니다.
+
+6개 Entity의 위 필드는 그대로 사용하지만 UUID/date/instant는 SQLite TEXT로 저장합니다.
+Entity UUID는 native uuid v4, user_id는 안정된 local UUID입니다. 모든 생성/수정 응답은
+실제 DB 행이며 updated_at은 native UTC clock으로 설정합니다. 최초 import에서는 원격의
+UUID/created_at/updated_at/date-only/RFC3339/관계/내용을 그대로 보존합니다.
+
+| 구조 | 주요 필드/규칙 |
+| --- | --- |
+| local_identity | singleton=1 PK, id unique, cloud_user_id nullable, imported_at nullable |
+| 6개 Entity | id PK, user_id, created_at, updated_at, remote_updated_at nullable, sync_state(local/imported/modified) + 기존 필드 |
+| workspace_settings | user_id PK, workspace_name, appearance, display_name, avatar_url nullable, updated_at |
+| tombstones | (entity_table,id) PK, remote_updated_at, deleted_at |
+
+tasks/notes/events/library_items.project_id → projects.id, `ON DELETE SET NULL`.
+Native Project 삭제 transaction은 하위 updated_at/sync_state도 갱신합니다.
+updated_at 정렬 index 및 project_id FK index를 포함합니다. 제목·내용·enum·Task range는
+SQL CHECK와 native validator로 보호합니다. RFC3339/정확한 date/HTTP(S) URL/UUID 검증은
+native 계층에서 수행합니다. UI 검증을 우회한 IPC에도 적용합니다.
+
+FK ON, WAL, synchronous FULL. `PRAGMA user_version`으로 version을 확인한 뒤 v0→v1
+migration+local UUID+default settings를 하나의 transaction으로 적용합니다.
+버전>1은 변경하지 않고 거부하며, migration/손상 오류는 reset하지 않습니다.
+향후 v2 migration은 별도 SQL/순서 분기로 추가하고 기존 데이터를 보존해야 합니다.
+
+local_identity.cloud_user_id는 원본 Cloud owner 매핑이며 local 계정을 대체하지 않습니다.
+행 user_id를 local UUID로 바꾸는 이유는 토큰/Cloud 계정 없이 로컬 작업을 유지하기 위해서입니다.
+개별 Entity remote_updated_at은 import 기준값이며 로컬 수정 뒤에도 유지합니다.
+imported 행 삭제에만 tombstone을 남깁니다. local-only 행 삭제는 물리 삭제입니다.
+원자적 Inbox 이동/Project detach/import rollback을 실제 파일 tests로 검증합니다.
+
+settings에는 이번 버전에서 sync_state/tombstone을 두지 않습니다. 아직 자동 sync가 없으며
+v0.4 settings sync 계약에 포함해야 합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
+DB encryption이 없습니다. 보안·가져오기 제한은 [offline.md](offline.md)를 참고하세요.

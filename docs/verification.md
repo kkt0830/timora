@@ -1,3 +1,67 @@
+# Verification — Timora v0.3 Candidate
+
+2026-10-09: branch `version/v0.3`, base main `576db72` (PR #6 merged).
+이전 버전 기록은 아래에 보존하며 이번 검사와 구분합니다.
+
+| 검사 | 결과 / 범위 |
+| --- | --- |
+| Install | npm ci 성공; Node 24.19.0; npm/Cargo lockfile 사용 |
+| TypeScript | npm run typecheck 성공 |
+| Node domain/service | 32개 통과: 기존 Auth/RLS filter/검색/profile, Local IPC no-network, Cloud preview read-only/finally logout, Task 그룹/날짜 경계 |
+| Web production build | npm run build 성공; 기존 Netlify dist 설정 유지 |
+| Browser | 로컬 Chromium + HTTP fixture 성공; Task 프리셋/그룹 개수/접기 reload/필터 및 기존 Auth/CRUD/Markdown/Calendar/Search IME composition/Profile/error/loading/mobile 회귀 |
+| SQLite core | 실제 temporary 파일 테스트 8개 통과; Linux, cargo test --locked --no-default-features |
+| Rust format | cargo fmt --check 성공 |
+| Remote schema / RLS regression | [CI 37878349039](https://github.com/kkt0830/timora/actions/runs/37878349039) web/database 성공; 격리 Postgres 16, 운영 DB 변경 없음 |
+| Windows exe / NSIS | [CI 37878349046](https://github.com/kkt0830/timora/actions/runs/37878349046) 성공, 2b3f0a6 artifact 생성; 최신 worker 수정의 재빌드 대기 |
+| lint | 별도 lint 설정 없음; strict TS/Rust format 검사 |
+| 실제 Windows offline restart / IME | 미실행; 필수 수동 release gate |
+| Netlify / Supabase production | 이번 개발에서 재배포·schema/data/RLS 변경 없음 |
+
+## 실제 SQLite 파일 검사
+
+`src-tauri/tests/local_database.rs`:
+
+1. 6개 Entity 생성/수정/삭제, settings, local owner 및 실제 connection close/reopen 일치.
+2. native invalid dates/range/unknown table/unsafe URL/FK/missing row 거부.
+3. Project 삭제 시 하위 데이터 보존/연결 해제.
+4. Inbox Task/Note 원문 보존/원본 제거/반복 실패, 실패 후 원본 유지.
+5. import UUID/관계/시각/내용/local owner mapping/metadata 재열기 유지,
+   modified/tombstone 및 삭제 뒤 기록 부활 방지.
+6. owner/FK/duplicate/settings/date import 오류 시 모든 데이터/설정/import marker rollback.
+7. 이미 core 데이터가 있는 로컬 Workspace 덮어쓰기 거부.
+8. newer schema/손상 파일/충돌 migration 오류 시 기존 내용 보존과 migration 전체 rollback.
+
+Native core는 네트워크 dependency를 사용하지 않습니다. Local adapter HTTP 금지 fixture는
+fetch 호출 0회를 검사합니다. Cloud preview tests는 mock Auth/read data 요청을 사용하며
+실제 운영 비밀번호/token/data를 테스트에 넣지 않습니다.
+
+## 검증 중 수정한 문제
+
+- Node strip-only runner와 호환되지 않는 TS parameter property를 명시적 field로 변경.
+- Task 경계 테스트의 다음날이 같은 주인 경우 기대값을 수정; 분류 precedence 확인.
+- Tauri CLI에 --locked를 직접 전달해 Windows CI가 실패한 문제를 Cargo runner 인수 경계로 수정.
+- Desktop deep-link/reload는 HashRouter, Web은 BrowserRouter를 유지.
+- migration 버전 거부 전 journal 설정을 바꾸지 않도록 버전 검사 순서 조정.
+- imported settings 시각도 native RFC3339 검증으로 보호.
+- Windows native UI thread가 SQLite IO/busy wait에 막히지 않도록 worker에서 직렬 실행.
+
+첫 Windows CI [37878113958](https://github.com/kkt0830/timora/actions/runs/37878113958)는
+옵션 전달 오류로 실패했고 성공으로 기록하지 않습니다. 이후 Windows 결과는 아래에 갱신합니다.
+
+## 수동 합격 및 알려진 제한
+
+[manual-acceptance-v03.md](manual-acceptance-v03.md)의 실제 Windows Wi-Fi 차단 → core CRUD →
+완전 프로세스 종료 → 재실행 후 데이터 유지, 실제 한국어 IME를 아직 수행하지 않았습니다.
+SQLite connection reopen/browser composition/Windows compilation은 이 합격을 대체하지 않습니다.
+따라서 현재는 공식 v0.3 완료가 아닌 검증 후보입니다.
+
+실제 계정 Cloud import, Windows 10, 설치/업데이트 후 보존, 큰 데이터, Safari/Firefox도
+미확인입니다. 자동 Cloud sync/conflict, encrypted DB, backup/restore UI, code signing/
+updater, Web offline editing, 파일 첨부, Routine/Journal/Today Sentence는 미구현입니다.
+
+---
+
 # Verification — Timora v0.2 Release Candidate
 
 ## Issue #4 후속 검증 — 2026-10-05 KST
