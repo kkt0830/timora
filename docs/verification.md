@@ -12,8 +12,8 @@
 | Desktop / Phone-size UI | 기존 fixture의 local-only/DB error/save error/HashRouter/search/Back 통과 |
 | 새 Native account/profile UI | first Auth/signup, offline restore/photo, logout 후 자료 보관, B 비노출/A 복구 통과. mocked IPC/Auth + explicit offline signal이며 OS 검증 아님 |
 | Android ARM64/x86_64 APK | source 727fae6, 공개 build config 포함 로컬 split APK 빌드/서명 검증 성공, system dialog/fs plugin 포함. 이 환경의 emulator는 KVM 없어 실행 gate 미검증 |
-| Windows exe / NSIS | [37909105412](https://github.com/kkt0830/timora/actions/runs/37909105412) 공개 Repository variables 누락에서 실패, build 미실행. SQLite job 성공 |
-| Android device CI | [37909105310](https://github.com/kkt0830/timora/actions/runs/37909105310) 공개 Repository variables 누락으로 build/emulator 미실행. 구성한 테스트는 fresh Login/locked IPC → seeded legacy-v1 upgrade → real offline CRUD/force-stop/Back/시스템 picker 취소를 검사. 실제 Cloud login은 seed로 대체하지 않음 |
+| Windows exe / NSIS | main source 0fe724d의 [37909985572](https://github.com/kkt0830/timora/actions/runs/37909985572) 재실행 성공. 공개 설정 검증/테스트/실행 파일/NSIS 빌드 및 artifact 업로드 통과. 실제 PC 수동 검수와 구분 |
+| Android device CI | main source 0fe724d의 [37909985590](https://github.com/kkt0830/timora/actions/runs/37909985590) 재실행에서 공개 설정/테스트/APK·AAB 빌드·서명·artifact 업로드 통과. Emulator의 adb install이 30초 제한에 걸려 runtime 미검증. 설치에만 180초를 허용하도록 조정. 구성한 테스트는 fresh Login/locked IPC → seeded legacy-v1 upgrade → real offline CRUD/force-stop/Back/시스템 picker 취소를 검사. 실제 Cloud login은 seed로 대체하지 않음 |
 | 실제 Tablet | 사용자 보고: 기존 APK 실행/기본 UI·Workspace에 특별한 문제 없음. 모델/OS/상세 테스트 미제공 |
 | 새 Auth/avatar 실기기 | Tablet/Phone/Windows PENDING. 실제 가입/로그인→restart→offline→restart, picker→원본 삭제→restart→offline은 manual acceptance로 확인 |
 
@@ -25,9 +25,10 @@ Tauri Stronghold 검토 후 vault key/OS credential store 연동이 없는 현 �
 
 Linux host full-GUI cargo check는 glib/GTK 개발 라이브러리 부족으로 실행하지 못했습니다.
 core Rust 테스트 및 실제 Android cross-build는 통과했으며 Windows target은 CI로 확인합니다.
-사용자는 Repository variables 등록 위치를 확인 중이라고 답변했습니다. 연결 도구에는
-GitHub Variables 쓰기 기능이 없어 임의 값/평문 secret을 Repository에 넣지 않았습니다.
-등록 후 실패한 Native jobs를 재실행하고 새 성공 실행의 artifact로 실제 기기 테스트합니다.
+사용자가 Repository variables의 두 공개 설정을 등록했고 REST 경로가 붙은 URL을 수정했습니다.
+재실행한 Android/Windows 설정 검증은 통과했습니다. 연결 도구에는 GitHub Variables 쓰기
+기능이 없어 사용자 등록으로 진행했으며 실제 값/평문 secret을 Repository에 넣지 않았습니다.
+Android 설치 시간 제한 수정의 CI 결과는 별도로 확인하며 이전 실패를 runtime 성공으로 기록하지 않습니다.
 CI Native 배포에는 Repository variables 두 공개 설정이 필요하고 누락하면 실패시켜
 first login이 불가능한 설치 파일을 성공 artifact로 안내하지 않습니다.
 

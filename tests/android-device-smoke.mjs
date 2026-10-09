@@ -27,7 +27,9 @@ async function attach() {
 }
 const apk = process.env.TIMORA_TEST_APK;
 assert.ok(apk, 'TIMORA_TEST_APK must reference the installable x86_64 test APK');
-adb('install', '-r', apk);
+// Installing the bundled debug APK can exceed 30 seconds on a cold CI emulator.
+// Keep ordinary adb commands bounded; allow three minutes only for installation.
+execFileSync('adb', ['install', '-r', apk], { encoding: 'utf8', timeout: 180_000 });
 adb('shell', 'cmd', 'connectivity', 'airplane-mode', 'enable');
 adb('shell', 'svc', 'wifi', 'disable'); adb('shell', 'svc', 'data', 'disable');
 assert.equal(adb('shell', 'settings', 'get', 'global', 'airplane_mode_on'), '1');
