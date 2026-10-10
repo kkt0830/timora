@@ -2,6 +2,7 @@ import { SupabaseAuth } from '../data/supabase-auth';
 import { SupabaseRepository } from '../data/supabase-repository';
 import { desktopInvoke, LocalAuth, LocalWorkspaceRepository } from '../data/local-repository';
 import { isNative } from './runtime';
+import { CloudSyncService } from './cloud-sync';
 
 export function createBackend() {
   const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '');
@@ -17,7 +18,10 @@ export function createBackend() {
       if (payload.role !== 'anon') throw new Error('Key');
     } else if (!publishableKey.startsWith('sb_publishable_')) throw new Error('Key');
     const config = { url, publishableKey };
-    if (isNative) return { error: '', auth: new LocalAuth(desktopInvoke, config), repository: new LocalWorkspaceRepository(desktopInvoke) };
+    if (isNative) {
+      const auth = new LocalAuth(desktopInvoke, config);
+      return { error: '', auth, repository: new LocalWorkspaceRepository(desktopInvoke), sync: new CloudSyncService(config, auth, desktopInvoke) };
+    }
     const auth = new SupabaseAuth(config, localStorage);
     return { error: '', auth, repository: new SupabaseRepository(config, auth) };
   } catch { return isNative ? { error: '', auth: new LocalAuth(desktopInvoke), repository: new LocalWorkspaceRepository(desktopInvoke) } : { error: 'Supabase URL 또는 공개 키 설정을 확인해 주세요. Secret/service_role 키는 브라우저에 사용할 수 없습니다.', auth: null, repository: null }; }

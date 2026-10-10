@@ -109,7 +109,7 @@ fn migration_preserves_uuid_entities_settings_and_legacy_import_binding() {
                 .unwrap()
                 .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
                 .unwrap(),
-            2
+            3
         );
     }
 }

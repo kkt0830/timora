@@ -2,6 +2,11 @@
 
 > «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
+**2026-10-10 개발 중단 체크포인트:** `version/v0.3`에 자동 Cloud 동기화의 미완성 코드를
+저장했습니다. 아직 설치·배포할 수 있는 완료 버전이 아닙니다. 기존 앱과 운영 DB는 변경하지
+않았습니다. 작성한 코드, 검사 결과와 재개 순서는 [동기화 개발 체크포인트](docs/cloud-sync-checkpoint.md)를
+읽어 주세요. 사용자 보고로 기존 Android 앱 실행과 Cloud 가져오기 성공을 추가 확인했습니다.
+
 **현재 소스: v0.3 Local-first Application Foundation 검증 후보.**
 Windows 구현은 PR #7, Android 확장은 [PR #8](https://github.com/kkt0830/timora/pull/8)로
 main에 병합됐습니다. 두 플랫폼은 같은 Core를 공유합니다.

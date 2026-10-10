@@ -1,7 +1,7 @@
 import type { EntityInput, EntityMap, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models.ts';
 
 export type CloudState = 'LOCAL_ONLY' | 'SIGNED_IN_ONLINE' | 'SIGNED_IN_OFFLINE' | 'CLOUD_REAUTH_REQUIRED';
-export interface Account { id: string; email?: string; local?: boolean; local_only?: boolean; cloud_user_id?: string; cloud_state?: CloudState; user_metadata?: { display_name?: string } }
+export interface Account { id: string; email?: string; local?: boolean; local_only?: boolean; cloud_user_id?: string; cloud_state?: CloudState; session_warning?: string; user_metadata?: { display_name?: string } }
 export interface AuthService {
   restore(): Promise<Account | null>;
   subscribe(listener: (account: Account | null) => void): () => void;
