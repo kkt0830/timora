@@ -156,7 +156,9 @@ c.execute('PRAGMA user_version=1');c.commit();c.close()`]);
   execFileSync('python3',['-c',`import sqlite3,sys
 c=sqlite3.connect(sys.argv[1]);c.execute("UPDATE local_identity SET cloud_user_id=?,cloud_project_url=?,email='fixture@example.com',access_state='signed_in' WHERE singleton=1",('11111111-1111-4111-8111-111111111111',sys.argv[2]));c.commit();c.execute('PRAGMA wal_checkpoint(TRUNCATE)');c.close()`,fixture,projectUrl]);
   adb('shell','run-as',appId,'rm','-f',dbPath,`${dbPath}-wal`,`${dbPath}-shm`);
-  execFileSync('adb',['shell','run-as',appId,'sh','-c',`cat > ${dbPath}`],{input:readFileSync(fixture),timeout:30_000});
+  // adb joins remote arguments into shell text. Keep the redirect inside the
+  // quoted run-as shell, as in the legacy fixture, rather than Android's shell.
+  execFileSync('adb',['shell','-T',`run-as ${appId} sh -c 'cat > ${dbPath}'`],{input:readFileSync(fixture),timeout:30_000});
   session=await attach();page=session.page;
   await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_session_write',{refreshToken:'isolated-refresh-fixture'}));
   assert.equal(await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_session_read')),'isolated-refresh-fixture');
