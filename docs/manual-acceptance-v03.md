@@ -8,9 +8,9 @@ WebView2 버전 / 성공 또는 오류 메시지. 비밀번호·인증 링크·�
 
 ## A — Offline launch
 
-- [ ] 성공한 Actions의 installer 또는 exe를 PC에 준비하고 앱을 완전히 종료한다.
+- [ ] 성공한 Actions의 installer 또는 exe를 PC에 준비하고 새 설치는 온라인에서 첫 로그인 후 앱을 완전히 종료한다.
 - [ ] Wi-Fi와 기타 인터넷 연결을 끊고 **설치된 production 앱**을 실행한다.
-- [ ] Cloud 로그인·.env 없이 Home/Today/Tasks/Notes/Projects/Calendar/Inbox/Library/Search/Settings가 열린다.
+- [ ] 재인증·.env 입력 없이 저장된 계정으로 Home/Today/Tasks/Notes/Projects/Calendar/Inbox/Library/Search/Settings가 열린다.
 - [ ] 빈 데이터 안내가 정상이고 Supabase 연결 대기 화면에 머무르지 않는다.
 
 ## B — Offline editing
@@ -67,3 +67,24 @@ Windows 10, 실제 사용자 Cloud import, 설치/업데이트 후 데이터 보
 - [ ] 선택 취소/손상/10 MB 초과 오류는 기존 사진 보존. 기존 IME/Back/WebView2 회귀.
 
 새 개선의 Windows 실기기 결과는 PENDING입니다. Windows compile/NSIS 생성만으로 체크하지 않습니다.
+
+
+## 자동 Cloud 동기화 — 추가 실기기 gate (2026-10-11)
+
+상태: **PENDING**. 기존 개인 앱을 삭제/초기화하지 않습니다. 같은 서명의 업데이트와
+운영 sync migration이 준비된 상태에서 확인합니다. 첫 업데이트 시 같은 계정으로 Cloud
+재인증하여 OS refresh credential을 저장합니다. APK/installer source와 결과를 기록합니다.
+
+- [ ] 비행기 모드에서 Project 및 연결된 Task/Note 저장, 앱 완전 종료·재실행 후 기록 유지.
+- [ ] 인터넷을 켜고 앱으로 복귀: 별도 가져오기 없이 대기 개수가 0으로 줄어들고 Cloud에 UUID/내용/관계가 한 번 저장됨.
+- [ ] 같은 계정의 두 번째 기기를 온라인에서 열어 같은 기록 확인. 운영 v0.2 웹에서는 새로고침 후 확인.
+- [ ] 두 번째 기기 수정·삭제가 첫 기기 온라인 복귀/30초 확인에 반영되며 삭제가 다시 생성되지 않음.
+- [ ] 같은 항목을 두 기기에서 오프라인 수정 후 연결: 충돌 화면에서 양쪽 내용 보존. 각각 이 기기/Cloud 선택을 확인.
+- [ ] 원격 Project 삭제와 로컬 child 편집 충돌: Project 선택 후 child 본문 보존, 연결 해제 또는 Project 복구, 전송 이어짐.
+- [ ] 전송 중 연결 끊기·재연결: 대기 기록 유지, 동일 항목 중복 생성 없음.
+- [ ] 앱 강제 종료 후 온라인 재실행: Cloud 재인증 입력 없이 OS credential로 전송 가능. 재인증 필요 오류가 나면 기록 보존·같은 계정 복구 확인.
+- [ ] 명시적 로그아웃 후 재실행은 로그인 화면/로컬 잠금. 다른 계정은 기존 기록 비노출, 원래 계정은 기록 보존.
+- [ ] 기존 사진·Task 날짜 그룹·IME·Back 회귀. 사진 파일은 Cloud로 전송하지 않음.
+
+자동 emulator의 암호화 refresh fixture는 실제 Supabase 세션 회전/두 사용자 기기 인증을
+대체하지 않습니다. 앱 완전 종료 중에는 전송하지 않고 다음 실행에서 이어갑니다.

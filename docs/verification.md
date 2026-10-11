@@ -1,3 +1,39 @@
+# 자동 Cloud Sync 검증 — 2026-10-11
+
+최신 앱/테스트 source: `9e0826c` (앱 로직은 `a19d7b8`과 동일, Android test fixture 명령만 보완). 사용자 요청으로 version/v0.3에 직접 반영하며 새 PR/main merge와 Netlify 재배포는 하지 않았습니다. 아래 10월 9일 account/profile 검증은 이전 구현의 이력입니다.
+
+| 검사 | 결과 / 실제 범위 |
+| --- | --- |
+| npm ci / TypeScript / production Web build | 로컬 성공 (Node 24). home cache 쓰기 실패 후 workspace npm cache 사용 |
+| Node domain/service/Auth/sync | 47개 성공. single-flight, 전송 실패 queue 보존/동일 ID 재시도, Cloud owner 차단, offline/local-only, obsolete cycle abort, secure refresh 복구/회전 |
+| 실제 SQLite/Rust | 16개 성공. 기존 12개 + durable queue/reopen/rollback, ack 후 후속 편집 rebase, 수신 echo 억제, 충돌 선택, owner/page rollback, Project 삭제·대기 child 보호 |
+| 실제 PostgreSQL/RLS | 별도 PostgreSQL 17에서 bootstrap/core/profile/sync SQL 성공; 기존 RLS/profile와 새 sync.sql 성공. 운영 fixture 없음 |
+| 두 SQLite + PostgreSQL 통합 | 실제 Rust/SQLite 두 기기와 PostgreSQL/RLS, Auth HTTP만 fixture. offline retry→다른 기기 UUID/내용 전달, 동시 수정 보존/선택, 삭제, 6 Entity, Project detach, 다른 계정 비노출 성공. 원격 Project 삭제와 pending child 편집의 conflict/pull 및 로컬 Project 복구 순서도 성공 |
+| Browser Web/Desktop/Android | navigation/CRUD/Auth/실패/빈 상태/회귀 기존 fixtures 통과 |
+| Native account + Sync UI | mocked IPC/Auth, 393px 화면. 계정·사진·logout/isolation 회귀 + conflict preview/Cloud choice/offline status/가로 overflow 검증 성공 |
+| Android ARM64/x86_64 APK | 로컬 Kotlin/Rust/Gradle 빌드 성공; ARM64 서명/application ID/min API 24/target 37 확인. 최신 source 로컬 재빌드 및 CI APK/AAB 성공 |
+| 실제 Android runtime / Keystore | source 9e0826c의 CI 38103096257 전체 성공. 실제 Kotlin/Keystore 암호화 refresh fixture→force-stop→read, 기존 Task UUID 보존, logout credential 제거/IPC 잠금 및 기존 upgrade/CRUD/Back 성공. 이 cloud executor의 emulator는 KVM 없어 미실행; CI 실행과 구분 |
+| Web/DB 최신 CI | source 9e0826c의 38103096276 전체 성공. Web browser + PostgreSQL/RLS + 실제 두 SQLite 기기 동기화 |
+| Android 최신 CI | source 9e0826c의 38103096257 전체 성공: public build config / APK·AAB / signature / 실제 emulator / artifact |
+| Windows 최신 CI | source 9e0826c의 Actions 진행 중. 아래 링크로 최종 결과 확인 |
+| 실제 사용자 기기 | 기존 Android 실행/Cloud import 성공을 사용자 보고로 확인. 새 automatic sync/live token rotation/두 실기기는 PENDING |
+
+운영 Supabase: 명시적 사용자 승인 후 `timora_native_workspace_sync` migration 적용 성공. Projects 3 / Tasks 5 / Notes 1 / Events 2 / Library 0 / Inbox 0 / Settings 1, 적용 전후 동일. Sync records 12행 seed. 익명 feed/RPC와 authenticated 직접 feed INSERT 차단 확인. 실제 authenticated role의 owner-bound sync_pull 읽기 transaction 검증 후 rollback. 원본 content/timestamps를 UPDATE하지 않는 migration이며 운영 fixture를 추가하지 않았습니다.
+
+Advisors: 새 schema의 ERROR/WARN은 없음. private sync_clock의 RLS/no policy INFO는 private schema 권한 전부 회수 및 내부 trigger 전용 설계로 의도된 차단입니다. 기존 Auth leaked-password protection WARN과 unused-index INFO는 이번 변경에서 설정/삭제하지 않았습니다. [RLS advisor 설명](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [Auth password 보호](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+최신 CI: [Web/DB](https://github.com/kkt0830/timora/actions/runs/38103096276), [Windows](https://github.com/kkt0830/timora/actions/runs/38103096311), [Android](https://github.com/kkt0830/timora/actions/runs/38103096257). CI fixture가 실제 사용자 계정 login/두 기기 합격을 대신하지 않습니다. 설치 파일 서명 불일치로 기존 앱/자료를 삭제하지 않습니다.
+
+설치 파일: [ARM64 Android test APK ZIP](https://github.com/kkt0830/timora/actions/runs/38103096257/artifacts/11688033981), source 9e0826c. ARM64 APK와 emulator용 x86_64 APK를 구분합니다.
+
+초기 Android 실행 38102279364와 a19d7b8 실행 38102805792는 vault test fixture의
+ADB redirect가 run-as 내부가 아닌 shell 디렉터리에서 실행돼 실패했습니다. read-only
+filesystem 오류와 정확한 명령을 확인하고 기존 legacy fixture처럼 인용한 run-as 내부로
+DB 스트림을 전달하도록 9e0826c에서 수정했습니다. 앱의 DB 경로/권한을 바꾸지 않았습니다.
+이전 실패 실행은 runtime PASS로 기록하지 않습니다.
+
+---
+
 # Native Account / Local Profile 개선 — 2026-10-09 KST
 
 이번 변경은 사용자 요청으로 새 PR 없이 version/v0.3에 직접 반영합니다.

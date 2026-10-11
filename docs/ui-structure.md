@@ -90,3 +90,7 @@ Native Profile은 계정 email/작은 Cloud 상태/닉네임/시스템 사진 �
 표시합니다. UUID·DB 경로·import source ID는 primary Profile에 노출하지 않습니다. 사진은
 선택 즉시 private-copy 저장, 닉네임은 저장 버튼입니다. Sidebar도 같은 로컬 사진을 사용하고
 Web은 기존 HTTPS avatar URL 입력을 유지합니다.
+
+## Cloud 동기화 화면
+
+Native Header의 상태 아이콘, 프로필 메뉴 및 Settings/Profile → `/sync`. 전송 대기·충돌·마지막 확인·오류/재인증을 보여주며 수동 재시도와 양쪽 내용을 펼쳐보는 충돌 선택을 제공합니다. 선택은 확인 dialog를 거칩니다. 작은 화면은 header 아이콘만 표시하고 상세 화면에서 상태를 읽습니다. Web은 이 Native 화면 대신 기존 Supabase 저장 흐름을 사용합니다.
