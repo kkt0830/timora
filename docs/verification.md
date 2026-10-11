@@ -15,7 +15,7 @@
 | 실제 Android runtime / Keystore | source 9e0826c의 CI 38103096257 전체 성공. 실제 Kotlin/Keystore 암호화 refresh fixture→force-stop→read, 기존 Task UUID 보존, logout credential 제거/IPC 잠금 및 기존 upgrade/CRUD/Back 성공. 이 cloud executor의 emulator는 KVM 없어 미실행; CI 실행과 구분 |
 | Web/DB 최신 CI | source 9e0826c의 38103096276 전체 성공. Web browser + PostgreSQL/RLS + 실제 두 SQLite 기기 동기화 |
 | Android 최신 CI | source 9e0826c의 38103096257 전체 성공: public build config / APK·AAB / signature / 실제 emulator / artifact |
-| Windows 최신 CI | source 9e0826c의 Actions 진행 중. 아래 링크로 최종 결과 확인 |
+| Windows 최신 CI | source 9e0826c의 38103096311 전체 성공: 공개 설정/Node/Rust 테스트, Credential Manager 경계를 포함한 actual Windows compile, exe·WebView2 offline NSIS·artifact 생성. 실제 PC vault/GUI·IME는 manual gate |
 | 실제 사용자 기기 | 기존 Android 실행/Cloud import 성공을 사용자 보고로 확인. 새 automatic sync/live token rotation/두 실기기는 PENDING |
 
 운영 Supabase: 명시적 사용자 승인 후 `timora_native_workspace_sync` migration 적용 성공. Projects 3 / Tasks 5 / Notes 1 / Events 2 / Library 0 / Inbox 0 / Settings 1, 적용 전후 동일. Sync records 12행 seed. 익명 feed/RPC와 authenticated 직접 feed INSERT 차단 확인. 실제 authenticated role의 owner-bound sync_pull 읽기 transaction 검증 후 rollback. 원본 content/timestamps를 UPDATE하지 않는 migration이며 운영 fixture를 추가하지 않았습니다.
@@ -24,7 +24,7 @@ Advisors: 새 schema의 ERROR/WARN은 없음. private sync_clock의 RLS/no polic
 
 최신 CI: [Web/DB](https://github.com/kkt0830/timora/actions/runs/38103096276), [Windows](https://github.com/kkt0830/timora/actions/runs/38103096311), [Android](https://github.com/kkt0830/timora/actions/runs/38103096257). CI fixture가 실제 사용자 계정 login/두 기기 합격을 대신하지 않습니다. 설치 파일 서명 불일치로 기존 앱/자료를 삭제하지 않습니다.
 
-설치 파일: [ARM64 Android test APK ZIP](https://github.com/kkt0830/timora/actions/runs/38103096257/artifacts/11688033981), source 9e0826c. ARM64 APK와 emulator용 x86_64 APK를 구분합니다.
+설치 파일: [ARM64 Android test APK ZIP](https://github.com/kkt0830/timora/actions/runs/38103096257/artifacts/11688033981), [Windows exe/NSIS ZIP](https://github.com/kkt0830/timora/actions/runs/38103096311/artifacts/11688687451), source 9e0826c. ARM64 APK와 emulator용 x86_64 APK를 구분합니다.
 
 초기 Android 실행 38102279364와 a19d7b8 실행 38102805792는 vault test fixture의
 ADB redirect가 run-as 내부가 아닌 shell 디렉터리에서 실행돼 실패했습니다. read-only

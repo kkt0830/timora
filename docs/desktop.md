@@ -6,7 +6,7 @@ Windows 10 실제 호환 확인은 아직 하지 않았습니다. macOS/Linux �
 ## 설치 및 실행
 
 [Desktop Actions](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)의 성공한
-`version/v0.3` 실행 → Artifacts → `timora-v0.3-windows-x64`를 다운로드/압축 해제합니다. 최신 자동 동기화 source/CI 결과와 설치 파일은 [verification.md](verification.md)에서 확인합니다. 이전 source bc90a62 artifact는 자동 동기화를 포함하지 않습니다.
+`version/v0.3` 실행 → Artifacts → `timora-v0.3-windows-x64`를 다운로드/압축 해제합니다. Source 9e0826c의 Windows CI가 통과했으며 [자동 동기화 exe/NSIS ZIP](https://github.com/kkt0830/timora/actions/runs/38103096311/artifacts/11688687451)을 받을 수 있습니다. 검사 범위는 [verification.md](verification.md)에 기록합니다. 이전 source bc90a62 artifact는 자동 동기화를 포함하지 않습니다.
 `Timora_0.3.0_x64-setup.exe`(실제 파일명은 artifact 안에서 확인)로 설치하거나
 WebView2가 설치된 PC에서 `timora-desktop.exe`를 실행합니다.
 

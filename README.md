@@ -11,8 +11,10 @@ Task 그룹, 계정 유지와 로컬 사진 기능 위에 자동 push/pull·재�
 사용자의 실기기 합격을 대신하지 않습니다. [동기화 안내](docs/cloud-sync.md),
 [검증 기록](docs/verification.md), [이전 체크포인트](docs/cloud-sync-checkpoint.md)를 참고하세요.
 
-Source `9e0826c`의 Web/DB와 Android APK·AAB/실제 emulator CI가 통과했습니다.
-[자동 동기화 Android test APK ZIP](https://github.com/kkt0830/timora/actions/runs/38103096257/artifacts/11688033981)을 받을 수 있습니다. Windows 최종 빌드는 검증 기록에서 확인합니다.
+Source `9e0826c`의 Web/DB, Windows exe·NSIS, Android APK·AAB/실제 emulator CI가 모두 통과했습니다.
+설치 파일: [자동 동기화 Android test APK ZIP](https://github.com/kkt0830/timora/actions/runs/38103096257/artifacts/11688033981),
+[Windows exe/installer ZIP](https://github.com/kkt0830/timora/actions/runs/38103096311/artifacts/11688687451).
+실제 사용자 계정의 두 기기 Sync/세션 회전 검수는 별도로 남아 있습니다.
 
 **운영 Web: v0.2**, https://timora-sfj2.netlify.app . 이번 개발에서 Netlify production을
 재배포하지 않았습니다. 자동 동기화용 Supabase metadata·trigger·RLS·RPC는
@@ -52,7 +54,7 @@ Netlify source-upload production 배포는 별개입니다.
 | 앱 전용 프로필 사진 | HTTPS URL | 시스템 선택기 / 로컬 복사 | 시스템 선택기 / 로컬 복사 |
 | Offline editing | 미지원 | 구현 | 구현 |
 | Cloud → Local initial import | 원본 Cloud | 구현 | 구현·사용자 성공 보고 |
-| 자동 Cloud Sync / 기기 간 동기화 | 새 소스 30초 확인 / 운영 Web 새로고침 | 구현·플랫폼/실기기 검수 | 공유 구현·실기기 검수 |
+| 자동 Cloud Sync / 기기 간 동기화 | 새 소스 30초 확인 / 운영 Web 새로고침 | 구현·CI 통과 / 실기기 검수 | 구현·CI 통과 / 실기기 검수 |
 | 설치 산출물 | 운영 v0.2 URL | exe / NSIS | 테스트 APK / CI |
 | 실제 OS 오프라인 재실행·IME gate | 해당 없음 | PENDING | PENDING |
 
