@@ -39,9 +39,112 @@ async fn local_account(state: tauri::State<'_, Arc<LocalState>>) -> Result<Value
     with_db(state, move |db| db.account()).await
 }
 #[tauri::command]
-async fn local_sign_out(state: tauri::State<'_, Arc<LocalState>>) -> Result<(), String> {
+async fn local_sign_out(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<LocalState>>,
+) -> Result<(), String> {
     state.auth_epoch.fetch_add(1, Ordering::SeqCst);
-    with_db(state, |db| db.sign_out()).await
+    with_db(state, move |db| {
+        let context = vault_context(db).ok();
+        db.sign_out()?;
+        // A durable local lock wins even if an OS credential store cannot be reached.
+        if let Some((user, project)) = context {
+            let _ = crate::session_vault::clear(&app, &user, &project);
+        }
+        Ok(())
+    })
+    .await
+}
+fn vault_context(db: &Database) -> Result<(String, String), String> {
+    db.require_workspace()?;
+    let identity = db.identity()?;
+    if identity["access_state"] != "signed_in" {
+        return Err("연결한 계정으로 인증해 주세요.".into());
+    }
+    let user = crate::text(&identity, "cloud_user_id")?.to_string();
+    let project = crate::text(&identity, "cloud_project_url")?.to_string();
+    if project
+        != option_env!("VITE_SUPABASE_URL")
+            .unwrap_or("")
+            .trim()
+            .trim_end_matches('/')
+    {
+        return Err("연결한 Cloud 서버가 이 앱 설정과 다릅니다.".into());
+    }
+    Ok((user, project))
+}
+#[tauri::command]
+async fn local_session_read(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<LocalState>>,
+) -> Result<Option<String>, String> {
+    with_db(state, move |db| {
+        let (user, project) = vault_context(db)?;
+        crate::session_vault::read(&app, &user, &project)
+    })
+    .await
+}
+#[tauri::command]
+async fn local_session_write(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<LocalState>>,
+    refresh_token: String,
+) -> Result<(), String> {
+    let epoch = state.auth_epoch.load(Ordering::SeqCst);
+    let owned = Arc::clone(state.inner());
+    with_db(state, move |db| {
+        if epoch != owned.auth_epoch.load(Ordering::SeqCst) {
+            return Err("세션 저장이 취소됐습니다.".into());
+        }
+        let (user, project) = vault_context(db)?;
+        crate::session_vault::write(&app, &user, &project, &refresh_token)
+    })
+    .await
+}
+#[tauri::command]
+async fn local_sync_status(state: tauri::State<'_, Arc<LocalState>>) -> Result<Value, String> {
+    with_db(state, |db| db.sync_status()).await
+}
+#[tauri::command]
+async fn local_sync_next(
+    state: tauri::State<'_, Arc<LocalState>>,
+    cloud_user_id: String,
+) -> Result<Value, String> {
+    with_db(state, move |db| db.sync_next(&cloud_user_id)).await
+}
+#[tauri::command]
+async fn local_sync_ack(
+    state: tauri::State<'_, Arc<LocalState>>,
+    cloud_user_id: String,
+    operation_id: String,
+    response: Value,
+) -> Result<(), String> {
+    with_db(state, move |db| {
+        db.sync_ack(&cloud_user_id, &operation_id, response)
+    })
+    .await
+}
+#[tauri::command]
+async fn local_sync_page(
+    state: tauri::State<'_, Arc<LocalState>>,
+    cloud_user_id: String,
+    after: String,
+    page: Value,
+) -> Result<bool, String> {
+    with_db(state, move |db| db.sync_page(&cloud_user_id, &after, page)).await
+}
+#[tauri::command]
+async fn local_sync_resolve(
+    state: tauri::State<'_, Arc<LocalState>>,
+    cloud_user_id: String,
+    table: String,
+    id: String,
+    choice: String,
+) -> Result<(), String> {
+    with_db(state, move |db| {
+        db.sync_resolve(&cloud_user_id, &table, &id, &choice)
+    })
+    .await
 }
 #[tauri::command]
 async fn local_bind_account(
@@ -241,6 +344,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(crate::session_vault::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             // Opening is lazy through commands: migration failures reach the error UI, never reset data.
@@ -255,6 +359,13 @@ pub fn run() {
             local_account,
             local_bind_account,
             local_sign_out,
+            local_session_read,
+            local_session_write,
+            local_sync_status,
+            local_sync_next,
+            local_sync_ack,
+            local_sync_page,
+            local_sync_resolve,
             local_avatar,
             local_pick_avatar,
             local_remove_avatar,

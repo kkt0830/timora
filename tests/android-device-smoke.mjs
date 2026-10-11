@@ -144,6 +144,34 @@ c.execute('PRAGMA user_version=1');c.commit();c.close()`]);
   // repeat compositor tiles in WebView and does not represent the visible device.
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/android-emulator-offline.png', execFileSync('adb', ['exec-out', 'screencap', '-p'], { timeout: 30_000 }));
+  // Dedicated CI emulator fixture only: connect the existing local identity by
+  // modifying its test DB, without claiming a real Supabase authentication test.
+  // Verify the actual Kotlin plugin/Android Keystore across process termination.
+  const projectUrl=process.env.VITE_SUPABASE_URL;
+  assert.ok(projectUrl,'The same public build URL is required for the vault fixture');
+  await session.device.close(); session=undefined;adb('shell','am','force-stop',appId);
+  const fixture='/tmp/timora-vault-emulator.db';
+  await writeFile(fixture,execFileSync('adb',['exec-out','run-as',appId,'cat',dbPath]));
+  try {await writeFile(fixture+'-wal',execFileSync('adb',['exec-out','run-as',appId,'cat',dbPath+'-wal']));} catch { /* Clean close may have removed the WAL. */ }
+  execFileSync('python3',['-c',`import sqlite3,sys
+c=sqlite3.connect(sys.argv[1]);c.execute("UPDATE local_identity SET cloud_user_id=?,cloud_project_url=?,email='fixture@example.com',access_state='signed_in' WHERE singleton=1",('11111111-1111-4111-8111-111111111111',sys.argv[2]));c.commit();c.execute('PRAGMA wal_checkpoint(TRUNCATE)');c.close()`,fixture,projectUrl]);
+  adb('shell','run-as',appId,'rm','-f',dbPath,`${dbPath}-wal`,`${dbPath}-shm`);
+  // adb joins remote arguments into shell text. Keep the redirect inside the
+  // quoted run-as shell, as in the legacy fixture, rather than Android's shell.
+  execFileSync('adb',['shell','-T',`run-as ${appId} sh -c 'cat > ${dbPath}'`],{input:readFileSync(fixture),timeout:30_000});
+  session=await attach();page=session.page;
+  await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_session_write',{refreshToken:'isolated-refresh-fixture'}));
+  assert.equal(await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_session_read')),'isolated-refresh-fixture');
+  const encrypted=adb('shell','run-as',appId,'cat','shared_prefs/timora_cloud_session.xml');
+  assert.ok(encrypted.includes('encrypted'));assert.ok(!encrypted.includes('isolated-refresh-fixture'));
+  await session.device.close();session=undefined;adb('shell','am','force-stop',appId);
+  session=await attach();page=session.page;
+  assert.equal(await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_session_read')),'isolated-refresh-fixture');
+  assert.equal((await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_load'))).tasks[0].id,result.taskId);
+  await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('local_sign_out'));
+  assert.ok(!adb('shell','run-as',appId,'cat','shared_prefs/timora_cloud_session.xml').includes('encrypted'));
+  assert.equal(await page.evaluate(async()=>{try{await window.__TAURI_INTERNALS__.invoke('local_session_read');return false;}catch{return true;}}),true);
+  console.log('Android Keystore: encrypted refresh fixture survived force-stop, local records stayed intact, and explicit logout cleared credential and locked IPC. Live Supabase refresh remains a physical-device gate.');
   console.log('Android emulator: fresh Auth/locked IPC and legacy-v1 upgrade passed; six-entity CRUD/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
 } finally {
   await session?.device.close();

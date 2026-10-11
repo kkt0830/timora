@@ -1254,3 +1254,8 @@ html[data-platform="android"] .topbar {
 .group-heading { width: 100%; display: flex; align-items: center; gap: 12px; justify-content: flex-start; margin-bottom: 8px; }
 .period-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .period-filters .selected { background: var(--accent); color: var(--on-accent); }
+
+.sync-status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.sync-status span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font-size: 12px; }
+@media (max-width: 600px) { .sync-status span { display: none; } }

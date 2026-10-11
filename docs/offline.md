@@ -11,7 +11,7 @@ Profile → 계정 연결을 선택할 때 기존 기록 연결을 확인하고,
 | 표시 상태 | 의미 |
 | --- | --- |
 | LOCAL_ONLY | 기존 익명 Workspace, 계정 연결 전 |
-| SIGNED_IN_ONLINE | 이 프로세스의 Cloud 인증 가능; 로컬에 저장, 동기화된다는 뜻 아님 |
+| SIGNED_IN_ONLINE | 이 프로세스의 Cloud 인증 가능; 로컬에 저장, 전송 완료 여부는 별도 Sync 상태로 확인 |
 | SIGNED_IN_OFFLINE | 연결한 계정과 Local Workspace 사용 가능, 인터넷 없음 |
 | CLOUD_REAUTH_REQUIRED | Local Workspace 사용 가능, Cloud 기능은 다시 인증 필요 |
 
@@ -23,17 +23,8 @@ CRUD/가져오기/프로필 IPC도 거부합니다. 같은 Cloud 계정으로만
 
 ## Cloud 세션과 보안 선택
 
-첨부 요구사항 §15의 fallback을 적용했습니다. Native access/refresh token은 메모리
-Storage에만 보관하고 비밀번호는 저장하지 않습니다. SQLite/localStorage/log에 토큰을
-기록하지 않습니다. 재시작 후 온라인이어도 CLOUD_REAUTH_REQUIRED로 시작할 수 있지만
-Local Workspace는 유지됩니다. Cloud 재인증 실패로 로컬 사용자를 자동 로그아웃하지 않습니다.
-오프라인 명시적 로그아웃은 로컬 잠금과 토큰 제거를 먼저 수행하고 서버 logout은 best effort입니다.
+Native access token은 메모리에 두고 refresh credential은 Android Keystore/Windows Credential Manager에서 계정·서버별로 복원합니다. 비밀번호는 저장하지 않으며 SQLite/localStorage/log에 토큰을 기록하지 않습니다. 재시작 시 로컬 Workspace를 먼저 열고 보안 세션을 나중에 복원합니다. 온라인이면 토큰을 갱신해 Sync를 이어갑니다. Vault/Cloud 인증 실패는 로컬 사용자를 자동 로그아웃하지 않고 재인증을 안내합니다. 명시적 로그아웃은 로컬 잠금과 credential 제거 후 서버 logout을 best effort로 수행합니다. 자세한 rotation/동기화 계약은 [cloud-sync.md](cloud-sync.md)를 참고하세요.
 
-[Tauri Stronghold](https://v2.tauri.app/plugin/stronghold/)는 vault password/hash와 그 열쇠의
-안전한 보관이 필요합니다. 현재 cross-platform OS vault/Android Keystore 연동 없이
-앱에 vault password를 넣는 방식을 피하고 메모리 fallback을 선택했습니다. Stronghold나
-OS secure credential store가 구현됐다고 주장하지 않습니다. 이후 실제 Keystore/Windows
-vault를 연동할 때 계정/서버별 scope, 원자적 rotation, logout 제거, backup 제외를 검증해야 합니다.
 Local DB/email/profile은 암호화되지 않습니다. Android app-private sandbox/backup 비활성화,
 Windows OS 계정/디스크 보호에 의존하며 기기에 접근 가능한 사람은 앱을 열 수 있습니다.
 
@@ -61,10 +52,7 @@ Cloud에는 읽기만 수행하며 독립적인 가져오기 세션은 finally l
 
 ## Sync metadata와 제한
 
-sync_state(local/imported/modified), remote_updated_at과 imported 삭제 tombstones를 유지합니다.
-Project 삭제는 하위 내용 보존/연결 해제, Inbox 이동은 transaction입니다. 이는 전송 큐나
-자동 동기화가 아닙니다. online/focus 이벤트도 Local repository를 다시 읽습니다.
-Windows/Android/Web 기록은 서로 독립적이며 자동 push/pull/conflict/realtime은 v0.4 범위입니다.
+SQLite v3는 local/modified 기록과 기존 tombstone을 durable outbox로 seed합니다. online/focus/visibility와 로컬 저장이 CloudSyncService를 깨우고 foreground에서 30초마다 pull합니다. Project 삭제는 child 내용 보존/연결 해제이며 Inbox 이동은 transaction입니다. 앱 완전 종료 중에는 전송하지 않으며 다음 실행에서 이어갑니다. 동일한 Cloud 계정의 Windows/Android/Web이 기록을 주고받습니다.
 
 Library는 URL/metadata만 저장합니다. 외부 PDF/Video/Web 본문을 캐시하지 않습니다.
 Web은 기존 Supabase adapter이며 Web offline/PWA는 지원하지 않습니다. background draft는

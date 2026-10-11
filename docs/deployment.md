@@ -58,3 +58,19 @@ Android는 Netlify 배포 대상이 아닙니다. android.yml에서 ARM64 테스
 수행하고 Actions artifact로 제공합니다. application ID app.timora.android, debug test signing.
 Release APK/AAB와 keystore/Secrets 구조는 docs/android.md를 참고합니다. production signing,
 Store 배포, 자동 업데이트는 미구현입니다. 실제 기기 gate 전에는 candidate로 표시합니다.
+
+
+## Native 자동 Cloud Sync 운영 준비 — 2026-10-11
+
+사용자가 운영 Supabase 적용을 명시적으로 승인한 후
+`20261010030830_native_workspace_sync.sql`을 `timora_native_workspace_sync`로 적용했습니다.
+기존 12개 business 행은 보존됐고 owner별 sync_records를 seed했습니다. 새 metadata
+테이블·trigger·RLS·sync_apply/sync_pull RPC를 추가했으며 Auth URL·공개 빌드 변수·Netlify
+production은 변경하지 않았습니다. 운영 테스트 fixture/계정/기록을 생성하지 않았습니다.
+실제 role/RLS 읽기와 적용 전후 개수는 [verification.md](verification.md)에 기록합니다.
+
+개발은 사용자 요청대로 version/v0.3에 직접 반영하며 새 PR/main merge는 없습니다.
+Native는 검증된 Actions APK/installer로 업데이트하고 같은 Cloud 계정으로 연결합니다.
+운영 v0.2 웹은 동기화된 Cloud 기록을 새로고침해 확인할 수 있습니다. APK 서명이 달라
+설치가 거부되면 개인 앱을 삭제하거나 데이터를 초기화하지 않습니다. 새 두 기기/세션
+실기기 확인은 [cloud-sync.md](cloud-sync.md)와 manual checklists를 따릅니다.

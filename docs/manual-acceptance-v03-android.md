@@ -98,8 +98,29 @@ APK/CI만 PASS인 경우 검증 후보 상태를 유지합니다. 이번 변경�
 - [ ] 시스템 picker 취소/읽기 불가/10 MB 초과/손상 파일은 기존 사진을 보존하고 오류 안내.
 - [ ] 원본 gallery 파일 삭제 → 강제 종료 → 재실행 → 사진/닉네임 유지.
 - [ ] 오프라인 → 강제 종료 → 재실행 → 사진 유지. Profile와 sidebar 같은 사진.
-- [ ] 사진 제거/닉네임 수정 → 재실행/offline 유지. Cloud 업로드/자동 sync 없음.
+- [ ] 사진 제거/닉네임 수정 → 재실행/offline 유지. 사진 파일 Cloud 업로드 없음; 닉네임 설정은 자동 Sync 대상.
 - [ ] Tablet과 별도로 Phone portrait/landscape/키보드/Back를 확인. 미수행은 PENDING.
 
 상태: 위 J 전체 PENDING. CI의 mocked Auth/IPC, seed한 anonymous DB, SQLite reopen은
 실제 Supabase 첫 로그인→Native process restart를 대체하지 않습니다.
+
+
+## 자동 Cloud 동기화 — 추가 실기기 gate (2026-10-11)
+
+상태: **PENDING**. 기존 개인 앱을 삭제/초기화하지 않습니다. 같은 서명의 업데이트와
+운영 sync migration이 준비된 상태에서 확인합니다. 첫 업데이트 시 같은 계정으로 Cloud
+재인증하여 OS refresh credential을 저장합니다. APK/installer source와 결과를 기록합니다.
+
+- [ ] 비행기 모드에서 Project 및 연결된 Task/Note 저장, 앱 완전 종료·재실행 후 기록 유지.
+- [ ] 인터넷을 켜고 앱으로 복귀: 별도 가져오기 없이 대기 개수가 0으로 줄어들고 Cloud에 UUID/내용/관계가 한 번 저장됨.
+- [ ] 같은 계정의 두 번째 기기를 온라인에서 열어 같은 기록 확인. 운영 v0.2 웹에서는 새로고침 후 확인.
+- [ ] 두 번째 기기 수정·삭제가 첫 기기 온라인 복귀/30초 확인에 반영되며 삭제가 다시 생성되지 않음.
+- [ ] 같은 항목을 두 기기에서 오프라인 수정 후 연결: 충돌 화면에서 양쪽 내용 보존. 각각 이 기기/Cloud 선택을 확인.
+- [ ] 원격 Project 삭제와 로컬 child 편집 충돌: Project 선택 후 child 본문 보존, 연결 해제 또는 Project 복구, 전송 이어짐.
+- [ ] 전송 중 연결 끊기·재연결: 대기 기록 유지, 동일 항목 중복 생성 없음.
+- [ ] 앱 강제 종료 후 온라인 재실행: Cloud 재인증 입력 없이 OS credential로 전송 가능. 재인증 필요 오류가 나면 기록 보존·같은 계정 복구 확인.
+- [ ] 명시적 로그아웃 후 재실행은 로그인 화면/로컬 잠금. 다른 계정은 기존 기록 비노출, 원래 계정은 기록 보존.
+- [ ] 기존 사진·Task 날짜 그룹·IME·Back 회귀. 사진 파일은 Cloud로 전송하지 않음.
+
+자동 emulator의 암호화 refresh fixture는 실제 Supabase 세션 회전/두 사용자 기기 인증을
+대체하지 않습니다. 앱 완전 종료 중에는 전송하지 않고 다음 실행에서 이어갑니다.

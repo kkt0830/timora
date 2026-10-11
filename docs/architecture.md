@@ -8,7 +8,7 @@ Shared React UI / domain / providers
 AuthService / WorkspaceRepository
        ↙                    ↘
 Web                       Native (Windows / Android)
-SupabaseAuth              LocalAuth (persisted identity + memory-only Cloud session)
+SupabaseAuth              LocalAuth (persisted identity + OS refresh credential)
 SupabaseRepository        LocalWorkspaceRepository
        ↓                    ↓ Tauri IPC
 PostgREST / Auth           Rust Database / rusqlite
@@ -57,16 +57,13 @@ rollback합니다. 미리보기 이후 로컬 데이터가 생기면 native empt
 Cloud는 여러 REST 조회이므로 동시 수정이 있으면 일관된 Cloud snapshot이 보장되지 않습니다.
 가져오기 중 다른 기기의 편집을 피하고, 관계가 깨진 입력은 전체 거부합니다.
 
-자동 pull/push/outbox/conflict resolution은 없습니다. Sync metadata는 로컬 변경/삭제를
-나중에 판단하기 위한 기반으로만 사용합니다. v0.4에서 owner mapping, remote revision,
-충돌·삭제·재시도 계약을 먼저 설계합니다.
+자동 Sync 구조는 [cloud-sync.md](cloud-sync.md)에 기록합니다. Native Local 변경과 outbox를 SQLite transaction으로 저장하고 CloudSyncService가 owner-bound RPC를 호출합니다. DB 트리거는 기존 Web CRUD도 변경 feed에 반영합니다.
 
 ## Web 보존과 보안
 
 Web의 Auth HTTP adapter, persistent project-keyed localStorage session, refresh epoch,
 Web Locks, 서버 사용자 확인, RLS/composite FK/Inbox RPC는 유지합니다. 500행 단위 pagination,
-로드된 계정 dataset 검색, profile 설정과 avatar fallback도 유지합니다. Cloud migration을
-추가하거나 운영 데이터에 테스트 fixture를 쓰지 않습니다.
+로드된 계정 dataset 검색, profile 설정과 avatar fallback도 유지합니다. 기존 Web CRUD/RLS를 유지하고 Cloud 변경 feed/RPC를 additive migration으로 추가합니다. 운영 데이터에 테스트 fixture를 쓰지 않습니다.
 
 Tauri main local window에만 capability를 적용합니다. dialog/fs plugin은 Rust 내부의
 시스템 선택 결과 읽기에만 사용하고 JavaScript에 범용 fs/dialog/shell/SQL 권한을 주지 않습니다.
@@ -75,13 +72,17 @@ local_pick_avatar에는 경로 인자가 없고 local_avatar는 DB가 소유한 
 Native binding은 reqwest의 HTTPS/timeout/redirect 금지와 build-configured endpoint로 검증하고
 UI가 전달한 사용자 ID/email/endpoint를 인증 근거로 사용하지 않습니다.
 명시적 logout epoch는 진행 중 binding이 로그아웃 후 완료되어 잠금을 풀지 못하게 합니다.
-Cloud session은 메모리 fallback으로 profile/offline 문서의 security tradeoff를 적용합니다.
+Native access token은 메모리에 두며 refresh credential은 Android Keystore/Windows Credential Manager에서 계정·서버별로 복원합니다. 실패해도 로컬 사용을 잠그지 않고 Cloud 재인증을 안내합니다.
 
 opener는 http/https URL만 허용합니다. CSP는 self script와 IPC/HTTPS 연결만 허용하고 raw
 Markdown HTML은 실행하지 않습니다. 개발 전용 devCsp는 Vite inline preamble/HMR만 추가 허용하며 production script-src 제한을 완화하지 않습니다. 로컬 DB는 암호화되지 않으며 OS 계정/디스크 보호가
 경계입니다. 로컬 프로필 사진은 private 복사본입니다. 외부 HTTPS avatar/URL 원격 본문은 오프라인에 캐시하지 않습니다.
 
 ## 규모와 배포
+
+CloudSyncService는 UI와 분리해 durable queue를 전송하고 수신 결과를 native transaction으로
+적용합니다. Provider가 foreground 트리거/상태를 연결하고 `/sync`가 충돌 선택을 제공합니다.
+Android SessionVaultPlugin과 Windows keyring만 OS credential 경계입니다.
 
 개인 Workspace 전체 데이터를 메모리에 읽어 UI/search를 공유합니다. 큰 데이터의
 화면별 paging/SQLite FTS는 후속 최적화 대상입니다. native titlebar와 최소 800×600 창을
@@ -100,4 +101,4 @@ JS visualViewport가 dialog 높이를 보조합니다. 공유 DB/domain을 플�
 
 Windows app.timora.desktop과 Android app.timora.android의 app_data_dir 파일은 독립적입니다.
 현재 remote_id 별도 column은 없고 보존한 Entity UUID가 원격 ID 역할을 합니다.
-remote_updated_at/sync_state/tombstones는 같은 schema이며 자동 Sync는 v0.4입니다.
+SQLite schema v3의 outbox/metadata/conflicts와 동일한 Cloud RPC를 두 플랫폼이 공유합니다.

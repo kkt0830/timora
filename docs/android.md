@@ -88,10 +88,9 @@ metadata/tombstones는 Windows와 같은 Database 구현입니다. 종료 전에
 DB 암호화는 없고 Android sandbox에 의존합니다. Android 자동 backup은 끄며 사용자가
 로컬 기록이 Cloud로 자동 백업된다고 오해하지 않도록 합니다.
 
-**Windows와 Android DB는 독립적**입니다. Windows에서 만든 작업이 Android에 자동으로
-나타나지 않습니다. Supabase initial import는 빈 DB에서 한 번 수행하는 읽기 전용 흐름입니다.
+**Windows와 Android DB는 기기별로 독립적**이며 같은 Cloud 계정으로 자동 동기화할 수 있습니다. Supabase initial import는 빈 DB에서 한 번 수행하는 읽기 전용 흐름입니다.
 비밀번호/토큰은 temporary memory에서 정리하고 DB/localStorage/log에 기록하지 않습니다.
-원격 schema/data/RLS 변경은 없습니다. 자동 Sync는 v0.4입니다.
+자동 Sync의 additive Cloud migration과 SQLite v3 계약은 [cloud-sync.md](cloud-sync.md)를 참고하세요.
 
 ## Mobile UI와 lifecycle
 
@@ -128,12 +127,14 @@ DB 암호화는 없고 Android sandbox에 의존합니다. Android 자동 backup
 Android workflow: npm ci/typecheck/Node tests/Rust format/SQLite tests → ARM64/x86_64 APK →
 signature/identity 검사 → API 36 에뮬레이터에서 비행기 모드, 실제 IPC로 6개 Entity/settings 저장,
 force-stop/relaunch/identity·관계·날짜·Markdown 보존, HashRouter와 system Back 검사.
+자동 Sync 개선에서는 실제 Kotlin Keystore 암호화 refresh fixture의 쓰기/읽기·강제 종료
+복구·명시적 logout 제거와 잠금도 확인합니다. fixture는 실제 서버 토큰을 사용하지 않습니다.
 브라우저 fixture는 별도로 external network 차단/Cloud 설정 없음/초기 Retry/폼 입력 유지/
 좁은 viewport/drawer/Back 우선순위를 검사합니다.
 
 실제 Galaxy 설치·OS lifecycle·IME·gesture/cutout/soft keyboard는
 [manual checklist](manual-acceptance-v03-android.md)에 기록합니다.
-자동 Sync/push/widgets/share sheet/background sync/file attachment/Play Store/production signing/
+widgets/share sheet/앱 종료 중 background sync/file attachment/Play Store/production signing/
 DB encryption/backup UI는 미구현입니다.
 
 ## Production signing 준비 (후속 배포)
@@ -153,7 +154,7 @@ Variables의 같은 이름을 사용하며 배포 빌드는 누락/privileged ke
 비밀번호/secret/service_role/signing key는 .env.example/Repository에 넣지 않습니다.
 
 Application ID는 app.timora.android, versionCode는 3001입니다. ID나 app data 경로를
-바꾸지 않았습니다. 같은 서명 APK 업데이트일 때 SQLite v1→v2로 보존합니다. debug runner
+바꾸지 않았습니다. 같은 서명 APK 업데이트일 때 SQLite v1/v2→v3로 보존합니다. debug runner
 서명은 여전히 배포마다 달라질 수 있으며 signing/updater를 구현한 것으로 표시하지 않습니다.
 
 사진 선택은 Tauri dialog의 Android 시스템 GET_CONTENT(image/*) 선택기입니다. Android

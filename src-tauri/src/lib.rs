@@ -214,7 +214,7 @@ impl Database {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(sql_error)?;
-        if version > 2 {
+        if version > 3 {
             return Err(
                 "이 DB는 더 새로운 Timora 버전에서 생성됐습니다. 업데이트한 앱으로 열어 주세요."
                     .into(),
@@ -256,6 +256,14 @@ impl Database {
                         .to_string()
                 })?;
             tx.pragma_update(None, "user_version", 2)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 3 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/003_durable_sync.sql"))
+                .map_err(|_| "Local sync migration 실패. 기존 DB는 보존됩니다.".to_string())?;
+            tx.pragma_update(None, "user_version", 3)
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
@@ -592,6 +600,11 @@ impl Database {
         }
         let owner = self.owner()?;
         let tx = self.conn.transaction().map_err(sql_error)?;
+        tx.execute(
+            "UPDATE native_sync_control SET applying=1 WHERE singleton=1",
+            [],
+        )
+        .map_err(sql_error)?;
         let imported: Option<String> = tx
             .query_row(
                 "SELECT imported_at FROM local_identity WHERE singleton=1",
@@ -630,6 +643,20 @@ impl Database {
         instant(text(&snapshot["settings"], "updated_at")?)?;
         Self::settings(&tx, &owner, &snapshot["settings"], true)?;
         tx.execute(
+            "DELETE FROM native_sync_outbox WHERE entity_table='workspace_settings'",
+            [],
+        )
+        .map_err(sql_error)?;
+        for table in TABLES {
+            tx.execute(&format!("INSERT OR REPLACE INTO native_sync_meta(entity_table,id,remote_updated_at) SELECT ?1,id,remote_updated_at FROM {table}"), [table]).map_err(sql_error)?;
+        }
+        tx.execute("INSERT OR REPLACE INTO native_sync_meta(entity_table,id,remote_updated_at) VALUES('workspace_settings','settings',?1)", [text(&snapshot["settings"],"updated_at")?]).map_err(sql_error)?;
+        tx.execute(
+            "UPDATE native_sync_control SET applying=0 WHERE singleton=1",
+            [],
+        )
+        .map_err(sql_error)?;
+        tx.execute(
             "UPDATE local_identity SET cloud_user_id=?1,imported_at=?2 WHERE singleton=1",
             params![cloud_user_id, now()],
         )
@@ -653,10 +680,13 @@ pub fn valid_avatar_name(name: &str) -> bool {
 }
 
 mod profile;
+mod sync;
 pub use profile::{normalize_avatar, AVATAR_INPUT_LIMIT};
 
 // Optional native shell; core-only SQLite tests stay independent of GUI dependencies.
 #[cfg(feature = "desktop")]
 mod runtime;
+#[cfg(feature = "desktop")]
+mod session_vault;
 #[cfg(feature = "desktop")]
 pub use runtime::run;

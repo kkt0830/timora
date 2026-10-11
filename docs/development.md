@@ -19,7 +19,8 @@ npm run tauri dev
 npm run desktop:build
 ```
 
-Desktop core에는 `.env`/Supabase 로그인/네트워크가 필요 없습니다. 개발 CSP는 Vite inline preamble/HMR을 허용하고 production CSP의 self-only script 정책은 유지합니다.
+SQLite core 테스트는 `.env`/Supabase 로그인/네트워크가 필요 없습니다. 실제 새 설치의
+첫 로그인과 Cloud 동기화에는 공개 설정과 인터넷이 필요합니다. 개발 CSP는 Vite inline preamble/HMR을 허용하고 production CSP의 self-only script 정책은 유지합니다.
 SQL migration은 앱이 로컬 DB version을 확인해 transaction으로 실행합니다. Cloud SQL을
 Desktop SQLite에 적용하지 않습니다. `tauri dev`는 Vite 5173을 자동 시작합니다.
 설치된 production exe로 오프라인 수동 합격을 검사하세요.
@@ -29,7 +30,7 @@ Desktop SQLite에 적용하지 않습니다. `tauri dev`는 Vite 5173을 자동 
 1. `.env.example`을 `.env`로 복사하고 VITE_SUPABASE_URL/PUBLISHABLE_KEY를 설정합니다.
    PowerShell: `Copy-Item .env.example .env`. Secret/service_role/DB password를 넣지 않습니다.
 2. 새 빈 Supabase DB에만 `db/schema.sql` → `db/migrations/*.sql`을 파일명 순서대로 한 번 적용합니다.
-   기존 Timora production DB에는 v0.3 schema 변경이 없습니다. bootstrap을 재실행하지 않습니다.
+   기존 Timora에는 승인한 sync migration만 추가 적용했습니다. bootstrap을 재실행하지 않습니다.
 3. Data API public schema, authenticated grant/RLS, max rows 최소 500을 확인합니다.
 4. Auth Email provider, Site URL과 Redirect URLs에 `http://localhost:5173`/실제 배포 URL을 등록합니다.
    기본 SMTP는 조직 팀원 이메일만 발송하며 일반 사용자 가입에는 Custom SMTP가 필요합니다.
@@ -75,7 +76,7 @@ Web fixture는 Vite 4173, Desktop-mode IPC fixture는 4175 포트를 사용합�
 외부 설치한 Playwright는 TIMORA_PLAYWRIGHT_MODULE에 module 경로를 지정할 수 있습니다.
 CI는 Playwright Chromium을 설치하며 test-results 이미지를 artifact로 남깁니다.
 
-GitHub Actions `ci.yml`: Web install/types/Node/build/browser, 격리 Postgres 16 core/Profile RLS.
+GitHub Actions `ci.yml`: Web install/types/Node/build/browser, 격리 Postgres 16 core/Profile/sync RLS 및 실제 두 SQLite 기기 동기화.
 `desktop.yml`: Linux SQLite/format 검사, Windows Node/SQLite/production exe+NSIS 빌드.
 CI 전용 tests/db-bootstrap.sql을 실제 Supabase에 실행하지 않습니다.
 
@@ -100,7 +101,7 @@ main → version/v0.x → tests → PR → review → merge 절차를 유지합�
 ## 제한
 
 기기 timezone, 기본 Markdown 부분집합, 전 객체 in-memory 검색. Desktop 외부 자료 파일은
-캐시하지 않습니다. Web 오프라인 편집, 자동 sync/conflict, DB encryption/백업 UI,
+캐시하지 않습니다. Web 오프라인 편집, 앱 종료 중 background sync, DB encryption/백업 UI,
 password recovery/계정 삭제 UI, 여러 로컬 Workspace는 아직 없습니다.
 
 ## v0.3 Android
@@ -110,3 +111,5 @@ JDK 21/SDK/NDK/Rust targets 준비 후 npm run android:dev 또는 android:apk --
 기존 generated project에 android:init을 재실행하지 않습니다. docs/android.md의 툴 버전/빌드
 경로/서명/재현 정책을 참고합니다. Android UI fixture는 npm run test:browser:android,
 실제 에뮬레이터 smoke는 tests/android-device-smoke.mjs이며 기기 IME 검수를 대체하지 않습니다.
+
+자동 Sync 개발과 isolated PostgreSQL/두 SQLite 통합 테스트는 [cloud-sync.md](cloud-sync.md)를 참고하세요.

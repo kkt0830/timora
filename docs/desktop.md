@@ -6,7 +6,7 @@ Windows 10 실제 호환 확인은 아직 하지 않았습니다. macOS/Linux �
 ## 설치 및 실행
 
 [Desktop Actions](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)의 성공한
-`version/v0.3` 실행 → Artifacts → `timora-v0.3-windows-x64`를 다운로드/압축 해제합니다. 검수용 source bc90a62의 [성공한 artifact](https://github.com/kkt0830/timora/actions/runs/37880376091/artifacts/11594795491)가 생성됐습니다.
+`version/v0.3` 실행 → Artifacts → `timora-v0.3-windows-x64`를 다운로드/압축 해제합니다. Source 9e0826c의 Windows CI가 통과했으며 [자동 동기화 exe/NSIS ZIP](https://github.com/kkt0830/timora/actions/runs/38103096311/artifacts/11688687451)을 받을 수 있습니다. 검사 범위는 [verification.md](verification.md)에 기록합니다. 이전 source bc90a62 artifact는 자동 동기화를 포함하지 않습니다.
 `Timora_0.3.0_x64-setup.exe`(실제 파일명은 artifact 안에서 확인)로 설치하거나
 WebView2가 설치된 PC에서 `timora-desktop.exe`를 실행합니다.
 
@@ -56,10 +56,11 @@ Settings → Cloud 가져오기 / DB 위치에서 확인합니다.
 UI 백업/복원 기능은 없습니다. 문제 해결을 위해 DB를 삭제하거나 schema version을 임의로
 바꾸지 마세요. 오류 메시지·앱 버전·경로를 기록하고 원본을 보존해 진단합니다.
 
-`PRAGMA user_version=2` migration은 transaction이며 실패하면 rollback합니다.
+`PRAGMA user_version=3` migration은 transaction이며 실패하면 rollback합니다.
 더 최신 버전의 DB나 손상된 DB는 오류/Retry를 표시하고 자동 초기화하지 않습니다.
 앱 identifier를 유지해 재설치/업데이트 후 같은 DB를 사용하도록 합니다.
-이 버전은 단일 로컬 Workspace이며 여러 OS 사용자/다른 PC DB를 자동 통합하지 않습니다.
+이 버전은 단일 로컬 Workspace입니다. 같은 Cloud 계정에 연결한 다른 PC/Android의
+기록은 자동 동기화하며, 서로 다른 OS 사용자나 Cloud 계정의 DB를 합치지 않습니다.
 
 ## UI 및 권한
 
@@ -78,5 +79,7 @@ Windows identifier/설치/DB 경로는 유지합니다. src/main.rs는 shared ru
 Android 프로젝트 추가 후에도 desktop.yml이 exe/NSIS를 다시 빌드합니다. 실제 PC 합격 결과는
 기존 Windows checklist를 유지하며 자동 CI를 수동 PASS로 바꾸지 않습니다.
 
-계정 연결/로그아웃/메모리 Cloud 세션과 private 사진 복사는 [offline.md](offline.md)를 참고하세요.
+계정 연결/로그아웃/OS 보안 refresh credential과 private 사진 복사는 [offline.md](offline.md)를 참고하세요.
 이번 개선은 version/v0.3에 직접 반영하며 기존 Windows CI 합격과 새 실기기 합격을 구분합니다.
+
+기본 자동 동기화와 충돌 처리/실기기 검사 흐름은 [cloud-sync.md](cloud-sync.md)를 참고하세요.

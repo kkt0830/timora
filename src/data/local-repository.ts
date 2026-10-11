@@ -16,15 +16,50 @@ export class LocalAuth implements AuthService {
   private cloud?: SupabaseAuth;
   private account: Account | null = null;
   private hasSession = false;
+  private restoring: Promise<void> | null = null;
+  private persistedRefresh: string | null = null;
+  private saving: Promise<void> = Promise.resolve();
+  private sessionWarning = '';
+  private published: string | undefined;
   private epoch = 0;
   private listeners = new Set<(account: Account | null) => void>();
   constructor(invoke: LocalInvoke, config?: BackendConfig) { this.invoke = invoke; if (config) this.cloud = new SupabaseAuth(config, this.storage, { useSiteUrl: true }); }
   private publish(): Account | null {
     if (this.account) this.account = { ...this.account, cloud_state: this.account.local_only || !this.account.cloud_user_id ? 'LOCAL_ONLY'
       : typeof navigator !== 'undefined' && navigator.onLine === false ? 'SIGNED_IN_OFFLINE' : this.hasSession ? 'SIGNED_IN_ONLINE' : 'CLOUD_REAUTH_REQUIRED' };
-    this.listeners.forEach(listener => listener(this.account)); return this.account;
+    if (this.account) this.account = { ...this.account, session_warning: this.sessionWarning };
+    const signature = JSON.stringify(this.account);
+    if (signature !== this.published) { this.published = signature; this.listeners.forEach(listener => listener(this.account)); }
+    return this.account;
   }
-  async restore(): Promise<Account | null> { const version = this.epoch; const account = await this.invoke<Account | null>('local_account'); if (version !== this.epoch) return this.account; this.account = account; return this.publish(); }
+  async restore(): Promise<Account | null> {
+    const version = this.epoch; const account = await this.invoke<Account | null>('local_account');
+    if (version !== this.epoch) return this.account;
+    this.account = account;
+    if (account?.cloud_user_id && !account.local_only && this.cloud) {
+      this.restoring = this.invoke<string | null>('local_session_read').then(refresh => {
+        if (version !== this.epoch || typeof refresh !== 'string' || !refresh) return;
+        this.cloud!.restoreCredential(refresh, account.cloud_user_id!); this.persistedRefresh = refresh;
+      }).catch(() => { if (version === this.epoch) { this.sessionWarning = '보안 세션을 복원하지 못했습니다. Cloud를 다시 인증하면 됩니다. 로컬 기록은 보존됩니다.'; this.publish(); } });
+    }
+    // The OS vault and Cloud never delay opening this device's local workspace.
+    return this.publish();
+  }
+  private async persist(version: number) {
+    // Serialize OS writes as well as HTTP refreshes. A slow older vault write
+    // must not overwrite a newly rotated credential after its write completes.
+    const pending = this.saving.then(() => this.writeCredential(version));
+    this.saving = pending.catch(() => {});
+    await pending;
+  }
+  private async writeCredential(version: number) {
+    const refresh = this.cloud?.refreshCredential();
+    if (!refresh || version !== this.epoch || refresh === this.persistedRefresh) return;
+    try {
+      await this.invoke('local_session_write', { refreshToken: refresh });
+      if (version === this.epoch) { this.persistedRefresh = refresh; this.sessionWarning = ''; }
+    } catch { if (version === this.epoch) this.sessionWarning = '보안 세션 저장에 실패했습니다. 이번 실행의 동기화는 가능하며 재실행 후에는 Cloud 재인증이 필요할 수 있습니다.'; }
+  }
   subscribe(listener: (account: Account | null) => void): () => void {
     this.listeners.add(listener); const changed = () => { this.publish(); };
     if (typeof window !== 'undefined') { window.addEventListener('online', changed); window.addEventListener('offline', changed); }
@@ -36,7 +71,7 @@ export class LocalAuth implements AuthService {
     if (version !== this.epoch) throw new Error('로그인 요청이 취소되었습니다.');
     const account = await this.invoke<Account>('local_bind_account', { accessToken: token });
     if (version !== this.epoch) return;
-    this.account = account; this.hasSession = true; this.publish();
+    this.account = account; this.hasSession = true; await this.persist(version); this.publish();
   }
   async signIn(email: string, password: string): Promise<void> {
     const version = ++this.epoch;
@@ -52,12 +87,19 @@ export class LocalAuth implements AuthService {
     const version = ++this.epoch;
     // Local logout must succeed before the UI claims the workspace is locked.
     await this.invoke('local_sign_out');
-    this.account = null; this.hasSession = false; this.publish();
+    this.account = null; this.hasSession = false; this.persistedRefresh = null; this.sessionWarning = ''; this.publish();
     try { await this.cloud?.signOut(); } catch { /* Remote logout is best effort; the local lock is already durable. */ } finally { if (version === this.epoch) this.storage.clear(); }
   }
   async token(forceRefresh = false): Promise<string> {
     const version = this.epoch;
-    try { const token = await this.configured().token(forceRefresh); if (version === this.epoch) { this.hasSession = true; this.publish(); } return token; }
+    try {
+      await this.restoring;
+      if (version !== this.epoch) throw new Error('인증 요청이 취소되었습니다.');
+      const token = await this.configured().token(forceRefresh);
+      await this.persist(version);
+      if (version === this.epoch) { this.hasSession = true; this.publish(); }
+      return token;
+    }
     catch (error) { if (version === this.epoch) { this.hasSession = false; this.publish(); } throw error; }
   }
 }

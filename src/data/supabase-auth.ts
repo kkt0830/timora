@@ -38,6 +38,11 @@ export class SupabaseAuth implements AuthService {
     if (!data.access_token || !data.refresh_token || !data.user?.id || !Number.isFinite(data.expires_in)) throw new Error('인증 응답이 올바르지 않습니다.');
     this.setSession({ ...data, expires_at: Date.now() / 1000 + data.expires_in });
   }
+  refreshCredential(): string | null { return this.read()?.refresh_token ?? null; }
+  restoreCredential(refreshToken: string, userId: string): void {
+    // Native OS vault holds only this refresh credential, never a password.
+    this.setSession({ access_token: '', refresh_token: refreshToken, expires_at: 0, user: { id: userId } });
+  }
   async restore(): Promise<Account | null> {
     const version = this.epoch;
     const hash = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.hash.slice(1));

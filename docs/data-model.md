@@ -41,7 +41,9 @@ user_id/updated_at, Task due_date/start_date/project_id, Event start/end/project
 - Inbox processed 대신 미분류/분류 type을 사용합니다. 이동 성공 시 원본을 삭제해 중복 처리를 막습니다.
 - Workspace 설정은 인증 user metadata에 섞지 않고 별도 소유 테이블에 저장합니다.
 
-ObjectRelation 타입은 후속 버전의 계약 초안으로 남겼습니다. 범용 relations 테이블, GitHub FK, Storage 메타데이터, offline tombstone/version은 Cloud SQL에 포함하지 않습니다. Local schema v1에는 아래와 같이 추가합니다. 이후 DB 변경은 별도 SQL migration으로 남겨 기존 데이터에 적용하며 bootstrap을 재실행하지 않습니다.
+ObjectRelation 타입은 후속 버전의 계약 초안으로 남겼습니다. 범용 relations 테이블, GitHub FK, Storage 메타데이터는 Cloud SQL에 포함하지 않습니다.
+초기 Cloud에는 offline tombstone/version도 없었지만 현재 자동 Sync metadata는 아래 v3
+계약에 별도로 추가합니다. 이후 DB 변경은 별도 SQL migration으로 남겨 기존 데이터에 적용하며 bootstrap을 재실행하지 않습니다.
 
 ## Hosted DB 적용 — 2026-10-02
 
@@ -72,7 +74,7 @@ fixtures를 모두 rollback했습니다. 작은 settings table의 현재 migrati
 두 CHECK를 즉시 검증합니다. lock_timeout 5초를 두며, 큰 테이블에 배포할
 경우 NOT VALID 추가와 별도 검증 transaction으로 분리하는 개선을 검토합니다.
 
-## v0.3 Local SQLite schema v2
+## 이전 v0.3 계정/사진 단계: Local SQLite schema v2
 
 실행 기준: `src-tauri/migrations/001_initial_local_schema.sql` +
 `002_local_account_profile.sql`, native validator
@@ -114,13 +116,29 @@ Cloud ID가 이미 연결되었거나 기존 import mapping이 있으면 다른 
 imported 행 삭제에만 tombstone을 남깁니다. local-only 행 삭제는 물리 삭제입니다.
 원자적 Inbox 이동/Project detach/import rollback을 실제 파일 tests로 검증합니다.
 
-settings에는 이번 버전에서 sync_state/tombstone을 두지 않습니다. 아직 자동 sync가 없으며
-v0.4 settings sync 계약에 포함해야 합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
+이전 v2에는 settings sync metadata가 없었습니다. 현재 v3는 native_sync_meta와 outbox에 singleton settings를 포함합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
 DB encryption이 없습니다. 보안·가져오기 제한은 [offline.md](offline.md)를 참고하세요.
 
-## Android expansion
+## 이전 Android expansion 단계
 
 Android와 Windows는 같은 Local schema v2/migration/identity/FK/transaction/metadata/tombstones를
 사용합니다. Android 전용 schema와 Cloud schema/RLS 변경은 없습니다. app_data_dir는 Android sandbox app data 영역이며
 Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존한 Entity UUID를 사용합니다.
-Sync는 아직 실행하지 않습니다. Android process termination 확인은 플랫폼별 acceptance입니다.
+현재 Sync는 아래 v3 계약을 따릅니다. Android process termination 확인은 플랫폼별 acceptance입니다.
+
+## 자동 Sync: SQLite schema v3와 Cloud metadata
+
+`003_durable_sync.sql`은 v2 위에 transaction으로 추가됩니다. 기록/UUID/사진을 보존하고 기존 local/modified 행 및 imported 삭제를 outbox에 seed합니다. `user_version=3`이며 3보다 최신 schema는 초기화하지 않고 거부합니다.
+
+| SQLite 구조 | 의미 |
+| --- | --- |
+| native_sync_control | cursor TEXT, applying flag, last_success |
+| native_sync_outbox | seq, unique operation_id, table/id, put/delete, payload, base_revision/base_updated_at |
+| native_sync_meta | table/id PK, 확인한 Cloud revision/updated_at |
+| native_sync_conflicts | table/id PK, 최신 원격 충돌 내용; 로컬 행/삭제 의도 보존 |
+
+`20261010030830_native_workspace_sync.sql`은 기존 Cloud business 행을 변경하지 않고 metadata를 seed합니다. `sync_records`는 user/table/id별 최신 revision과 삭제 tombstone을 보관하고, `sync_receipts`는 user/operation_id별 동일 요청의 응답을 보관합니다. 두 public table은 owner RLS를 사용합니다. private sync_clock은 owner별 revision을 commit 순서로 할당합니다. 삭제 tombstone/receipt의 보존 기간과 정리 작업은 아직 구현하지 않습니다.
+
+`sync_pull`/`sync_apply`는 SECURITY INVOKER입니다. authenticated role과 auth.uid()를 강제하고 project 복합 FK와 기존 RLS를 유지합니다. 내부 capture trigger만 private SECURITY DEFINER이며 search_path를 비우고 사용자 소유권을 확인합니다. Auth 사용자 cascade 삭제 시 clock을 재생성하지 않습니다.
+
+Local owner UUID와 Cloud user_id는 다르며 runtime에서 매핑합니다. Entity UUID는 보존합니다. Settings는 로컬 키 `settings`와 원격 auth.uid()를 매핑합니다. revision/cursor는 JS 정수 정밀도 손실을 피하려고 TEXT로 전달합니다. 자세한 충돌/재전송 계약은 [cloud-sync.md](cloud-sync.md)를 참고하세요.

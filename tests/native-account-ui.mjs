@@ -7,7 +7,7 @@ const {chromium}=await import(process.env.TIMORA_PLAYWRIGHT_MODULE??'playwright'
 const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4176','--strictPort'],{env:{...process.env,VITE_SUPABASE_URL:'https://native-fixture.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'},stdio:['ignore','pipe','pipe']});
 let output='';server.stdout.on('data',d=>output+=d);server.stderr.on('data',d=>output+=d);let browser;
 const owner='11111111-1111-4111-8111-111111111111',cloud='22222222-2222-4222-8222-222222222222';
-const data=emptyWorkspace(owner);let state='new',photo=null,pickFailure=false,tokenEmail='';const requests=[],errors=[];
+const data=emptyWorkspace(owner);let state='new',photo=null,pickFailure=false,tokenEmail='',syncConflicts=[];const requests=[],errors=[];
 const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=';
 try{
  for(let i=0;;i++){try{if((await fetch('http://127.0.0.1:4176')).ok)break;}catch{}if(i>100)throw new Error(output);await new Promise(r=>setTimeout(r,100));}
@@ -25,6 +25,11 @@ try{
   if(command==='local_bind_account'){if(tokenEmail!=='a@example.com')throw new Error('이 Workspace는 다른 계정에 연결되어 있습니다. 원래 계정으로 로그인해 주세요.');state='signed_in';return {id:owner,local:true,local_only:false,cloud_user_id:cloud,email:tokenEmail};}
   if(command==='local_sign_out'){state='signed_out';return null;}
   if(state!=='signed_in')throw new Error('Workspace locked');
+  if(command==='local_session_read')return null;
+  if(command==='local_session_write')return null;
+  if(command==='local_sync_status')return {pending:syncConflicts.length,conflict_count:syncConflicts.length,conflicts:syncConflicts,cursor:'0',last_success:null};
+  if(command==='local_sync_next')return null;
+  if(command==='local_sync_resolve'){assert.equal(args.cloudUserId,cloud);assert.equal(args.choice,'cloud');data.tasks[0]={...data.tasks[0],title:'Cloud task'};syncConflicts=[];return null;}
   if(command==='local_load')return data;
   if(command==='local_avatar')return photo;
   if(command==='local_pick_avatar'){if(pickFailure)throw new Error('손상된 사진입니다. 기존 사진은 보존됩니다.');photo=image;return photo;}
@@ -49,6 +54,13 @@ try{
  await page.getByLabel('이메일',{exact:true}).fill('b@example.com');await page.getByLabel('비밀번호',{exact:true}).fill('fixture-password');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.getByRole('alert').getByText(/다른 계정/).waitFor();assert.equal(state,'signed_out');assert.equal(await page.getByText('A의 기록',{exact:true}).count(),0);
  await page.getByLabel('이메일',{exact:true}).fill('a@example.com');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.getByRole('heading',{name:'Settings',exact:true,level:1}).waitFor();await page.goto('http://127.0.0.1:4176/#/tasks');await page.getByText('A의 기록',{exact:true}).waitFor();assert.equal(data.tasks.length,1);
  await page.goto('http://127.0.0.1:4176/#/profile');await page.getByRole('button',{name:'사진 제거',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.profile-summary img'));await page.reload();await page.getByRole('heading',{name:'로컬 이름',exact:true}).waitFor();assert.equal(await page.locator('.profile-summary img').count(),0);
+  syncConflicts=[{entity_table:'tasks',id:data.tasks[0].id,local:data.tasks[0],remote:{revision:'2',deleted:false,payload:{...data.tasks[0],title:'Cloud task',description:'long-content-'.repeat(100)}}}];
+  await page.goto('http://127.0.0.1:4176/#/sync');await page.getByRole('heading',{name:'Cloud 동기화',exact:true,level:1}).waitFor();
+  await page.getByRole('button',{name:'지금 동기화',exact:true}).click();await page.getByText('전송 대기 1개 · 충돌 1개',{exact:true}).waitFor();
+  await page.getByText('Cloud 내용',{exact:true}).click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await page.getByRole('button',{name:'Cloud 내용 사용',exact:true}).click();await page.getByText('전송 대기 0개 · 충돌 0개',{exact:true}).waitFor();assert.equal(data.tasks[0].title,'Cloud task');
+  await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{get:()=>false,configurable:true});window.dispatchEvent(new Event('offline'));});
+  await page.getByRole('heading',{name:'오프라인 · 전송 대기 0개',exact:true}).waitFor();
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/native-account-profile.png',fullPage:true});
  console.log('Native UI contract: first login/signup, local restore/offline/avatar, explicit logout/data preservation, A/B isolation and same-account recovery passed. Real native Auth/system picker remains a separate gate.');
 }finally{await browser?.close();server.kill('SIGTERM');}

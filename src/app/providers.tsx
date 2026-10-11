@@ -5,8 +5,11 @@ import { NativeProfileProvider } from './NativeProfileProvider';
 import { createBackend } from '../services/backend';
 import { emptyWorkspace } from '../domain/models';
 import type { EntityInput, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models';
+import { emptySyncState } from '../services/cloud-sync';
+import type { SyncState } from '../services/cloud-sync';
 
 const backend = createBackend();
+const syncService = 'sync' in backend ? backend.sync : null;
 export const messageOf = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
 interface AuthState {
   account: Account | null; loading: boolean; error: string; configured: boolean;
@@ -25,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) return;
     let active = true;
     setLoading(true); setError('');
-    const unsubscribe = auth.subscribe(user => { if (active) { setAccount(user); setError(''); } });
+    const unsubscribe = auth.subscribe(user => { if (active) { syncService?.setAccount(user); setAccount(user); setError(''); } });
     const promise = attempt ? auth.restore() : (initialRestore ??= auth.restore());
     void promise.then(user => { if (active) setAccount(user); }).catch(e => { if (active) setError(messageOf(e)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; unsubscribe(); };
@@ -59,6 +62,7 @@ interface WorkspaceState {
   saveSettings: (settings: WorkspaceSettings) => Promise<void>;
 }
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
+const SyncContext = createContext<{ state: SyncState; retry: () => void; resolve: (table: string, id: string, choice: 'local' | 'cloud') => Promise<void> } | null>(null);
 export function WorkspaceProvider({ account, children }: { account: Account; children: ReactNode }) {
   const repository = backend.repository!;
   const [data, setData] = useState(() => emptyWorkspace(account.id));
@@ -66,6 +70,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>(emptySyncState);
   const mounted = useRef(false);
   const generation = useRef(0);
   const lock = useRef(false);
@@ -82,14 +87,29 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === 'visible' && !lock.current) void reload(false); };
     window.addEventListener('focus', refresh); window.addEventListener('online', refresh);
-    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh); };
+    const interval = account.local ? undefined : window.setInterval(refresh, 30000);
+    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh); if (interval) window.clearInterval(interval); };
   }, [reload]);
+  useEffect(() => {
+    if (!syncService) return;
+    syncService.setAccount(account);
+    let lastRefresh: string | null = null;
+    const unsubscribe = syncService.subscribe(state => {
+      setSyncState(state);
+      if (state.phase === 'idle' && state.last_success && state.last_success !== lastRefresh && !lock.current) { lastRefresh = state.last_success; void reload(false); }
+    });
+    const wake = () => { if (document.visibilityState === 'visible') void syncService.wake(); };
+    const offline = () => { void syncService.wake(); };
+    wake(); const interval = window.setInterval(wake, 30000);
+    window.addEventListener('online', wake); window.addEventListener('offline', offline); window.addEventListener('focus', wake); document.addEventListener('visibilitychange', wake);
+    return () => { unsubscribe(); syncService.stop(); window.clearInterval(interval); window.removeEventListener('online', wake); window.removeEventListener('offline', offline); window.removeEventListener('focus', wake); document.removeEventListener('visibilitychange', wake); };
+  }, [account.id, account.cloud_user_id, account.local_only, reload]);
   const mutate = async (action: () => Promise<void>) => {
     if (lock.current) throw new Error('저장 중입니다. 잠시 기다려 주세요.');
     lock.current = true; setBusy(true);
     // Invalidate any older load so it cannot overwrite the result of this mutation.
     generation.current++;
-    try { await action(); } finally { lock.current = false; if (mounted.current) { setBusy(false); setLoading(false); } }
+    try { await action(); } finally { lock.current = false; if (mounted.current) { setBusy(false); setLoading(false); void syncService?.wake(); } }
   };
   const value: WorkspaceState = {
     data, loading, loaded, error, busy, reload,
@@ -120,6 +140,8 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
     update(); media.addEventListener('change', update);
     return () => { media.removeEventListener('change', update); delete document.documentElement.dataset.theme; };
   }, [data.settings.appearance]);
-  return <WorkspaceContext.Provider value={value}><NativeProfileProvider account={account}>{children}</NativeProfileProvider></WorkspaceContext.Provider>;
+  const sync = { state: syncState, retry: () => { void syncService?.wake(); }, resolve: async (table: string, id: string, choice: 'local' | 'cloud') => { if (!syncService) throw new Error('동기화 설정이 없습니다.'); await syncService.resolve(table, id, choice); await reload(false); } };
+  return <WorkspaceContext.Provider value={value}><SyncContext.Provider value={sync}><NativeProfileProvider account={account}>{children}</NativeProfileProvider></SyncContext.Provider></WorkspaceContext.Provider>;
 }
 export function useWorkspace() { const value = useContext(WorkspaceContext); if (!value) throw new Error('WorkspaceProvider required'); return value; }
+export function useSync() { const value = useContext(SyncContext); if (!value) throw new Error('WorkspaceProvider required'); return value; }
