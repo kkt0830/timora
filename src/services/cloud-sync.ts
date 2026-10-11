@@ -84,7 +84,8 @@ export class CloudSyncService {
     const flight = run().catch(error => {
       if (!current()) return;
       const auth = error instanceof ApiError && [400, 401, 403].includes(error.status);
-      this.publish({ phase: auth ? 'auth_required' : (typeof navigator !== 'undefined' && navigator.onLine === false) ? 'offline' : 'error', error: error instanceof Error ? error.message : '동기화를 완료하지 못했습니다. 로컬 변경은 보관됩니다.' });
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      this.publish({ phase: offline ? 'offline' : auth ? 'auth_required' : 'error', error: offline ? '' : error instanceof Error ? error.message : '동기화를 완료하지 못했습니다. 로컬 변경은 보관됩니다.' });
     }).finally(() => {
       if (this.flight !== flight) return;
       this.flight = null;

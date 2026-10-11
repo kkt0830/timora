@@ -22,7 +22,7 @@ export function SyncPage() {
     try { await resolve(table, id, choice); } catch (e) { setError(messageOf(e)); } finally { setBusy(false); }
   }
   return <><PageTitle eyebrow="WORKSPACE" title="Cloud 동기화" description="로컬 변경은 먼저 이 기기에 저장하고, 연결되면 같은 계정의 기기들과 주고받습니다." />
-    <section className="card"><h2 role="status">{syncLabel(state)}</h2><p>전송 대기 {state.pending}개 · 충돌 {state.conflict_count}개</p>
+    <section className="card"><h2 aria-live="polite">{syncLabel(state)}</h2><p>전송 대기 {state.pending}개 · 충돌 {state.conflict_count}개</p>
       <p>마지막 확인: {state.last_success ? new Date(state.last_success).toLocaleString() : '아직 없음'}</p>
       <p className="muted">앱을 사용하는 동안 저장·온라인 복귀·화면 복귀 시 자동 동기화하며, 다른 기기의 변경도 주기적으로 확인합니다. 앱이 완전히 종료되어 있으면 다음 실행에서 이어갑니다.</p>
       {(state.phase === 'local_only' || state.phase === 'auth_required') && <NavLink to="/account">계정 연결 / Cloud 인증</NavLink>}

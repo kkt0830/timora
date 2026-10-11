@@ -59,7 +59,8 @@ try{
   await page.getByRole('button',{name:'지금 동기화',exact:true}).click();await page.getByText('전송 대기 1개 · 충돌 1개',{exact:true}).waitFor();
   await page.getByText('Cloud 내용',{exact:true}).click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   await page.getByRole('button',{name:'Cloud 내용 사용',exact:true}).click();await page.getByText('전송 대기 0개 · 충돌 0개',{exact:true}).waitFor();assert.equal(data.tasks[0].title,'Cloud task');
-  await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{get:()=>false,configurable:true});window.dispatchEvent(new Event('offline'));});await page.getByRole('heading',{name:'오프라인 · 전송 대기 0개',exact:true}).waitFor();
+  await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{get:()=>false,configurable:true});window.dispatchEvent(new Event('offline'));});
+  await page.getByRole('heading',{name:'오프라인 · 전송 대기 0개',exact:true}).waitFor();
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/native-account-profile.png',fullPage:true});
  console.log('Native UI contract: first login/signup, local restore/offline/avatar, explicit logout/data preservation, A/B isolation and same-account recovery passed. Real native Auth/system picker remains a separate gate.');
 }finally{await browser?.close();server.kill('SIGTERM');}
