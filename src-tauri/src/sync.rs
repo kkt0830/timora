@@ -113,7 +113,7 @@ impl Database {
     }
     pub fn sync_next(&self, cloud_id: &str) -> Result<Value> {
         self.sync_owner(cloud_id)?;
-        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) ORDER BY seq LIMIT 1",&[])?;
+        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='projects' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.project_id')) ORDER BY seq LIMIT 1",&[])?;
         let Some(mut row) = rows.pop() else {
             return Ok(Value::Null);
         };

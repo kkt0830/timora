@@ -1,7 +1,8 @@
 export interface BackendConfig { url: string; publishableKey: string }
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) { super(message); this.status = status; }
+  code?: string;
+  constructor(message: string, status: number, code?: string) { super(message); this.status = status; this.code = code; }
 }
 export async function apiRequest<T>(config: BackendConfig, path: string, init: RequestInit = {}, accessToken?: string): Promise<T> {
   const headers = new Headers(init.headers);
@@ -17,8 +18,8 @@ export async function apiRequest<T>(config: BackendConfig, path: string, init: R
   let data: unknown;
   try { data = text ? JSON.parse(text) : null; } catch { throw new ApiError('서버 응답을 읽을 수 없습니다.', response.status); }
   if (!response.ok) {
-    const detail = data as { msg?: string; message?: string; error_description?: string } | null;
-    throw new ApiError(detail?.msg ?? detail?.message ?? detail?.error_description ?? `요청 실패 (${response.status})`, response.status);
+    const detail = data as { msg?: string; message?: string; error_description?: string; code?: string } | null;
+    throw new ApiError(detail?.msg ?? detail?.message ?? detail?.error_description ?? `요청 실패 (${response.status})`, response.status, detail?.code);
   }
   return data as T;
 }

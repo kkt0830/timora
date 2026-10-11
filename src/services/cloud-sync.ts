@@ -65,10 +65,18 @@ export class CloudSyncService {
         catch (error) { if (!(error instanceof ApiError) || error.status !== 401 || !current()) throw error; return apiRequest<T>(this.config, `/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(body), signal }, await this.auth.token(true)); }
       };
       // Push first: a lost acknowledgement retries its receipt before pull can call it a conflict.
+      let dependencyError: ApiError | null = null;
       for (let delivered = 0; current() && delivered < 200; delivered++) {
         const operation = await this.invoke<Operation | null>('local_sync_next', { cloudUserId: account.cloud_user_id });
         if (!operation) break;
-        const response = await request('sync_apply', { operation_id: operation.operation_id, entity_table: operation.entity_table, entity_id: operation.id, action: operation.action, payload: operation.payload, base_revision: operation.base_revision, base_updated_at: operation.base_updated_at });
+        let response: unknown;
+        try { response = await request('sync_apply', { operation_id: operation.operation_id, entity_table: operation.entity_table, entity_id: operation.id, action: operation.action, payload: operation.payload, base_revision: operation.base_revision, base_updated_at: operation.base_updated_at }); }
+        catch (error) {
+          // A project may have been deleted elsewhere while its child was edited
+          // offline. Pull that deletion so native can preserve both as a conflict.
+          if (error instanceof ApiError && error.code === '23503') { dependencyError = error; break; }
+          throw error;
+        }
         if (!current()) return;
         await this.invoke('local_sync_ack', { cloudUserId: account.cloud_user_id, operationId: operation.operation_id, response });
       }
@@ -79,7 +87,10 @@ export class CloudSyncService {
         await this.invoke('local_sync_page', { cloudUserId: account.cloud_user_id, after: snapshot.cursor, page });
         if (!page.has_more) break;
       }
-      if (current()) { await this.status(); if (current()) this.publish({ phase: 'idle', error: '' }); }
+      if (current()) { await this.status(); if (current()) {
+        if (dependencyError && !this.state.conflict_count) throw dependencyError;
+        this.publish({ phase: 'idle', error: '' });
+      } }
     };
     const flight = run().catch(error => {
       if (!current()) return;

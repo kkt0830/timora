@@ -35,7 +35,7 @@ globalThis.fetch=(url,init)=> {
    const sql=url.endsWith('sync_apply')?'select public.sync_apply($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull($1,$2) result';
    const params=url.endsWith('sync_apply')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
    const {rows}=await pg.query(sql,params);await pg.query('commit');return new Response(JSON.stringify(rows[0].result));
-  }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message}),{status:500});}
+  }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message,code:e.code}),{status:500});}
  });tail=task.catch(()=>{});return task;
 };
 async function sync(d) {await d.service.wake();assert.equal(d.state.phase,'idle',d.state.error);}
@@ -64,6 +64,14 @@ try {
  for(const [table,input] of Object.entries({tasks:{title:'T',description:'',status:'todo',priority:'high',start_date:null,due_date:'2026-10-12',project_id:project.id},events:{title:'E',description:'',start_at:'2026-10-12T09:00:00Z',end_at:'2026-10-12T10:00:00Z',project_id:project.id},library_items:{title:'L',description:'',url:'https://example.com',type:'article',project_id:project.id},inbox_items:{content:'Capture',type:'unclassified'}}))await phone.invoke('local_save',{table,input});
  await sync(phone);await sync(tablet);
  for(const table of ['projects','tasks','events','library_items','inbox_items'])assert.equal((await load(tablet,table)).length,1,table);
+ // Remote parent delete while a device has an unsent child edit must become a
+ // recoverable conflict rather than block all future pull behind a FK error.
+ await tablet.invoke('local_remove',{table:'projects',id:project.id});await sync(tablet);
+ await phone.invoke('local_save',{table:'notes',input:{...note('offline linked child'),project_id:project.id}});
+ await sync(phone);assert.equal(phone.state.conflict_count,1);
+ await phone.service.resolve('projects',project.id,'local');await sync(phone);await sync(tablet);
+ assert.equal((await load(tablet,'notes'))[0].content,'offline linked child');
+ assert.equal((await load(tablet,'projects'))[0].id,project.id);
  await phone.invoke('local_remove',{table:'projects',id:project.id});await sync(phone);await sync(tablet);
  assert.equal((await load(tablet,'tasks'))[0].project_id,null);
  console.log('PASS: two real SQLite workspaces → PostgreSQL/RLS → offline retry, conflict/local choice, delete, six entities, project detachment and second-account isolation');
