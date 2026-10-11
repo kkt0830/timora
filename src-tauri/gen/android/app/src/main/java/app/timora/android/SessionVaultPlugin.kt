@@ -4,7 +4,7 @@ import android.app.Activity
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import app.tauri.JSObject
+import app.tauri.plugin.JSObject
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin

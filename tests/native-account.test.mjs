@@ -14,12 +14,14 @@ test('Native restart restores identity without HTTP or persistent token storage;
   assert.equal(seen.at(-1).id,local.id);assert.equal((await auth.restore()).cloud_user_id,A);
  }finally{mock.mock.restore();}
 });
-test('Native first login verifies the server token in native IPC, then persists local identity, not credentials',async()=>{
+test('Native first login verifies server identity and stores refresh only through the secure vault IPC',async()=>{
  const calls=[];let identity=null;
  const mock=test.mock.method(globalThis,'fetch',async url=>response({access_token:'memory-access',refresh_token:'memory-refresh',expires_in:3600,user:{id:A,email:local.email}}));
  try { const auth=new LocalAuth(async(command,args)=>{calls.push({command,args}); if(command==='local_bind_account'){assert.deepEqual(args,{accessToken:'memory-access'});identity={...local};}return identity;},config);
   assert.equal(await auth.restore(),null);await auth.signIn(local.email,'never-persist-password');
-  assert.equal((await auth.restore()).cloud_state,'SIGNED_IN_ONLINE');assert.ok(calls.every(c=>!JSON.stringify(c).includes('never-persist-password')&&!JSON.stringify(c).includes('memory-refresh')));
+  assert.equal((await auth.restore()).cloud_state,'SIGNED_IN_ONLINE');assert.ok(calls.every(c=>!JSON.stringify(c).includes('never-persist-password')));
+  assert.deepEqual(calls.find(c=>c.command==='local_session_write').args,{refreshToken:'memory-refresh'});
+  assert.ok(calls.filter(c=>c.command!=='local_session_write').every(c=>!JSON.stringify(c).includes('memory-refresh')));
   const restarted=new LocalAuth(async()=>identity,config);assert.equal((await restarted.restore()).id,local.id);await assert.rejects(restarted.token(),/로그인/);
  }finally{mock.mock.restore();}
 });

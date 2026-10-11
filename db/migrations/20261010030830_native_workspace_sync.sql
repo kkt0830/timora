@@ -33,6 +33,11 @@ declare item jsonb; owner_id uuid; item_id uuid; version bigint;
 begin
  item=case when TG_OP='DELETE' then to_jsonb(OLD) else to_jsonb(NEW) end;
  owner_id=(item->>'user_id')::uuid;
+ -- Auth user deletion cascades through business tables. No feed is needed once
+ -- that owner has gone; recreating its clock would violate the Auth foreign key.
+ if not exists(select 1 from auth.users where id=owner_id) then
+  return case when TG_OP='DELETE' then OLD else NEW end;
+ end if;
  if auth.uid() is not null and auth.uid()<>owner_id then raise exception 'Sync owner mismatch' using errcode='42501'; end if;
  item_id=case when TG_TABLE_NAME='workspace_settings' then owner_id else (item->>'id')::uuid end;
  insert into timora_private.sync_clock(user_id,revision) values(owner_id,1)
@@ -117,7 +122,7 @@ begin
  if action='put' and stored is not null then
   select bool_and(stored->c is not distinct from payload->c) into equal_content from unnest(columns)c;
  end if;
- if not equal_content and (
+ if not equal_content and not (action='delete' and stored is null) and (
   (base_revision is not null and coalesce(previous.revision,0)<>base_revision::bigint)
   or (base_revision is null and base_updated_at is not null and (stored is null or (stored->>'updated_at')::timestamptz<>base_updated_at::timestamptz))
   or (base_revision is null and base_updated_at is null and previous.revision is not null)

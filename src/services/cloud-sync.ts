@@ -20,14 +20,17 @@ export class CloudSyncService {
   private controller: AbortController | null = null;
   private generation = 0;
   private again = false;
-  constructor(private config: BackendConfig, private auth: AuthService, private invoke: LocalInvoke) {}
+  private config: BackendConfig;
+  private auth: AuthService;
+  private invoke: LocalInvoke;
+  constructor(config: BackendConfig, auth: AuthService, invoke: LocalInvoke) { this.config = config; this.auth = auth; this.invoke = invoke; }
   subscribe(listener: (state: SyncState) => void): () => void { this.listeners.add(listener); listener(this.state); return () => { this.listeners.delete(listener); }; }
   private publish(next: Partial<SyncState>) { this.state = { ...this.state, ...next }; this.listeners.forEach(fn => fn(this.state)); }
   setAccount(account: Account | null) {
-    if (this.account?.id !== account?.id || Boolean(this.account) !== Boolean(account)) { this.generation++; this.controller?.abort(); this.publish({ ...emptySyncState }); }
+    if (this.account?.id !== account?.id || this.account?.cloud_user_id !== account?.cloud_user_id || this.account?.local_only !== account?.local_only || Boolean(this.account) !== Boolean(account)) { this.generation++; this.controller?.abort(); this.flight = null; this.again = false; this.publish({ ...emptySyncState }); }
     this.account = account;
   }
-  stop() { this.generation++; this.account = null; this.controller?.abort(); this.again = false; }
+  stop() { this.generation++; this.account = null; this.controller?.abort(); this.flight = null; this.again = false; }
   async status() {
     if (!this.account) return;
     const version = this.generation;
@@ -76,14 +79,15 @@ export class CloudSyncService {
         await this.invoke('local_sync_page', { cloudUserId: account.cloud_user_id, after: snapshot.cursor, page });
         if (!page.has_more) break;
       }
-      if (current()) { await this.status(); this.publish({ phase: 'idle', error: '' }); }
+      if (current()) { await this.status(); if (current()) this.publish({ phase: 'idle', error: '' }); }
     };
     const flight = run().catch(error => {
       if (!current()) return;
       const auth = error instanceof ApiError && [400, 401, 403].includes(error.status);
       this.publish({ phase: auth ? 'auth_required' : (typeof navigator !== 'undefined' && navigator.onLine === false) ? 'offline' : 'error', error: error instanceof Error ? error.message : '동기화를 완료하지 못했습니다. 로컬 변경은 보관됩니다.' });
     }).finally(() => {
-      if (this.flight === flight) this.flight = null;
+      if (this.flight !== flight) return;
+      this.flight = null;
       // A local mutation during the cycle needs another pass, but errors never hot-loop.
       const repeat = this.again && this.state.phase === 'idle'; this.again = false;
       if (repeat && current()) queueMicrotask(() => { void this.wake(); });

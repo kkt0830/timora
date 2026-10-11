@@ -66,5 +66,16 @@ jobs:
       - run: psql -v ON_ERROR_STOP=1 -f db/schema.sql
       - run: psql -v ON_ERROR_STOP=1 -f db/migrations/002_project_foreign_key_indexes.sql
       - run: psql -v ON_ERROR_STOP=1 -f db/migrations/003_profile_identity.sql
+      - run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261010030830_native_workspace_sync.sql
+      - run: psql -v ON_ERROR_STOP=1 -f tests/sync.sql
       - run: psql -v ON_ERROR_STOP=1 -f tests/rls.sql
       - run: psql -v ON_ERROR_STOP=1 -f tests/profile-rls.sql
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --manifest-path src-tauri/Cargo.toml --example sync_driver --no-default-features --locked
+      - name: Install isolated PostgreSQL integration test adapter
+        run: npm install --prefix "$RUNNER_TEMP/timora-db-tools" pg@8.16.3
+      - name: Two-device SQLite and PostgreSQL synchronization
+        run: TIMORA_PG_MODULE="$RUNNER_TEMP/timora-db-tools/node_modules/pg/lib/index.js" node tests/sync-integration.mjs

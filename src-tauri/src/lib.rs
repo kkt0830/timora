@@ -263,7 +263,8 @@ impl Database {
             let tx = conn.transaction().map_err(sql_error)?;
             tx.execute_batch(include_str!("../migrations/003_durable_sync.sql"))
                 .map_err(|_| "Local sync migration 실패. 기존 DB는 보존됩니다.".to_string())?;
-            tx.pragma_update(None, "user_version", 3).map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 3)
+                .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
         conn.query_row("SELECT id FROM local_identity WHERE singleton=1", [], |r| {
@@ -599,7 +600,11 @@ impl Database {
         }
         let owner = self.owner()?;
         let tx = self.conn.transaction().map_err(sql_error)?;
-        tx.execute("UPDATE native_sync_control SET applying=1 WHERE singleton=1", []).map_err(sql_error)?;
+        tx.execute(
+            "UPDATE native_sync_control SET applying=1 WHERE singleton=1",
+            [],
+        )
+        .map_err(sql_error)?;
         let imported: Option<String> = tx
             .query_row(
                 "SELECT imported_at FROM local_identity WHERE singleton=1",
@@ -637,12 +642,20 @@ impl Database {
         }
         instant(text(&snapshot["settings"], "updated_at")?)?;
         Self::settings(&tx, &owner, &snapshot["settings"], true)?;
-        tx.execute("DELETE FROM native_sync_outbox WHERE entity_table='workspace_settings'", []).map_err(sql_error)?;
+        tx.execute(
+            "DELETE FROM native_sync_outbox WHERE entity_table='workspace_settings'",
+            [],
+        )
+        .map_err(sql_error)?;
         for table in TABLES {
             tx.execute(&format!("INSERT OR REPLACE INTO native_sync_meta(entity_table,id,remote_updated_at) SELECT ?1,id,remote_updated_at FROM {table}"), [table]).map_err(sql_error)?;
         }
         tx.execute("INSERT OR REPLACE INTO native_sync_meta(entity_table,id,remote_updated_at) VALUES('workspace_settings','settings',?1)", [text(&snapshot["settings"],"updated_at")?]).map_err(sql_error)?;
-        tx.execute("UPDATE native_sync_control SET applying=0 WHERE singleton=1", []).map_err(sql_error)?;
+        tx.execute(
+            "UPDATE native_sync_control SET applying=0 WHERE singleton=1",
+            [],
+        )
+        .map_err(sql_error)?;
         tx.execute(
             "UPDATE local_identity SET cloud_user_id=?1,imported_at=?2 WHERE singleton=1",
             params![cloud_user_id, now()],

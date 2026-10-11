@@ -9,7 +9,9 @@ export async function apiRequest<T>(config: BackendConfig, path: string, init: R
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   if (init.body) headers.set('Content-Type', 'application/json');
   let response: Response;
-  try { response = await fetch(`${config.url}${path}`, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(15000) }); }
+  const timeout = AbortSignal.timeout(15000);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+  try { response = await fetch(`${config.url}${path}`, { ...init, headers, signal }); }
   catch { throw new ApiError('서버에 연결할 수 없습니다. 네트워크를 확인하고 다시 시도해 주세요.', 0); }
   const text = await response.text();
   let data: unknown;

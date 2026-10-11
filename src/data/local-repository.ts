@@ -18,6 +18,7 @@ export class LocalAuth implements AuthService {
   private hasSession = false;
   private restoring: Promise<void> | null = null;
   private persistedRefresh: string | null = null;
+  private saving: Promise<void> = Promise.resolve();
   private sessionWarning = '';
   private published: string | undefined;
   private epoch = 0;
@@ -37,7 +38,7 @@ export class LocalAuth implements AuthService {
     this.account = account;
     if (account?.cloud_user_id && !account.local_only && this.cloud) {
       this.restoring = this.invoke<string | null>('local_session_read').then(refresh => {
-        if (version !== this.epoch || !refresh) return;
+        if (version !== this.epoch || typeof refresh !== 'string' || !refresh) return;
         this.cloud!.restoreCredential(refresh, account.cloud_user_id!); this.persistedRefresh = refresh;
       }).catch(() => { if (version === this.epoch) { this.sessionWarning = '보안 세션을 복원하지 못했습니다. Cloud를 다시 인증하면 됩니다. 로컬 기록은 보존됩니다.'; this.publish(); } });
     }
@@ -45,6 +46,13 @@ export class LocalAuth implements AuthService {
     return this.publish();
   }
   private async persist(version: number) {
+    // Serialize OS writes as well as HTTP refreshes. A slow older vault write
+    // must not overwrite a newly rotated credential after its write completes.
+    const pending = this.saving.then(() => this.writeCredential(version));
+    this.saving = pending.catch(() => {});
+    await pending;
+  }
+  private async writeCredential(version: number) {
     const refresh = this.cloud?.refreshCredential();
     if (!refresh || version !== this.epoch || refresh === this.persistedRefresh) return;
     try {
