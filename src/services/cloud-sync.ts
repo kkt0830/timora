@@ -72,7 +72,7 @@ export class CloudSyncService {
         catch (error) { if (!(error instanceof ApiError) || error.status !== 401 || !current()) throw error; return apiRequest<T>(this.config, `/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(body), signal }, await this.auth.token(true)); }
       };
       // Push first: a lost acknowledgement retries its receipt before pull can call it a conflict.
-      let dependencyError: ApiError | null = null;
+      let dependencyError: { error: ApiError; operation: Operation } | null = null;
       for (let delivered = 0; current() && delivered < 200; delivered++) {
         const operation = await this.invoke<Operation | null>('local_sync_next', { cloudUserId: account.cloud_user_id });
         if (!operation) break;
@@ -82,7 +82,7 @@ export class CloudSyncService {
           // A project may have been deleted elsewhere while its child was edited
           // offline. Pull that deletion so native can preserve both as a conflict.
           if (!current()) return;
-          if (error instanceof ApiError && error.code === '23503') { dependencyError = error; break; }
+          if (error instanceof ApiError && error.code === '23503') { dependencyError = { error, operation }; break; }
           // Only a definitive database rejection is safe to quarantine. Ambiguous
           // network/5xx failures retain their ID and retry the existing receipt.
           if (error instanceof ApiError && error.source === 'data' && [400, 409, 422].includes(error.status) && /^(22|23)/.test(error.code ?? '')) {
@@ -102,7 +102,15 @@ export class CloudSyncService {
         if (!page.has_more) break;
       }
       if (current()) { await this.status(); if (current()) {
-        if (dependencyError && !this.state.conflict_count) throw dependencyError;
+        if (dependencyError) {
+          const { operation, error } = dependencyError;
+          const projectId = operation.payload && typeof operation.payload === 'object' && 'project_id' in operation.payload ? operation.payload.project_id : undefined;
+          const covered = this.state.conflicts.some(c => (c.entity_table === operation.entity_table && c.id === operation.id) || (c.entity_table === 'projects' && c.id === projectId));
+          if (!covered) {
+            await this.invoke('local_sync_fail', { cloudUserId: account.cloud_user_id, operationId: operation.operation_id, error: `${error.message} (${error.code})` });
+            await this.status(); if (!current()) return;
+          }
+        }
         this.publish({ phase: 'idle', error: '' });
         // Finish new-device settings initialization without waiting for the timer.
         // Never loop on blocked/conflicted rows: native only returns ready operations.

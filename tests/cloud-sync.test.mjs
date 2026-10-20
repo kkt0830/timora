@@ -96,3 +96,14 @@ test('generic RPC 400 is not classified as an authentication failure or discarde
  try{await f.service.wake();assert.equal(f.state.phase,'error');assert.equal(f.queue.length,1);assert.ok(!f.calls.some(c=>c.command==='local_sync_fail'));}
  finally{mock.mock.restore();f.service.stop();}
 });
+
+test('an unresolved foreign key rejection is isolated after pull instead of retrying forever',async()=>{
+ const f=fixture([{...operation,operation_id:'missing-project'}]);
+ const mock=test.mock.method(globalThis,'fetch',async url=>{
+  if(url.endsWith('/user'))return response({id:A});
+  if(url.endsWith('sync_apply'))return response({message:'missing dependency',code:'23503'},409);
+  return response({cursor:'1',records:[],dependencies:[],has_more:false});
+ });
+ try{await f.service.wake();assert.equal(f.state.phase,'idle');assert.equal(f.state.failed_count,1);assert.ok(f.calls.some(c=>c.command==='local_sync_page'));assert.ok(f.calls.some(c=>c.command==='local_sync_fail'));}
+ finally{mock.mock.restore();f.service.stop();}
+});
