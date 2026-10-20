@@ -101,6 +101,16 @@ impl Database {
                 local_row(&self.conn, text(&item, "entity_table")?, text(&item, "id")?)?;
             conflicts.push(item);
         }
+        let mut failures = json_rows(&self.conn, "SELECT operation_id,entity_table,id,action,payload,last_error,failed_at,CAST(attempts AS TEXT) AS attempts FROM native_sync_outbox WHERE failed_at IS NOT NULL ORDER BY seq", &[])?;
+        for item in &mut failures {
+            item["payload"] = item["payload"]
+                .as_str()
+                .map(serde_json::from_str)
+                .transpose()
+                .map_err(|_| "실패 항목 형식 오류")?
+                .unwrap_or(Value::Null);
+            item["local"] = local_row(&self.conn, text(item, "entity_table")?, text(item, "id")?)?;
+        }
         let control = json_rows(
             &self.conn,
             "SELECT cursor,last_success FROM native_sync_control WHERE singleton=1",
@@ -108,12 +118,12 @@ impl Database {
         )?
         .remove(0);
         Ok(
-            json!({"pending":pending,"conflicts":conflicts,"conflict_count":count,"cursor":control["cursor"],"last_success":control["last_success"]}),
+            json!({"pending":pending,"failed_count":failures.len(),"failures":failures,"conflicts":conflicts,"conflict_count":count,"cursor":control["cursor"],"last_success":control["last_success"]}),
         )
     }
     pub fn sync_next(&self, cloud_id: &str) -> Result<Value> {
         self.sync_owner(cloud_id)?;
-        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='projects' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.project_id')) ORDER BY seq LIMIT 1",&[])?;
+        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE o.failed_at IS NULL AND NOT EXISTS(SELECT 1 FROM native_sync_outbox earlier WHERE earlier.entity_table=o.entity_table AND earlier.id=o.id AND earlier.seq<o.seq) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='projects' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.project_id')) ORDER BY seq LIMIT 1",&[])?;
         let Some(mut row) = rows.pop() else {
             return Ok(Value::Null);
         };
@@ -122,6 +132,36 @@ impl Database {
             None => Value::Null,
         };
         Ok(row)
+    }
+    pub fn sync_fail(&mut self, cloud_id: &str, operation_id: &str, error: &str) -> Result<()> {
+        self.sync_owner(cloud_id)?;
+        let message: String = error.chars().take(1000).collect();
+        self.conn.execute("UPDATE native_sync_outbox SET attempts=attempts+1,last_error=?1,failed_at=?2 WHERE operation_id=?3",params![message,now(),operation_id]).map_err(sql_error)?;
+        Ok(())
+    }
+    pub fn sync_retry(&mut self, cloud_id: &str, operation_id: &str) -> Result<()> {
+        let owner = self.sync_owner(cloud_id)?;
+        let tx = self.conn.transaction().map_err(sql_error)?;
+        let item = json_rows(&tx,"SELECT entity_table,id,base_revision,base_updated_at FROM native_sync_outbox WHERE operation_id=?1 AND failed_at IS NOT NULL",&[SqlValue::Text(operation_id.into())])?.into_iter().next().ok_or("실패 항목이 변경되었습니다. 다시 확인해 주세요.")?;
+        let table = text(&item, "entity_table")?;
+        let id = text(&item, "id")?;
+        let has_conflict: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM native_sync_conflicts WHERE entity_table=?1 AND id=?2)",params![table,id],|r|r.get(0)).map_err(sql_error)?;
+        if has_conflict {
+            return Err("먼저 이 항목의 Cloud 충돌을 확인하고 해결해 주세요.".into());
+        }
+        let mut local = local_row(&tx, table, id)?;
+        // Explicit user action supersedes earlier edits with the current local intent.
+        // Use a fresh operation ID: a receipt ID must never acquire different content.
+        if table == "library_items" && !local.is_null() {
+            local = Self::write(&tx, &owner, table, &local, id, true, false)?;
+        }
+        tx.execute(
+            "DELETE FROM native_sync_outbox WHERE entity_table=?1 AND id=?2",
+            params![table, id],
+        )
+        .map_err(sql_error)?;
+        tx.execute("INSERT INTO native_sync_outbox(entity_table,id,action,payload,base_revision,base_updated_at) VALUES(?1,?2,?3,?4,?5,?6)",params![table,id,if local.is_null(){"delete"}else{"put"},if local.is_null(){None}else{Some(local.to_string())},item["base_revision"].as_str(),item["base_updated_at"].as_str()]).map_err(sql_error)?;
+        tx.commit().map_err(sql_error)
     }
     fn apply_remote(
         conn: &Connection,
@@ -288,6 +328,21 @@ impl Database {
         for list in ["dependencies", "records"] {
             for record in page[list].as_array().ok_or("동기화 목록 응답 오류")? {
                 Self::apply_remote(&tx, &owner, cloud_id, record, false)?;
+            }
+        }
+        if page["has_more"] == false {
+            let initialized: bool = tx
+                .query_row(
+                    "SELECT settings_initialized FROM native_sync_control",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(sql_error)?;
+            if !initialized {
+                let local = local_row(&tx, "workspace_settings", "settings")?;
+                tx.execute("UPDATE native_sync_control SET settings_initialized=1", [])
+                    .map_err(sql_error)?;
+                tx.execute("INSERT INTO native_sync_outbox(entity_table,id,action,payload) VALUES('workspace_settings','settings','put',?1)",[local.to_string()]).map_err(sql_error)?;
             }
         }
         tx.execute(

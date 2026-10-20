@@ -36,6 +36,7 @@ export class SupabaseRepository implements WorkspaceRepository {
   }
   async save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {
     validateInput(table, input);
+    if (table === 'library_items' && /\s/.test(String((input as EntityInput<'library_items'>).url))) input = { ...input, url: new URL(String((input as EntityInput<'library_items'>).url)).href };
     const query = id ? `?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}` : '';
     const rows = await this.request<EntityMap[K][]>(`${table}${query}`, { method: id ? 'PATCH' : 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...input, user_id: userId }) });
     if (!rows[0]) throw new Error('항목이 없거나 수정 권한이 없습니다. 새로고침해 주세요.');

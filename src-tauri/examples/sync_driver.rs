@@ -17,6 +17,13 @@ fn main() {
         let result: Result<Value, String> = match request["command"].as_str().unwrap() {
             "local_sync_status" => db.sync_status(),
             "local_sync_next" => db.sync_next(s("cloudUserId")),
+            "local_sync_fail" => db
+                .sync_fail(s("cloudUserId"), s("operationId"), s("error"))
+                .map(|_| Value::Null),
+            "local_sync_retry" => db
+                .sync_retry(s("cloudUserId"), s("operationId"))
+                .map(|_| Value::Null),
+            "local_settings" => db.save_settings(a["input"].clone()),
             "local_sync_ack" => db
                 .sync_ack(s("cloudUserId"), s("operationId"), a["response"].clone())
                 .map(|_| Value::Null),

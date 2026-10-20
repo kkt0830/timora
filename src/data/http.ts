@@ -2,9 +2,11 @@ export interface BackendConfig { url: string; publishableKey: string }
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(message: string, status: number, code?: string) { super(message); this.status = status; this.code = code; }
+  source: 'auth' | 'data' | 'other';
+  constructor(message: string, status: number, code?: string, source: 'auth' | 'data' | 'other' = 'other') { super(message); this.status = status; this.code = code; this.source = source; }
 }
 export async function apiRequest<T>(config: BackendConfig, path: string, init: RequestInit = {}, accessToken?: string): Promise<T> {
+  const source = path.startsWith('/auth/') ? 'auth' : path.startsWith('/rest/') ? 'data' : 'other';
   const headers = new Headers(init.headers);
   headers.set('apikey', config.publishableKey);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
@@ -19,7 +21,7 @@ export async function apiRequest<T>(config: BackendConfig, path: string, init: R
   try { data = text ? JSON.parse(text) : null; } catch { throw new ApiError('서버 응답을 읽을 수 없습니다.', response.status); }
   if (!response.ok) {
     const detail = data as { msg?: string; message?: string; error_description?: string; code?: string } | null;
-    throw new ApiError(detail?.msg ?? detail?.message ?? detail?.error_description ?? `요청 실패 (${response.status})`, response.status, detail?.code);
+    throw new ApiError(detail?.msg ?? detail?.message ?? detail?.error_description ?? `요청 실패 (${response.status})`, response.status, detail?.code, source);
   }
   return data as T;
 }

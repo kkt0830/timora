@@ -109,7 +109,9 @@ export class LocalWorkspaceRepository implements WorkspaceRepository {
   constructor(invoke: LocalInvoke) { this.invoke = invoke; }
   load(_userId: string): Promise<WorkspaceData> { return this.invoke('local_load'); }
   save<K extends EntityTable>(table: K, _userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {
-    validateInput(table, input); return this.invoke('local_save', { table, input, id: id ?? null });
+    validateInput(table, input);
+    if (table === 'library_items' && /\s/.test(String((input as EntityInput<'library_items'>).url))) input = { ...input, url: new URL(String((input as EntityInput<'library_items'>).url)).href };
+    return this.invoke('local_save', { table, input, id: id ?? null });
   }
   remove(table: EntityTable, _userId: string, id: string): Promise<void> { return this.invoke('local_remove', { table, id }); }
   convertInbox(_userId: string, id: string, target: 'task' | 'note'): Promise<void> { return this.invoke('local_convert', { id, target }); }

@@ -4,11 +4,12 @@ import { apiRequest, ApiError } from '../data/http.ts';
 import type { BackendConfig } from '../data/http.ts';
 
 export interface SyncConflict { entity_table: string; id: string; local: Record<string, unknown> | null; remote: { deleted: boolean; payload: Record<string, unknown> | null; revision: string } }
-export interface SyncSnapshot { pending: number; conflict_count: number; conflicts: SyncConflict[]; cursor: string; last_success: string | null }
+export interface SyncFailure { operation_id: string; entity_table: string; id: string; action: string; payload: Record<string, unknown> | null; local: Record<string, unknown> | null; last_error: string; failed_at: string; attempts: string }
+export interface SyncSnapshot { failed_count: number; failures: SyncFailure[]; pending: number; conflict_count: number; conflicts: SyncConflict[]; cursor: string; last_success: string | null }
 export interface SyncState extends SyncSnapshot { phase: 'idle' | 'syncing' | 'offline' | 'local_only' | 'auth_required' | 'error'; error: string }
 interface Operation { operation_id: string; entity_table: string; id: string; action: string; payload: unknown; base_revision: string | null; base_updated_at: string | null }
 interface Page { records: unknown[]; dependencies: unknown[]; cursor: string; has_more: boolean }
-export const emptySyncState: SyncState = { pending: 0, conflict_count: 0, conflicts: [], cursor: '0', last_success: null, phase: 'idle', error: '' };
+export const emptySyncState: SyncState = { pending: 0, failed_count: 0, failures: [], conflict_count: 0, conflicts: [], cursor: '0', last_success: null, phase: 'idle', error: '' };
 
 // Foreground automatic sync: never block local writes or discard an unacknowledged operation.
 // One cycle at a time; resume/online/local writes wake it, polling receives other devices.
@@ -43,6 +44,12 @@ export class CloudSyncService {
     await this.invoke('local_sync_resolve', { cloudUserId, table, id, choice });
     await this.status(); void this.wake();
   }
+  async retryFailed(operationId: string) {
+    const cloudUserId = this.account?.cloud_user_id;
+    if (!cloudUserId) throw new Error('먼저 계정을 연결해 주세요.');
+    await this.invoke('local_sync_retry', { cloudUserId, operationId });
+    await this.status(); await this.wake();
+  }
   wake(): Promise<void> {
     if (this.flight) { this.again = true; return this.flight; }
     const account = this.account;
@@ -74,7 +81,14 @@ export class CloudSyncService {
         catch (error) {
           // A project may have been deleted elsewhere while its child was edited
           // offline. Pull that deletion so native can preserve both as a conflict.
+          if (!current()) return;
           if (error instanceof ApiError && error.code === '23503') { dependencyError = error; break; }
+          // Only a definitive database rejection is safe to quarantine. Ambiguous
+          // network/5xx failures retain their ID and retry the existing receipt.
+          if (error instanceof ApiError && error.source === 'data' && [400, 409, 422].includes(error.status) && /^(22|23)/.test(error.code ?? '')) {
+            await this.invoke('local_sync_fail', { cloudUserId: account.cloud_user_id, operationId: operation.operation_id, error: `${error.message} (${error.code})` });
+            continue;
+          }
           throw error;
         }
         if (!current()) return;
@@ -90,11 +104,14 @@ export class CloudSyncService {
       if (current()) { await this.status(); if (current()) {
         if (dependencyError && !this.state.conflict_count) throw dependencyError;
         this.publish({ phase: 'idle', error: '' });
+        // Finish new-device settings initialization without waiting for the timer.
+        // Never loop on blocked/conflicted rows: native only returns ready operations.
+        if (await this.invoke<Operation | null>('local_sync_next', { cloudUserId: account.cloud_user_id })) this.again = true;
       } }
     };
     const flight = run().catch(error => {
       if (!current()) return;
-      const auth = error instanceof ApiError && [400, 401, 403].includes(error.status);
+      const auth = error instanceof ApiError && (error.status === 401 || (error.source === 'auth' && [400, 403].includes(error.status)));
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
       this.publish({ phase: offline ? 'offline' : auth ? 'auth_required' : 'error', error: offline ? '' : error instanceof Error ? error.message : '동기화를 완료하지 못했습니다. 로컬 변경은 보관됩니다.' });
     }).finally(() => {

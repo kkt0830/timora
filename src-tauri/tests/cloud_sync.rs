@@ -9,7 +9,13 @@ fn bind(db: &mut Database) {
         "https://test.supabase.co",
     )
     .unwrap();
-    // A fresh workspace queues its settings. Acknowledge them before entity tests.
+    // First pull observes that Cloud has no settings before creating defaults.
+    db.sync_page(
+        A,
+        "0",
+        json!({"cursor":"0","records":[],"dependencies":[],"has_more":false}),
+    )
+    .unwrap();
     let op = db.sync_next(A).unwrap();
     let record = remote("workspace_settings", A, "1", op["payload"].clone());
     db.sync_ack(
@@ -161,4 +167,133 @@ fn project_delete_conflict_keeps_pending_child_and_cloud_choice_detaches_it() {
     db.sync_resolve(A, "projects", &id, "cloud").unwrap();
     assert!(db.load().unwrap()["notes"][0]["project_id"].is_null());
     assert!(db.sync_next(A).unwrap()["payload"]["project_id"].is_null());
+}
+
+#[test]
+fn failed_deliveries_survive_restart_block_only_dependencies_and_retry_latest_intent() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut db = Database::open(&path).unwrap();
+    bind(&mut db);
+    let lib = db.save("library_items",json!({"title":"Original","url":"https://example.com/a b","type":"website","description":"","project_id":null}),None).unwrap();
+    assert_eq!(lib["url"], "https://example.com/a%20b");
+    let bad = db.sync_next(A).unwrap();
+    db.sync_fail(
+        A,
+        bad["operation_id"].as_str().unwrap(),
+        "constraint fixture (23514)",
+    )
+    .unwrap();
+    db.save("library_items",json!({"title":"Latest","url":"https://example.com/c d","type":"website","description":"","project_id":null}),Some(lib["id"].as_str().unwrap().into())).unwrap();
+    let independent = db.save("notes", note("independent"), None).unwrap();
+    drop(db);
+    let mut db = Database::open(&path).unwrap();
+    assert_eq!(db.sync_status().unwrap()["failed_count"], 1);
+    let next = db.sync_next(A).unwrap();
+    assert_eq!(next["id"], independent["id"]);
+    ack(&mut db, &next, "2");
+    assert!(db.sync_next(A).unwrap().is_null());
+    assert!(db
+        .sync_retry(B, bad["operation_id"].as_str().unwrap())
+        .is_err());
+    db.sync_retry(A, bad["operation_id"].as_str().unwrap())
+        .unwrap();
+    let retry = db.sync_next(A).unwrap();
+    assert_ne!(retry["operation_id"], bad["operation_id"]);
+    assert_eq!(retry["payload"]["title"], "Latest");
+    assert_eq!(retry["payload"]["url"], "https://example.com/c%20d");
+    ack(&mut db, &retry, "3");
+    assert_eq!(db.sync_status().unwrap()["pending"], 0);
+}
+
+#[test]
+fn failed_project_holds_children_while_unrelated_items_can_send() {
+    let dir = tempdir().unwrap();
+    let mut db = Database::open(&dir.path().join("db")).unwrap();
+    bind(&mut db);
+    let project = db
+        .save(
+            "projects",
+            json!({"name":"P","description":"","status":"active","color":"#123456"}),
+            None,
+        )
+        .unwrap();
+    let op = db.sync_next(A).unwrap();
+    db.sync_fail(A, op["operation_id"].as_str().unwrap(), "fixture")
+        .unwrap();
+    let mut child = note("child");
+    child["project_id"] = project["id"].clone();
+    db.save("notes", child, None).unwrap();
+    let free = db.save("notes", note("free"), None).unwrap();
+    let next = db.sync_next(A).unwrap();
+    assert_eq!(next["id"], free["id"]);
+    ack(&mut db, &next, "2");
+    assert!(db.sync_next(A).unwrap().is_null());
+}
+
+#[test]
+fn fresh_defaults_pull_cloud_settings_but_real_offline_preferences_still_conflict() {
+    let dir = tempdir().unwrap();
+    let mut db = Database::open(&dir.path().join("db")).unwrap();
+    db.bind_verified_account(
+        &json!({"id":A,"email":"a@example.com","user_metadata":{"display_name":"Auth nickname"}}),
+        "https://test.supabase.co",
+    )
+    .unwrap();
+    assert!(db.sync_next(A).unwrap().is_null());
+    let mut settings = db.load().unwrap()["settings"].clone();
+    settings["workspace_name"] = json!("Cloud workspace");
+    settings["appearance"] = json!("dark");
+    let record = remote("workspace_settings", A, "1", settings);
+    db.sync_page(
+        A,
+        "0",
+        json!({"cursor":"1","dependencies":[],"records":[record],"has_more":false}),
+    )
+    .unwrap();
+    assert_eq!(
+        db.load().unwrap()["settings"]["workspace_name"],
+        "Cloud workspace"
+    );
+    assert_eq!(db.sync_status().unwrap()["pending"], 0);
+    assert_eq!(db.sync_status().unwrap()["conflict_count"], 0);
+    let mut local = db.load().unwrap()["settings"].clone();
+    local["workspace_name"] = json!("Offline edit");
+    db.save_settings(local).unwrap();
+    let mut cloud = db.load().unwrap()["settings"].clone();
+    cloud["workspace_name"] = json!("Other device");
+    db.sync_page(A,"1",json!({"cursor":"2","dependencies":[],"records":[remote("workspace_settings",A,"2",cloud)],"has_more":false})).unwrap();
+    assert_eq!(db.sync_status().unwrap()["conflict_count"], 1);
+    assert_eq!(
+        db.load().unwrap()["settings"]["workspace_name"],
+        "Offline edit"
+    );
+}
+
+#[test]
+fn v3_upgrade_preserves_delivery_ids_and_user_preferences() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("v3.db");
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch(include_str!("../migrations/001_initial_local_schema.sql"))
+        .unwrap();
+    conn.execute_batch(include_str!("../migrations/002_local_account_profile.sql"))
+        .unwrap();
+    conn.execute("INSERT INTO local_identity(singleton,id,access_state,created_at,cloud_user_id,cloud_project_url,email) VALUES(1,?1,'signed_in','2026-01-01T00:00:00Z',?1,'https://test.supabase.co','a@example.com')",[A]).unwrap();
+    conn.execute("INSERT INTO workspace_settings VALUES(?1,'Offline custom','dark','Keep',NULL,'2026-01-01T00:00:00Z')",[A]).unwrap();
+    conn.execute_batch(include_str!("../migrations/003_durable_sync.sql"))
+        .unwrap();
+    conn.pragma_update(None, "user_version", 3).unwrap();
+    let old: String = conn
+        .query_row("SELECT operation_id FROM native_sync_outbox", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    drop(conn);
+    let db = Database::open(&path).unwrap();
+    assert_eq!(db.sync_next(A).unwrap()["operation_id"], old);
+    assert_eq!(
+        db.load().unwrap()["settings"]["workspace_name"],
+        "Offline custom"
+    );
 }

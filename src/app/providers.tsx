@@ -62,7 +62,7 @@ interface WorkspaceState {
   saveSettings: (settings: WorkspaceSettings) => Promise<void>;
 }
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
-const SyncContext = createContext<{ state: SyncState; retry: () => void; resolve: (table: string, id: string, choice: 'local' | 'cloud') => Promise<void> } | null>(null);
+const SyncContext = createContext<{ state: SyncState; retry: () => void; retryFailed: (operationId: string) => Promise<void>; resolve: (table: string, id: string, choice: 'local' | 'cloud') => Promise<void> } | null>(null);
 export function WorkspaceProvider({ account, children }: { account: Account; children: ReactNode }) {
   const repository = backend.repository!;
   const [data, setData] = useState(() => emptyWorkspace(account.id));
@@ -140,7 +140,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
     update(); media.addEventListener('change', update);
     return () => { media.removeEventListener('change', update); delete document.documentElement.dataset.theme; };
   }, [data.settings.appearance]);
-  const sync = { state: syncState, retry: () => { void syncService?.wake(); }, resolve: async (table: string, id: string, choice: 'local' | 'cloud') => { if (!syncService) throw new Error('동기화 설정이 없습니다.'); await syncService.resolve(table, id, choice); await reload(false); } };
+  const sync = { state: syncState, retry: () => { void syncService?.wake(); }, retryFailed: async (operationId: string) => { if (!syncService) throw new Error('동기화 설정이 없습니다.'); await syncService.retryFailed(operationId); await reload(false); }, resolve: async (table: string, id: string, choice: 'local' | 'cloud') => { if (!syncService) throw new Error('동기화 설정이 없습니다.'); await syncService.resolve(table, id, choice); await reload(false); } };
   return <WorkspaceContext.Provider value={value}><SyncContext.Provider value={sync}><NativeProfileProvider account={account}>{children}</NativeProfileProvider></SyncContext.Provider></WorkspaceContext.Provider>;
 }
 export function useWorkspace() { const value = useContext(WorkspaceContext); if (!value) throw new Error('WorkspaceProvider required'); return value; }

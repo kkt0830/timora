@@ -106,6 +106,29 @@ async fn local_sync_status(state: tauri::State<'_, Arc<LocalState>>) -> Result<V
     with_db(state, |db| db.sync_status()).await
 }
 #[tauri::command]
+async fn local_sync_fail(
+    state: tauri::State<'_, Arc<LocalState>>,
+    cloud_user_id: String,
+    operation_id: String,
+    error: String,
+) -> Result<(), String> {
+    with_db(state, move |db| {
+        db.sync_fail(&cloud_user_id, &operation_id, &error)
+    })
+    .await
+}
+#[tauri::command]
+async fn local_sync_retry(
+    state: tauri::State<'_, Arc<LocalState>>,
+    cloud_user_id: String,
+    operation_id: String,
+) -> Result<(), String> {
+    with_db(state, move |db| {
+        db.sync_retry(&cloud_user_id, &operation_id)
+    })
+    .await
+}
+#[tauri::command]
 async fn local_sync_next(
     state: tauri::State<'_, Arc<LocalState>>,
     cloud_user_id: String,
@@ -363,6 +386,8 @@ pub fn run() {
             local_session_write,
             local_sync_status,
             local_sync_next,
+            local_sync_fail,
+            local_sync_retry,
             local_sync_ack,
             local_sync_page,
             local_sync_resolve,
