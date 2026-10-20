@@ -13,7 +13,7 @@
     "targets": "all",
     "android": {
       "minSdkVersion": 24,
-      "versionCode": 3001
+      "versionCode": 3002
     }
   }
 }

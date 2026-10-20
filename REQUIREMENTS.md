@@ -1,4 +1,8 @@
-# Requirements — Timora v0.3
+# Requirements — Timora v0.3.1
+
+현재 패치 범위는 [Issue #13](docs/issues/issue-13-v031.md)의 5개 결함과 관련 회귀입니다.
+기존 사용자 데이터·사진·UUID/owner를 보존하고 운영 Cloud schema는 변경하지 않습니다.
+이하 v0.3 기능/변경 이력을 유지하며 실제 기기 검수와 자동 검사를 구분합니다.
 
 기존 v0.2 UI/서비스와 main에 병합된 Windows v0.3(PR #7)을 보존하며
 이번 자동 동기화 개선은 version/v0.3에 새 PR 없이 직접 반영합니다. 각 플랫폼 실제 오프라인 재실행·IME

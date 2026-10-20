@@ -61,3 +61,6 @@ migration 실패/손상/newer schema는 자동 초기화하지 않습니다. 앱
 보관한 로컬 기록을 잃게 하므로 로그인·서명·DB 오류의 일반 해결책으로 사용하지 않습니다.
 백업/복원 UI와 다중 Workspace는 미지원입니다. 실제 검사 범위는 [verification](verification.md),
 Android 실기기 검수는 [체크리스트](manual-acceptance-v03-android.md)에 기록합니다.
+
+
+v0.3.1은 SQLite v4로 기존 v3 queue/기록/사진을 보존해 업그레이드합니다. 확정된 실패 operation은 restart 후에도 원문을 확인하고 최신 상태로 재시도할 수 있습니다. network 단절/서버 응답 유실은 기존 ID로 재전송합니다. 이전 연결 기기의 설정을 기본값이라고 추정해 지우지 않습니다.

@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { CloudSyncService } from '../src/services/cloud-sync.ts';
 const pgModule=await import(process.env.TIMORA_PG_MODULE??'pg');
 const {Client}=pgModule.default??pgModule;
@@ -13,7 +14,7 @@ const pg=new Client();await pg.connect();
 const dir=await mkdtemp(join(tmpdir(),'timora-sync-'));
 const A='10000000-0000-0000-0000-000000000001',B='10000000-0000-0000-0000-000000000002';
 const processes=[],services=[];
-const actualFetch=globalThis.fetch;let disconnected=false;
+const actualFetch=globalThis.fetch;let disconnected=false, loseAck=false;
 function device(name,owner) {
  const process=spawn('src-tauri/target/debug/examples/sync_driver',[join(dir,name+'.db'),owner],{stdio:['pipe','pipe','inherit']});processes.push(process);
  const requests=[];createInterface({input:process.stdout}).on('line',line=>{const reply=JSON.parse(line);const next=requests.shift();reply.error?next.reject(Error(reply.error)):next.resolve(reply.result);});
@@ -34,11 +35,11 @@ globalThis.fetch=(url,init)=> {
   try {await pg.query('set local role authenticated');await pg.query("select set_config('request.jwt.claim.sub',$1,true)",[owner]);
    const sql=url.endsWith('sync_apply')?'select public.sync_apply($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull($1,$2) result';
    const params=url.endsWith('sync_apply')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
-   const {rows}=await pg.query(sql,params);await pg.query('commit');return new Response(JSON.stringify(rows[0].result));
-  }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message,code:e.code}),{status:500});}
+   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
+  }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message,code:e.code}),{status:/^(22|23)/.test(e.code??'')?400:500});}
  });tail=task.catch(()=>{});return task;
 };
-async function sync(d) {await d.service.wake();assert.equal(d.state.phase,'idle',d.state.error);}
+async function sync(d) {for(let i=0;i<4;i++){await d.service.wake();await new Promise(r=>setImmediate(r));if(d.state.phase!=='syncing')break;}assert.equal(d.state.phase,'idle',d.state.error);}
 async function load(d,table) {return (await d.invoke('local_load'))[table];}
 const note=content=>({title:'Shared note',content,project_id:null});
 try {
@@ -74,6 +75,30 @@ try {
  assert.equal((await load(tablet,'projects'))[0].id,project.id);
  await phone.invoke('local_remove',{table:'projects',id:project.id});await sync(phone);await sync(tablet);
  assert.equal((await load(tablet,'tasks'))[0].project_id,null);
+ // Mimic a v0.3 queued raw URL using this isolated test database only.
+ const library=(await load(phone,'library_items'))[0];
+ const legacy=new DatabaseSync(join(dir,'phone.db'));
+ legacy.prepare('UPDATE library_items SET url=? WHERE id=?').run('https://example.com/old bad',library.id);legacy.close();
+ const later=await phone.invoke('local_save',{table:'notes',input:note('not blocked by invalid URL')});
+ await sync(phone);assert.equal(phone.state.failed_count,1);
+ assert.equal((await pg.query('select content from public.notes where id=$1',[later.id])).rows[0].content,'not blocked by invalid URL');
+ assert.ok(BigInt(phone.state.cursor)>0n);const failedId=phone.state.failures[0].operation_id;
+ await phone.service.retryFailed(failedId);await sync(phone);assert.equal(phone.state.failed_count,0);
+ assert.equal((await pg.query('select url from public.library_items where id=$1',[library.id])).rows[0].url,'https://example.com/old%20bad');
+ // Lost acknowledgement after commit: retry keeps its original operation ID.
+ const lost=await phone.invoke('local_save',{table:'notes',input:note('ack retained')});
+ const before=await phone.invoke('local_sync_next',{cloudUserId:A});loseAck=true;
+ await phone.service.wake();assert.equal(phone.state.phase,'error');
+ assert.equal((await phone.invoke('local_sync_next',{cloudUserId:A})).operation_id,before.operation_id);
+ await sync(phone);assert.equal((await pg.query('select count(*)::int n from public.notes where id=$1',[lost.id])).rows[0].n,1);
+ assert.equal(phone.state.conflict_count,0);
+ // An existing Cloud account connects to an untouched new device without a settings conflict.
+ const C='10000000-0000-0000-0000-000000000003';await pg.query('insert into auth.users(id) values($1)',[C]);
+ await pg.query('begin');await pg.query('set local role authenticated');await pg.query("select set_config('request.jwt.claim.sub',$1,true)",[C]);
+ await pg.query("insert into public.workspace_settings(user_id,workspace_name,appearance) values($1,'Existing cloud','dark')",[C]);await pg.query('commit');
+ const fresh=device('fresh',C);await sync(fresh);assert.equal(fresh.state.conflict_count,0);
+ assert.equal((await fresh.invoke('local_load')).settings.workspace_name,'Existing cloud');
+ console.log('PASS: rejected legacy URL isolated/repaired, independent writes/pull, committed response loss/idempotent retry, and fresh Cloud settings baseline');
  console.log('PASS: two real SQLite workspaces → PostgreSQL/RLS → offline retry, conflict/local choice, delete, six entities, project detachment and second-account isolation');
 }finally {
  globalThis.fetch=actualFetch;for(const s of services)s.stop();for(const p of processes)p.stdin.end();

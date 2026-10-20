@@ -958,10 +958,12 @@ strong {
   position: relative;
 }
 .popover-panel {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
+  position: fixed;
+  inset: auto;
+  margin: 0;
   width: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1259,3 +1261,5 @@ html[data-platform="android"] .topbar {
 .sync-status span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sync-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font-size: 12px; }
 @media (max-width: 600px) { .sync-status span { display: none; } }
+
+.popover-panel::backdrop { background: transparent; }

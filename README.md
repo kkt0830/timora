@@ -1,20 +1,22 @@
-# Timora v0.3 — Local-first Application Foundation
+# Timora v0.3.1 — Sync Recovery & Mobile Fixes
 
 > «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
-**현재 소스: v0.3 자동 Cloud 동기화 검증 후보.** 기존 Windows/Android Local-first,
-Task 그룹, 계정 유지와 로컬 사진 기능 위에 자동 push/pull·재전송·충돌 선택을 추가합니다.
-`version/v0.3`에서 개발하며 새 PR/main merge와 Netlify 재배포는 하지 않습니다.
+**v0.3.1 검증 후보**입니다. Issue #13의 동기화 실패·초기 설정 충돌·모바일 메뉴를
+수정했습니다. 개발 브랜치는 `version/v0.3.1`이며 main 반영은 PR 검토 후 진행합니다.
 
-사용자는 기존 Android 앱 실행과 Cloud 가져오기 성공을 보고했습니다. 새 동기화의
-실제 Supabase 세션 회전과 두 실기기 검수는 별도입니다. 자동 테스트와 설치 빌드가
-사용자의 실기기 합격을 대신하지 않습니다. [동기화 안내](docs/cloud-sync.md),
-[검증 기록](docs/verification.md), [이전 체크포인트](docs/cloud-sync-checkpoint.md)를 참고하세요.
+- 서버가 명확히 거부한 항목은 기기에 보관하고 독립 항목 전송과 Cloud 수신을 이어갑니다.
+- Cloud 동기화 화면에서 실패 내용/현재 내용을 비교하고 **최신 내용으로 재시도**합니다.
+  확인 후 해당 항목의 기존 대기 변경을 최신 로컬 상태로 대체합니다. 삭제한 항목이면 삭제를 전송합니다.
+- 데이터/권한 오류와 인증 오류를 구분합니다. 필요한 공백 URL만 인코딩하며 원격 가져오기 원문은 보존합니다.
+- 새 기기의 미편집 기본 설정은 Cloud 기준으로 초기화하고 실제 오프라인 설정 변경은 보존합니다.
+- 작은 화면의 프로필 메뉴 스크롤과 바깥 첫 터치의 닫기 동작을 수정했습니다.
 
-Source `9e0826c`의 Web/DB, Windows exe·NSIS, Android APK·AAB/실제 emulator CI가 모두 통과했습니다.
-설치 파일: [자동 동기화 Android test APK ZIP](https://github.com/kkt0830/timora/actions/runs/38103096257/artifacts/11688033981),
-[Windows exe/installer ZIP](https://github.com/kkt0830/timora/actions/runs/38103096311/artifacts/11688687451).
-실제 사용자 계정의 두 기기 Sync/세션 회전 검수는 별도로 남아 있습니다.
+[변경 기록](CHANGELOG.md), [v0.3.1 상세·제한](docs/issues/issue-13-v031.md),
+[동기화 사용 안내](docs/cloud-sync.md), [검증 및 설치 파일](docs/verification.md)을 참고하세요.
+Node 51개·Rust 20개, 실제 SQLite/PostgreSQL 및 브라우저 검사는 통과했습니다.
+Windows/Android 설치 파일과 실제 기기 검수 범위는 검증 문서에서 확인합니다.
+검토용 PR: [#15](https://github.com/kkt0830/timora/pull/15).
 
 **운영 Web: v0.2**, https://timora-sfj2.netlify.app . 이번 개발에서 Netlify production을
 재배포하지 않았습니다. 자동 동기화용 Supabase metadata·trigger·RLS·RPC는
@@ -88,7 +90,7 @@ npm run desktop:build
 Windows 산출물: `src-tauri/target/release/timora-desktop.exe`,
 `src-tauri/target/release/bundle/nsis/*-setup.exe`.
 [Desktop Actions](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)의
-성공한 실행에서도 `timora-v0.3-windows-x64` artifact를 받습니다.
+성공한 실행에서도 `timora-v0.3.1-windows-x64` artifact를 받습니다.
 NSIS installer에 WebView2 offline installer를 포함합니다.
 [설치·DB 위치·검증](docs/desktop.md)을 참고하세요.
 
@@ -101,9 +103,9 @@ ARM64 Android 7.0(API 24) 이상 기기용 테스트 APK입니다. Play Store에
 
 1. Android 폰/Tablet의 브라우저에서 [Timora 저장소](https://github.com/kkt0830/timora)를 열고 GitHub에 로그인합니다.
 2. **Actions → Timora Android checks** ([바로가기](https://github.com/kkt0830/timora/actions/workflows/android.yml))를 엽니다.
-3. `version/v0.3` 브랜치의 최신 **성공한 실행**을 선택하고, 실행 source가 자동 Cloud 동기화를 포함하는지 [검증 기록](docs/verification.md)에서 확인합니다.
+3. `version/v0.3.1` 브랜치의 최신 **성공한 실행**을 선택하고, 실행 source가 자동 Cloud 동기화를 포함하는지 [검증 기록](docs/verification.md)에서 확인합니다.
    예전 성공 실행은 이번 기능을 포함하지 않을 수 있습니다.
-4. 실행 페이지 하단 **Artifacts → timora-v0.3-android-arm64-test**를 눌러 ZIP을 다운로드합니다.
+4. 실행 페이지 하단 **Artifacts → timora-v0.3.1-android-arm64-test**를 눌러 ZIP을 다운로드합니다.
 5. 파일 앱에서 ZIP을 풀고 `arm64/debug/app-arm64-debug.apk`를 엽니다.
    `x86_64/debug/app-x86_64-debug.apk`는 에뮬레이터용입니다.
 6. 필요하면 브라우저/파일 앱의 **이 출처의 앱 설치 허용**을 설정하고 설치합니다.
@@ -168,7 +170,7 @@ Web은 Supabase adapter, Windows/Android는 Local adapter → Tauri IPC → Rust
 UI에서 SQL을 실행하지 않습니다. Native는 native 쓰기가 성공한 후 UI 상태를 갱신합니다.
 
 로컬 DB는 앱 데이터 디렉터리의 `timora.db`에 보관하며
-`PRAGMA user_version=3`과 트랜잭션 migration을 사용합니다.
+`PRAGMA user_version=4`과 트랜잭션 migration을 사용합니다.
 손상·migration 실패·더 새로운 schema를 자동 초기화하지 않습니다.
 로컬 UUID와 Cloud 계정은 분리되며 연결 후 로컬 UUID/행 소유권을 바꾸지 않습니다.
 Cloud access token은 메모리, refresh credential은 Android Keystore/Windows Credential
@@ -189,7 +191,7 @@ npm run test:local
 ```
 
 `test:local`에는 Rust가 필요합니다. 별도 lint 설정은 없으며 TypeScript와
-`cargo fmt --check`를 사용합니다. 실제 SQLite 파일 테스트 16개, Node 테스트 47개,
+`cargo fmt --check`를 사용합니다. 실제 SQLite 파일 테스트 20개, Node 테스트 51개,
 Web 브라우저 회귀와 두 SQLite/PostgreSQL 동기화 통합 검사를 통과했습니다.
 이번 Windows/Android 빌드·런타임 결과는 검증 기록을 확인합니다. [설치 파일](https://github.com/kkt0830/timora/actions/workflows/desktop.yml)을 받을 수 있습니다. 수동 결과와 검사 범위는
 [verification](docs/verification.md)에 기록합니다. 브라우저 fixture나 SQLite 단위 검사는

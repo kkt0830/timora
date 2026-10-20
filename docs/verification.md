@@ -1,3 +1,33 @@
+# v0.3.1 검증 — 2026-10-20 KST
+
+앱/테스트 source: d995ffe. version/v0.3.1에서 Issue #13 패치를 구현했습니다. 아래 이전 v0.3 이력과 구분합니다.
+
+| 검사 | 결과/범위 |
+| --- | --- |
+| npm ci / production build | workspace cache로 설치 성공, TypeScript/Vite build 성공 |
+| Node | 51 passed. 서버 거부 격리, 400/403/401 분류, 미해결 FK 보류 추가 |
+| Rust 실제 파일 | 20 passed. 실패 보관/reopen·동일 entity/Project 보류·최신 retry·fresh settings·v3→v4 보존 |
+| PostgreSQL/RLS + 실제 SQLite | 기존 SQL/RLS 성공. 거부된 과거 URL 격리, 독립 Note/pull, 최신 retry 수렴, commit 후 응답 유실/receipt, 기존 Cloud settings 새 기기 성공 |
+| Browser | Web/Desktop/Android/Native-account 모두 성공. 393×360 메뉴 bounds, 첫 닫기 touch/두 번째 이동, 실패 UI/retry |
+| Web/DB CI | [39395809194](https://github.com/kkt0830/timora/actions/runs/39395809194) 전체 성공 |
+| Windows CI | [39395809106](https://github.com/kkt0830/timora/actions/runs/39395809106) 전체 성공. 실제 Windows compile, exe/NSIS 및 WebView2 offline installer artifact |
+| Android CI | [39395809156](https://github.com/kkt0830/timora/actions/runs/39395809156) 전체 성공. ARM64/x86_64 APK·서명·AAB 및 실제 emulator offline CRUD/force-stop/legacy upgrade/Back/Keystore |
+| 실제 기기 | 새 APK/installer의 사용자 두 기기·실제 Auth 회전·IME 검수는 PENDING |
+
+설치 파일 (앱/테스트 source **d995ffe**, 보관 30일, GitHub 로그인 필요):
+
+- [Android ARM64 테스트 APK ZIP](https://github.com/kkt0830/timora/actions/runs/39395809156/artifacts/12252307670): 압축 해제 후 `arm64/debug/app-arm64-debug.apk`. x86_64는 에뮬레이터용입니다.
+- [Windows x64 exe/NSIS ZIP](https://github.com/kkt0830/timora/actions/runs/39395809106/artifacts/12252151988).
+- [검토용 Draft PR #15](https://github.com/kkt0830/timora/pull/15). main/Netlify production 반영은 별도입니다.
+
+운영 Supabase schema/RLS/RPC 및 사용자 데이터 변경 없음. 로컬 SQLite에만 additive migration 004를 추가합니다. Auth/HTTP/IPC fixture를 실제 운영 계정 검증으로 표현하지 않습니다. user_version=4이며 DB/사진/UUID/owner/이전 v3 queue ID/payload 보존을 확인했습니다.
+
+기존 유효 URL까지 정규화했을 때 원문 표기 회귀가 발견돼 필요한 공백 URL만 정규화하도록 수정했습니다. 최초 import의 한글 URL 원문 보존 테스트도 유지합니다. 이전 003 migration은 변경하지 않았습니다.
+
+서명 불일치로 개인 앱을 삭제하지 않습니다. 새 source의 실제 기기 합격 전 Draft/검증 후보로 표시합니다.
+
+---
+
 # 자동 Cloud Sync 검증 — 2026-10-11
 
 최신 앱/테스트 source: `9e0826c` (앱 로직은 `a19d7b8`과 동일, Android test fixture 명령만 보완). 사용자 요청으로 version/v0.3에 직접 반영하며 새 PR/main merge와 Netlify 재배포는 하지 않았습니다. 아래 10월 9일 account/profile 검증은 이전 구현의 이력입니다.

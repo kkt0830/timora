@@ -116,7 +116,7 @@ Cloud ID가 이미 연결되었거나 기존 import mapping이 있으면 다른 
 imported 행 삭제에만 tombstone을 남깁니다. local-only 행 삭제는 물리 삭제입니다.
 원자적 Inbox 이동/Project detach/import rollback을 실제 파일 tests로 검증합니다.
 
-이전 v2에는 settings sync metadata가 없었습니다. 현재 v3는 native_sync_meta와 outbox에 singleton settings를 포함합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
+이전 v2에는 settings sync metadata가 없었습니다. v3부터 native_sync_meta와 outbox에 singleton settings를 포함하며 현재 v4는 아래 실패 보관 metadata를 추가합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
 DB encryption이 없습니다. 보안·가져오기 제한은 [offline.md](offline.md)를 참고하세요.
 
 ## 이전 Android expansion 단계
@@ -128,7 +128,7 @@ Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존�
 
 ## 자동 Sync: SQLite schema v3와 Cloud metadata
 
-`003_durable_sync.sql`은 v2 위에 transaction으로 추가됩니다. 기록/UUID/사진을 보존하고 기존 local/modified 행 및 imported 삭제를 outbox에 seed합니다. `user_version=3`이며 3보다 최신 schema는 초기화하지 않고 거부합니다.
+`003_durable_sync.sql`은 v2 위에 transaction으로 추가됩니다. 기록/UUID/사진을 보존하고 기존 local/modified 행 및 imported 삭제를 outbox에 seed합니다. 당시 `user_version=3`이었고, 현재는 아래 004 migration 이후 `user_version=4`입니다. 현재 지원 범위보다 최신 schema는 초기화하지 않고 거부합니다.
 
 | SQLite 구조 | 의미 |
 | --- | --- |
@@ -142,3 +142,12 @@ Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존�
 `sync_pull`/`sync_apply`는 SECURITY INVOKER입니다. authenticated role과 auth.uid()를 강제하고 project 복합 FK와 기존 RLS를 유지합니다. 내부 capture trigger만 private SECURITY DEFINER이며 search_path를 비우고 사용자 소유권을 확인합니다. Auth 사용자 cascade 삭제 시 clock을 재생성하지 않습니다.
 
 Local owner UUID와 Cloud user_id는 다르며 runtime에서 매핑합니다. Entity UUID는 보존합니다. Settings는 로컬 키 `settings`와 원격 auth.uid()를 매핑합니다. revision/cursor는 JS 정수 정밀도 손실을 피하려고 TEXT로 전달합니다. 자세한 충돌/재전송 계약은 [cloud-sync.md](cloud-sync.md)를 참고하세요.
+
+
+## v0.3.1 — SQLite schema 4
+
+004_sync_recovery.sql: native_sync_outbox에 attempts INTEGER, last_error TEXT, failed_at TEXT를 추가하고 (entity_table,id,seq) index를 둡니다. 기존 operation ID/payload를 유지합니다. native_sync_control.settings_initialized는 기존 사용자 설정 보존을 기본값(1)으로 하며, new identity만 미편집(0)으로 구분합니다. settings update trigger는 초기값 전송을 억제하고 사용자 편집/원격 baseline 이후에는 정상 queue합니다.
+
+sync_status는 실패 목록/개수를 반환합니다. 동일 entity의 앞선 operation과 실패 Project를 넘어서 전송하지 않습니다. 명시적 sync_retry는 현재 local intent를 새 ID로 원자적으로 queue하고, sync_fail은 확인된 서버 거부만 보관합니다. 현재 json_rows의 TEXT 계약을 유지하기 위해 failure 목록의 attempts는 명시적 TEXT cast입니다.
+
+schema 4보다 최신 파일/실패 migration은 초기화하지 않습니다. Cloud schema/RLS/RPC migration은 추가하지 않았습니다.

@@ -10,9 +10,10 @@ function fixture(operations=[]) {
  const queue=[...operations],calls=[];let cursor='0';
  const invoke=async(command,args)=>{
   calls.push({command,args});
-  if(command==='local_sync_status')return {...emptySyncState,pending:queue.length,cursor};
-  if(command==='local_sync_next')return queue[0]??null;
-  if(command==='local_sync_ack'){queue.shift();return;}
+  if(command==='local_sync_status')return {...emptySyncState,pending:queue.length,failed_count:queue.filter(o=>o.blocked).length,cursor};
+  if(command==='local_sync_next')return queue.find(o=>!o.blocked)??null;
+  if(command==='local_sync_ack'){queue.splice(queue.findIndex(o=>o.operation_id===args.operationId),1);return;}
+  if(command==='local_sync_fail'){queue.find(o=>o.operation_id===args.operationId).blocked=true;return;}
   if(command==='local_sync_page'){cursor=args.page.cursor;return true;}
   throw new Error('unexpected IPC '+command);
  };
@@ -70,4 +71,39 @@ test('secure native credential restores lazily, rotates in the vault and never d
  });
  try {assert.equal((await auth.restore()).id,'local');assert.equal(mock.mock.callCount(),0);const token=auth.token();release('vault-refresh');assert.equal(await token,'new-access');assert.deepEqual(calls.find(c=>c.command==='local_session_write').args,{refreshToken:'rotated-refresh'});}
  finally{mock.mock.restore();}
+});
+
+test('a definitive data rejection is retained while independent uploads and pull continue',async()=>{
+ const bad={...operation,operation_id:'bad'},good={...operation,operation_id:'good',id:'other-note'};
+ const f=fixture([bad,good]);const seen=[];
+ const mock=test.mock.method(globalThis,'fetch',async(url,init)=>{
+  if(url.endsWith('/user'))return response({id:A});
+  const body=JSON.parse(init.body);seen.push({url,body});
+  if(url.endsWith('sync_apply'))return body.operation_id==='bad'?response({message:'constraint fixture',code:'23514'},400):response({status:'applied',record:{}});
+  return response({cursor:'1',records:[],dependencies:[],has_more:false});
+ });
+ try{await f.service.wake();assert.equal(f.state.phase,'idle');assert.equal(f.state.failed_count,1);assert.equal(f.queue.length,1);assert.equal(f.queue[0].operation_id,'bad');assert.ok(seen.some(r=>r.url.endsWith('sync_pull')));await f.service.wake();assert.equal(seen.filter(r=>r.body.operation_id==='bad').length,1);}
+ finally{mock.mock.restore();f.service.stop();}
+});
+test('RPC permission failures are errors, while expired authentication still requires reauthentication',async()=>{
+ const f=fixture([operation]);let status=403;
+ const mock=test.mock.method(globalThis,'fetch',async url=>url.endsWith('/user')?response({id:A}):response({message:'denied',code:'42501'},status));
+ try{await f.service.wake();assert.equal(f.state.phase,'error');assert.equal(f.queue.length,1);assert.ok(!f.calls.some(c=>c.command==='local_sync_fail'));status=401;await f.service.wake();assert.equal(f.state.phase,'auth_required');assert.equal(f.queue.length,1);}
+ finally{mock.mock.restore();f.service.stop();}
+});
+test('generic RPC 400 is not classified as an authentication failure or discarded',async()=>{
+ const f=fixture([operation]);const mock=test.mock.method(globalThis,'fetch',async url=>url.endsWith('/user')?response({id:A}):response({message:'schema cache request error',code:'PGRST204'},400));
+ try{await f.service.wake();assert.equal(f.state.phase,'error');assert.equal(f.queue.length,1);assert.ok(!f.calls.some(c=>c.command==='local_sync_fail'));}
+ finally{mock.mock.restore();f.service.stop();}
+});
+
+test('an unresolved foreign key rejection is isolated after pull instead of retrying forever',async()=>{
+ const f=fixture([{...operation,operation_id:'missing-project'}]);
+ const mock=test.mock.method(globalThis,'fetch',async url=>{
+  if(url.endsWith('/user'))return response({id:A});
+  if(url.endsWith('sync_apply'))return response({message:'missing dependency',code:'23503'},409);
+  return response({cursor:'1',records:[],dependencies:[],has_more:false});
+ });
+ try{await f.service.wake();assert.equal(f.state.phase,'idle');assert.equal(f.state.failed_count,1);assert.ok(f.calls.some(c=>c.command==='local_sync_page'));assert.ok(f.calls.some(c=>c.command==='local_sync_fail'));}
+ finally{mock.mock.restore();f.service.stop();}
 });

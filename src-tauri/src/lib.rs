@@ -214,7 +214,7 @@ impl Database {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(sql_error)?;
-        if version > 3 {
+        if version > 4 {
             return Err(
                 "이 DB는 더 새로운 Timora 버전에서 생성됐습니다. 업데이트한 앱으로 열어 주세요."
                     .into(),
@@ -264,6 +264,24 @@ impl Database {
             tx.execute_batch(include_str!("../migrations/003_durable_sync.sql"))
                 .map_err(|_| "Local sync migration 실패. 기존 DB는 보존됩니다.".to_string())?;
             tx.pragma_update(None, "user_version", 3)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 4 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/004_sync_recovery.sql"))
+                .map_err(sql_error)?;
+            if version == 0 {
+                // Only a brand-new workspace is known to have untouched defaults.
+                tx.execute(
+                    "DELETE FROM native_sync_outbox WHERE entity_table='workspace_settings'",
+                    [],
+                )
+                .map_err(sql_error)?;
+                tx.execute("UPDATE native_sync_control SET settings_initialized=0", [])
+                    .map_err(sql_error)?;
+            }
+            tx.pragma_update(None, "user_version", 4)
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
@@ -416,6 +434,14 @@ impl Database {
         let mut row = Map::new();
         for col in columns {
             row.insert((*col).into(), input[*col].clone());
+        }
+        if table == "library_items"
+            && !imported
+            && text(input, "url")?.chars().any(char::is_whitespace)
+        {
+            let normalized =
+                url::Url::parse(text(input, "url")?).map_err(|_| "URL을 확인해 주세요.")?;
+            row.insert("url".into(), json!(normalized.as_str()));
         }
         row.insert("id".into(), json!(id));
         row.insert("user_id".into(), json!(owner));
@@ -578,6 +604,9 @@ impl Database {
     }
     fn settings(conn: &Connection, owner: &str, input: &Value, imported: bool) -> Result<Value> {
         validate_settings(input)?;
+        // User preference edits and imported/received settings establish a baseline.
+        conn.execute("UPDATE native_sync_control SET settings_initialized=1", [])
+            .map_err(sql_error)?;
         conn.execute("UPDATE workspace_settings SET workspace_name=?1,appearance=?2,display_name=?3,avatar_url=?4,updated_at=?5 WHERE user_id=?6",params![text(input,"workspace_name")?,text(input,"appearance")?,text(input,"display_name")?,input["avatar_url"].as_str(),if imported { text(input,"updated_at")?.to_string() } else { now() },owner]).map_err(sql_error)?;
         json_rows(conn, "SELECT * FROM workspace_settings", &[])?
             .into_iter()
@@ -614,7 +643,7 @@ impl Database {
             .map_err(sql_error)?;
         if imported.is_some() {
             return Err(
-                "이미 가져온 Workspace입니다. 자동 동기화는 아직 지원하지 않습니다.".into(),
+                "이미 가져온 Workspace입니다. 이후 변경은 계정 연결과 Cloud 인증 상태를 확인한 뒤 자동 동기화로 반영해 주세요.".into(),
             );
         }
         for table in TABLES {
