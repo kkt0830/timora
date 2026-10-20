@@ -1,7 +1,7 @@
 name: Timora Desktop checks
 on:
   push:
-    branches: [main, version/v0.3]
+    branches: [main, "version/**"]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -37,6 +37,7 @@ jobs:
         with:
           path: src-tauri/target
           key: ${{ runner.os }}-timora-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-timora-rust-
       - run: node scripts/validate-native-config.mjs
       - run: npm ci
       - run: npm test
@@ -46,7 +47,7 @@ jobs:
       - name: Windows executable and offline-capable NSIS installer
         uses: actions/upload-artifact@v4
         with:
-          name: timora-v0.3-windows-x64
+          name: timora-v0.3.1-windows-x64
           path: |
             src-tauri/target/release/timora-desktop.exe
             src-tauri/target/release/bundle/nsis/*-setup.exe

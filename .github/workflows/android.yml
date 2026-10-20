@@ -1,7 +1,7 @@
 name: Timora Android checks
 on:
   push:
-    branches: [main, version/v0.3]
+    branches: [main, "version/**"]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -42,6 +42,7 @@ jobs:
         with:
           path: src-tauri/target
           key: android-arm64-${{ env.NDK_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: android-arm64-${{ env.NDK_VERSION }}-
       - name: Install compatible stable SDK and NDK
         run: |
           sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;$NDK_VERSION"
@@ -73,7 +74,7 @@ jobs:
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         with:
-          name: timora-v0.3-android-arm64-test
+          name: timora-v0.3.1-android-arm64-test
           path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 30

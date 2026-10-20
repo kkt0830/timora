@@ -7,7 +7,7 @@ const {chromium}=await import(process.env.TIMORA_PLAYWRIGHT_MODULE??'playwright'
 const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4176','--strictPort'],{env:{...process.env,VITE_SUPABASE_URL:'https://native-fixture.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'},stdio:['ignore','pipe','pipe']});
 let output='';server.stdout.on('data',d=>output+=d);server.stderr.on('data',d=>output+=d);let browser;
 const owner='11111111-1111-4111-8111-111111111111',cloud='22222222-2222-4222-8222-222222222222';
-const data=emptyWorkspace(owner);let state='new',photo=null,pickFailure=false,tokenEmail='',syncConflicts=[];const requests=[],errors=[];
+const data=emptyWorkspace(owner);let state='new',photo=null,pickFailure=false,tokenEmail='',syncConflicts=[],syncFailures=[];const requests=[],errors=[];
 const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=';
 try{
  for(let i=0;;i++){try{if((await fetch('http://127.0.0.1:4176')).ok)break;}catch{}if(i>100)throw new Error(output);await new Promise(r=>setTimeout(r,100));}
@@ -27,8 +27,9 @@ try{
   if(state!=='signed_in')throw new Error('Workspace locked');
   if(command==='local_session_read')return null;
   if(command==='local_session_write')return null;
-  if(command==='local_sync_status')return {pending:syncConflicts.length,conflict_count:syncConflicts.length,conflicts:syncConflicts,cursor:'0',last_success:null};
+  if(command==='local_sync_status')return {pending:syncConflicts.length+syncFailures.length,failed_count:syncFailures.length,failures:syncFailures,conflict_count:syncConflicts.length,conflicts:syncConflicts,cursor:'0',last_success:null};
   if(command==='local_sync_next')return null;
+  if(command==='local_sync_retry'){assert.equal(args.cloudUserId,cloud);assert.equal(args.operationId,'failed-fixture');syncFailures=[];return null;}
   if(command==='local_sync_resolve'){assert.equal(args.cloudUserId,cloud);assert.equal(args.choice,'cloud');data.tasks[0]={...data.tasks[0],title:'Cloud task'};syncConflicts=[];return null;}
   if(command==='local_load')return data;
   if(command==='local_avatar')return photo;
@@ -61,6 +62,19 @@ try{
   await page.getByRole('button',{name:'Cloud 내용 사용',exact:true}).click();await page.getByText('전송 대기 0개 · 충돌 0개',{exact:true}).waitFor();assert.equal(data.tasks[0].title,'Cloud task');
   await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{get:()=>false,configurable:true});window.dispatchEvent(new Event('offline'));});
   await page.getByRole('heading',{name:'오프라인 · 전송 대기 0개',exact:true}).waitFor();
+ // Failed operation details remain visible and explicit retry uses the current intent.
+ syncFailures=[{operation_id:'failed-fixture',entity_table:'tasks',id:data.tasks[0].id,action:'put',payload:data.tasks[0],local:data.tasks[0],last_error:'constraint fixture (23514)',failed_at:new Date().toISOString(),attempts:'1'}];
+ await page.getByRole('button',{name:'지금 동기화',exact:true}).click();await page.getByText('constraint fixture (23514)',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'최신 내용으로 재시도',exact:true}).click();await page.getByText('constraint fixture (23514)',{exact:true}).waitFor({state:'hidden'});
+ await page.goto('http://127.0.0.1:4176/#/tasks');
+ await page.setViewportSize({width:393,height:360});await page.getByRole('button',{name:'메뉴 열기',exact:true}).click();await page.getByRole('button',{name:'프로필 메뉴',exact:true}).click();
+ const popover=page.locator('.popover-panel');await popover.waitFor();let box=await popover.boundingBox();assert.ok(box.y>=0 && box.y+box.height<=361);
+ await page.touchscreen.tap(380,200);await popover.waitFor({state:'hidden'});assert.match(page.url(),/#\/tasks$/);
+ await page.setViewportSize({width:393,height:852});const home=page.getByRole('link',{name:'Home',exact:true});const homeBox=await home.boundingBox();
+ await page.getByRole('button',{name:'프로필 메뉴',exact:true}).click();await popover.waitFor();
+ await page.touchscreen.tap(homeBox.x+homeBox.width/2,homeBox.y+homeBox.height/2);await popover.waitFor({state:'hidden'});assert.match(page.url(),/#\/tasks$/);
+ await page.touchscreen.tap(homeBox.x+homeBox.width/2,homeBox.y+homeBox.height/2);await page.getByRole('heading',{name:'오늘도 나의 흐름으로 👋',exact:true}).waitFor();
+ console.log('v0.3.1 UI: failed-operation retry, short viewport popover bounds, and close-only first touch passed.');
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/native-account-profile.png',fullPage:true});
  console.log('Native UI contract: first login/signup, local restore/offline/avatar, explicit logout/data preservation, A/B isolation and same-account recovery passed. Real native Auth/system picker remains a separate gate.');
 }finally{await browser?.close();server.kill('SIGTERM');}
