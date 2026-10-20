@@ -10,8 +10,15 @@
 | PostgreSQL/RLS + 실제 SQLite | 기존 SQL/RLS 성공. 거부된 과거 URL 격리, 독립 Note/pull, 최신 retry 수렴, commit 후 응답 유실/receipt, 기존 Cloud settings 새 기기 성공 |
 | Browser | Web/Desktop/Android/Native-account 모두 성공. 393×360 메뉴 bounds, 첫 닫기 touch/두 번째 이동, 실패 UI/retry |
 | Web/DB CI | [39395809194](https://github.com/kkt0830/timora/actions/runs/39395809194) 전체 성공 |
-| Windows / Android CI | [Windows 39395809106](https://github.com/kkt0830/timora/actions/runs/39395809106), [Android 39395809156](https://github.com/kkt0830/timora/actions/runs/39395809156) 진행/대기. 최종 결과는 후속 기록 |
+| Windows CI | [39395809106](https://github.com/kkt0830/timora/actions/runs/39395809106) 전체 성공. 실제 Windows compile, exe/NSIS 및 WebView2 offline installer artifact |
+| Android CI | [39395809156](https://github.com/kkt0830/timora/actions/runs/39395809156) 전체 성공. ARM64/x86_64 APK·서명·AAB 및 실제 emulator offline CRUD/force-stop/legacy upgrade/Back/Keystore |
 | 실제 기기 | 새 APK/installer의 사용자 두 기기·실제 Auth 회전·IME 검수는 PENDING |
+
+설치 파일 (앱/테스트 source **d995ffe**, 보관 30일, GitHub 로그인 필요):
+
+- [Android ARM64 테스트 APK ZIP](https://github.com/kkt0830/timora/actions/runs/39395809156/artifacts/12252307670): 압축 해제 후 `arm64/debug/app-arm64-debug.apk`. x86_64는 에뮬레이터용입니다.
+- [Windows x64 exe/NSIS ZIP](https://github.com/kkt0830/timora/actions/runs/39395809106/artifacts/12252151988).
+- [검토용 Draft PR #15](https://github.com/kkt0830/timora/pull/15). main/Netlify production 반영은 별도입니다.
 
 운영 Supabase schema/RLS/RPC 및 사용자 데이터 변경 없음. 로컬 SQLite에만 additive migration 004를 추가합니다. Auth/HTTP/IPC fixture를 실제 운영 계정 검증으로 표현하지 않습니다. user_version=4이며 DB/사진/UUID/owner/이전 v3 queue ID/payload 보존을 확인했습니다.
 

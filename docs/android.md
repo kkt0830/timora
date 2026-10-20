@@ -1,6 +1,6 @@
-# Android — Timora v0.3 Local-first Application Foundation
+# Android — Timora v0.3.1
 
-Windows(PR #7)/Android(PR #8) 구현 위에 계정/로컬 사진 개선을 `version/v0.3`에 직접 반영합니다.
+Windows(PR #7)/Android(PR #8)와 이전 계정/로컬 사진 개선 위에 Issue #13 패치를 `version/v0.3.1`에서 개발합니다.
 동일한 React UI/domain/repository/Rust Database를 사용합니다. Android 전용 schema는 없습니다.
 실제 Galaxy 기기의 합격 여부는 [Android manual acceptance](manual-acceptance-v03-android.md)에
 기록합니다. CI/에뮬레이터 성공만으로 실제 기기 지원 완료를 선언하지 않습니다.
@@ -9,6 +9,7 @@ Windows(PR #7)/Android(PR #8) 구현 위에 계정/로컬 사진 개선을 `vers
 
 [Android Actions](https://github.com/kkt0830/timora/actions/workflows/android.yml)의 성공한 실행에서
 `timora-v0.3.1-android-arm64-test` ZIP을 내려받아 압축을 풀고 **arm64 debug APK**를 설치합니다.
+Source d995ffe의 [v0.3.1 테스트 APK ZIP](https://github.com/kkt0830/timora/actions/runs/39395809156/artifacts/12252307670)을 받을 수 있습니다. 최종 CI 결과는 [verification.md](verification.md)에서 확인합니다.
 Galaxy 등 ARM64 기기용이며 x86_64 APK는 CI 에뮬레이터용입니다. 필요 시 브라우저/파일 앱의
 '이 출처의 앱 설치 허용'을 설정합니다. 새 설치는 온라인 회원가입/로그인으로 시작하고
 그 뒤 저장된 계정과 Workspace는 재실행/오프라인에서 유지됩니다. 기존 v1 익명 기록은
@@ -68,8 +69,8 @@ resources를 Git에 포함합니다. plugin dependency 설정(`tauri.settings.gr
 Gradle/Kotlin cache, build outputs는 생성·무시합니다. CI는 init으로 소스를 덮어쓰지 않습니다.
 
 `app.timora.android`는 안정된 Android application ID입니다. Windows의
-`app.timora.desktop` 및 기존 PC 데이터 경로는 변경하지 않습니다. 버전 이름은 0.3.0,
-Android versionCode는 3000이며 다음 배포에서는 증가시켜야 합니다.
+`app.timora.desktop` 및 기존 PC 데이터 경로는 변경하지 않습니다. 버전 이름은 0.3.1,
+Android versionCode는 3002이며 다음 배포에서는 증가시켜야 합니다.
 
 ## 런타임과 데이터
 

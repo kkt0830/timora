@@ -16,6 +16,7 @@
 [동기화 사용 안내](docs/cloud-sync.md), [검증 및 설치 파일](docs/verification.md)을 참고하세요.
 Node 51개·Rust 20개, 실제 SQLite/PostgreSQL 및 브라우저 검사는 통과했습니다.
 Windows/Android 설치 파일과 실제 기기 검수 범위는 검증 문서에서 확인합니다.
+검토용 PR: [#15](https://github.com/kkt0830/timora/pull/15).
 
 **운영 Web: v0.2**, https://timora-sfj2.netlify.app . 이번 개발에서 Netlify production을
 재배포하지 않았습니다. 자동 동기화용 Supabase metadata·trigger·RLS·RPC는

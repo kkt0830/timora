@@ -116,7 +116,7 @@ Cloud ID가 이미 연결되었거나 기존 import mapping이 있으면 다른 
 imported 행 삭제에만 tombstone을 남깁니다. local-only 행 삭제는 물리 삭제입니다.
 원자적 Inbox 이동/Project detach/import rollback을 실제 파일 tests로 검증합니다.
 
-이전 v2에는 settings sync metadata가 없었습니다. 현재 v3는 native_sync_meta와 outbox에 singleton settings를 포함합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
+이전 v2에는 settings sync metadata가 없었습니다. v3부터 native_sync_meta와 outbox에 singleton settings를 포함하며 현재 v4는 아래 실패 보관 metadata를 추가합니다. SQLite는 단일 OS/Workspace DB이며 RLS나
 DB encryption이 없습니다. 보안·가져오기 제한은 [offline.md](offline.md)를 참고하세요.
 
 ## 이전 Android expansion 단계
@@ -128,7 +128,7 @@ Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존�
 
 ## 자동 Sync: SQLite schema v3와 Cloud metadata
 
-`003_durable_sync.sql`은 v2 위에 transaction으로 추가됩니다. 기록/UUID/사진을 보존하고 기존 local/modified 행 및 imported 삭제를 outbox에 seed합니다. `user_version=3`이며 3보다 최신 schema는 초기화하지 않고 거부합니다.
+`003_durable_sync.sql`은 v2 위에 transaction으로 추가됩니다. 기록/UUID/사진을 보존하고 기존 local/modified 행 및 imported 삭제를 outbox에 seed합니다. 당시 `user_version=3`이었고, 현재는 아래 004 migration 이후 `user_version=4`입니다. 현재 지원 범위보다 최신 schema는 초기화하지 않고 거부합니다.
 
 | SQLite 구조 | 의미 |
 | --- | --- |
