@@ -142,3 +142,12 @@ Windows 파일과 독립적입니다. remote_id는 별도 column 없이 보존�
 `sync_pull`/`sync_apply`는 SECURITY INVOKER입니다. authenticated role과 auth.uid()를 강제하고 project 복합 FK와 기존 RLS를 유지합니다. 내부 capture trigger만 private SECURITY DEFINER이며 search_path를 비우고 사용자 소유권을 확인합니다. Auth 사용자 cascade 삭제 시 clock을 재생성하지 않습니다.
 
 Local owner UUID와 Cloud user_id는 다르며 runtime에서 매핑합니다. Entity UUID는 보존합니다. Settings는 로컬 키 `settings`와 원격 auth.uid()를 매핑합니다. revision/cursor는 JS 정수 정밀도 손실을 피하려고 TEXT로 전달합니다. 자세한 충돌/재전송 계약은 [cloud-sync.md](cloud-sync.md)를 참고하세요.
+
+
+## v0.3.1 — SQLite schema 4
+
+004_sync_recovery.sql: native_sync_outbox에 attempts INTEGER, last_error TEXT, failed_at TEXT를 추가하고 (entity_table,id,seq) index를 둡니다. 기존 operation ID/payload를 유지합니다. native_sync_control.settings_initialized는 기존 사용자 설정 보존을 기본값(1)으로 하며, new identity만 미편집(0)으로 구분합니다. settings update trigger는 초기값 전송을 억제하고 사용자 편집/원격 baseline 이후에는 정상 queue합니다.
+
+sync_status는 실패 목록/개수를 반환합니다. 동일 entity의 앞선 operation과 실패 Project를 넘어서 전송하지 않습니다. 명시적 sync_retry는 현재 local intent를 새 ID로 원자적으로 queue하고, sync_fail은 확인된 서버 거부만 보관합니다. 현재 json_rows의 TEXT 계약을 유지하기 위해 failure 목록의 attempts는 명시적 TEXT cast입니다.
+
+schema 4보다 최신 파일/실패 migration은 초기화하지 않습니다. Cloud schema/RLS/RPC migration은 추가하지 않았습니다.

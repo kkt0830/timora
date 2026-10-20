@@ -50,3 +50,8 @@ Windows PR #7은 사용자에 의해 main에 병합된 상태를 확인했습니
 main을 기반으로 feature/v0.3-android → Draft PR #8 → 자동 검사/실제 기기 검수 → 검토 → merge입니다.
 수동 검수 완료를 추정하지 않으며 main/Netlify를 개발 중 자동 반영하지 않습니다.
 플랫폼별 체크리스트와 산출물 source SHA를 PR에 기록합니다.
+
+
+## v0.3.1
+
+main(PR #12 merge) → version/v0.3.1 → 기능별 commit/회귀·플랫폼 CI → Draft PR → 실제 기기 검수/검토 → main merge. 이번 요청은 새 패치 버전 개발이며 과거 v0.3 직접 커밋 예외를 main 직접 개발로 확대하지 않습니다. 코드·문서·Actions artifact의 source를 구분하고 자동 main merge/Netlify production 배포는 하지 않습니다.

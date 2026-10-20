@@ -94,3 +94,8 @@ Web은 기존 HTTPS avatar URL 입력을 유지합니다.
 ## Cloud 동기화 화면
 
 Native Header의 상태 아이콘, 프로필 메뉴 및 Settings/Profile → `/sync`. 전송 대기·충돌·마지막 확인·오류/재인증을 보여주며 수동 재시도와 양쪽 내용을 펼쳐보는 충돌 선택을 제공합니다. 선택은 확인 dialog를 거칩니다. 작은 화면은 header 아이콘만 표시하고 상세 화면에서 상태를 읽습니다. Web은 이 Native 화면 대신 기존 Supabase 저장 흐름을 사용합니다.
+
+
+## v0.3.1
+
+Cloud 동기화에 전송 실패 목록·원문/현재 내용·확인 후 최신 내용 재시도를 추가했습니다. 실패 항목과 genuine conflict를 구분합니다. 프로필 메뉴는 viewport 내부 scroll 및 modal top-layer를 사용하며 바깥 첫 touch는 닫기만 수행합니다. 앱 표시 버전 0.3.1, Navigation은 유지합니다.

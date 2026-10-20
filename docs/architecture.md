@@ -102,3 +102,8 @@ JS visualViewport가 dialog 높이를 보조합니다. 공유 DB/domain을 플�
 Windows app.timora.desktop과 Android app.timora.android의 app_data_dir 파일은 독립적입니다.
 현재 remote_id 별도 column은 없고 보존한 Entity UUID가 원격 ID 역할을 합니다.
 SQLite schema v3의 outbox/metadata/conflicts와 동일한 Cloud RPC를 두 플랫폼이 공유합니다.
+
+
+## v0.3.1 경계 추가
+
+Native IPC local_sync_fail/local_sync_retry는 기존 owner guard와 SQLite transaction을 사용합니다. CloudSyncService는 Auth/RPC 오류 원천을 구분하고, 확정 SQL 거부를 보류합니다. network/서버 오류의 receipt 계약과 push-first 순서는 유지합니다. 실패 UI는 원문과 현재 내용을 보여준 뒤 사용자 확인으로 최신 intent를 재전송합니다. Popover는 native dialog top-layer로 input 경계를 분리합니다. 새 client는 기존 운영 Supabase RPC와 호환됩니다.

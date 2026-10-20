@@ -10,6 +10,7 @@ v0.1 Core Workspace → v0.2 Design & Experience를 보존합니다. 사용자�
 | v0.1 | Core Workspace | 실제 Supabase/Netlify, 로그인·저장 확인 완료 |
 | v0.2 | Design & Experience | production 배포; Issue #4 버그/UI PR #6 main 병합 |
 | v0.3 | Local-first Application Foundation | Windows + Android / SQLite / 최초 Cloud import / Task 그룹 / 계정 유지·로컬 사진·기본 자동 Sync/충돌 선택; 실제 기기 합격 대기 |
+| v0.3.1 | Sync recovery / Mobile fixes | Issue #13의 5개 수정·SQLite v4·플랫폼/실기기 검수 |
 | v0.4 | Cloud Sync & Conflict Resolution | 기본 Sync 검증 이후 대규모 데이터·고급 충돌·백그라운드/오프라인 개선 범위 확정 |
 | v0.5 | GitHub Integration | 안전한 인증·Repository/Issue 연결 |
 | v0.6 | Object Relations | Backlinks·연결형 지식 구조 |
