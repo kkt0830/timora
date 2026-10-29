@@ -1,3 +1,21 @@
+# v0.3.1 안정화 작업 — 2026-10-29 KST
+
+작업 브랜치의 내부 백업 스냅샷은 SQLite WAL과 연결된 프로필 사진을 임시 공간에
+담고 DB 무결성·필수 테이블·외래 키를 검사합니다. Rust 24개 검사(기존 20개와
+스냅샷 4개), Node 51개, TypeScript/Vite 빌드 및 native-account 브라우저 fixture가
+현재 개발 환경에서 통과했습니다. 스냅샷은 사용자 기능으로 노출하지 않았습니다.
+백업 ZIP·checksum·파일 선택·복원·Cloud 재연결 보호는 아직 구현하거나 검증하지
+않았으므로 사용자용 백업 기능이 제공되는 것으로 취급하지 않습니다.
+
+이번 브랜치의 실제 Android/Windows 빌드, 실기기, 운영 Supabase 및 새 버전의
+서명 업데이트 검증은 실행하지 않았습니다. 아래 표의 CI 결과는 이전 source에
+대한 이력입니다. 기존 앱 데이터 삭제나 초기화는 허용된 업데이트 경로가 아닙니다.
+
+2026-10-29 추가 검사: Rust 27개 통과. 가져온 Note를 오프라인 수정하고 재실행한
+뒤 전송 확인을 처리하는 SQLite 회귀와, 계정/동기화 제어 행 누락 시 패닉 대신
+오류를 반환하며 기록을 보존하는 검사를 추가했습니다. 전송 확인 응답은 fixture로,
+실제 Supabase 로그인이나 두 기기 통과를 뜻하지 않습니다.
+
 # v0.3.1 검증 — 2026-10-20 KST
 
 앱/테스트 source: d995ffe. version/v0.3.1에서 Issue #13 패치를 구현했습니다. 아래 이전 v0.3 이력과 구분합니다.
@@ -18,13 +36,13 @@
 
 - [Android ARM64 테스트 APK ZIP](https://github.com/kkt0830/timora/actions/runs/39395809156/artifacts/12252307670): 압축 해제 후 `arm64/debug/app-arm64-debug.apk`. x86_64는 에뮬레이터용입니다.
 - [Windows x64 exe/NSIS ZIP](https://github.com/kkt0830/timora/actions/runs/39395809106/artifacts/12252151988).
-- [검토용 Draft PR #15](https://github.com/kkt0830/timora/pull/15). main/Netlify production 반영은 별도입니다.
+- [PR #15](https://github.com/kkt0830/timora/pull/15)는 merge commit `79a5688`로 main에 병합됐습니다. Netlify production 재배포는 별도입니다.
 
 운영 Supabase schema/RLS/RPC 및 사용자 데이터 변경 없음. 로컬 SQLite에만 additive migration 004를 추가합니다. Auth/HTTP/IPC fixture를 실제 운영 계정 검증으로 표현하지 않습니다. user_version=4이며 DB/사진/UUID/owner/이전 v3 queue ID/payload 보존을 확인했습니다.
 
 기존 유효 URL까지 정규화했을 때 원문 표기 회귀가 발견돼 필요한 공백 URL만 정규화하도록 수정했습니다. 최초 import의 한글 URL 원문 보존 테스트도 유지합니다. 이전 003 migration은 변경하지 않았습니다.
 
-서명 불일치로 개인 앱을 삭제하지 않습니다. 새 source의 실제 기기 합격 전 Draft/검증 후보로 표시합니다.
+서명 불일치로 개인 앱을 삭제하지 않습니다. 새 source의 실제 기기 합격 전 검증 후보로 표시합니다.
 
 ---
 

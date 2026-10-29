@@ -311,12 +311,14 @@ impl Database {
         )
     }
     fn identity(&self) -> Result<Value> {
-        Ok(json_rows(
+        json_rows(
             &self.conn,
             "SELECT id,cloud_user_id,imported_at,access_state,email,cloud_project_url,last_authenticated_at,created_at,local_avatar FROM local_identity WHERE singleton=1",
             &[],
         )?
-        .remove(0))
+        .into_iter()
+        .next()
+        .ok_or_else(|| "Local 계정 정보가 없습니다. DB를 삭제하지 말고 진단해 주세요.".to_string())
     }
     pub fn require_workspace(&self) -> Result<()> {
         if self.account()?.is_null() {
@@ -694,12 +696,14 @@ impl Database {
     }
     pub fn info(&self) -> Result<Value> {
         self.require_workspace()?;
-        Ok(json_rows(
+        json_rows(
             &self.conn,
             "SELECT id,cloud_user_id,imported_at FROM local_identity",
             &[],
         )?
-        .remove(0))
+        .into_iter()
+        .next()
+        .ok_or_else(|| "Local 계정 정보가 없습니다. DB를 삭제하지 말고 진단해 주세요.".to_string())
     }
 }
 
@@ -709,6 +713,7 @@ pub fn valid_avatar_name(name: &str) -> bool {
 }
 
 mod profile;
+mod snapshot;
 mod sync;
 pub use profile::{normalize_avatar, AVATAR_INPUT_LIMIT};
 
