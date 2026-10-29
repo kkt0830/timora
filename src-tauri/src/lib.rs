@@ -709,6 +709,7 @@ pub fn valid_avatar_name(name: &str) -> bool {
 }
 
 mod profile;
+mod snapshot;
 mod sync;
 pub use profile::{normalize_avatar, AVATAR_INPUT_LIMIT};
 
