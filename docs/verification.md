@@ -18,13 +18,13 @@
 
 - [Android ARM64 테스트 APK ZIP](https://github.com/kkt0830/timora/actions/runs/39395809156/artifacts/12252307670): 압축 해제 후 `arm64/debug/app-arm64-debug.apk`. x86_64는 에뮬레이터용입니다.
 - [Windows x64 exe/NSIS ZIP](https://github.com/kkt0830/timora/actions/runs/39395809106/artifacts/12252151988).
-- [검토용 Draft PR #15](https://github.com/kkt0830/timora/pull/15). main/Netlify production 반영은 별도입니다.
+- [PR #15](https://github.com/kkt0830/timora/pull/15)는 merge commit `79a5688`로 main에 병합됐습니다. Netlify production 재배포는 별도입니다.
 
 운영 Supabase schema/RLS/RPC 및 사용자 데이터 변경 없음. 로컬 SQLite에만 additive migration 004를 추가합니다. Auth/HTTP/IPC fixture를 실제 운영 계정 검증으로 표현하지 않습니다. user_version=4이며 DB/사진/UUID/owner/이전 v3 queue ID/payload 보존을 확인했습니다.
 
 기존 유효 URL까지 정규화했을 때 원문 표기 회귀가 발견돼 필요한 공백 URL만 정규화하도록 수정했습니다. 최초 import의 한글 URL 원문 보존 테스트도 유지합니다. 이전 003 migration은 변경하지 않았습니다.
 
-서명 불일치로 개인 앱을 삭제하지 않습니다. 새 source의 실제 기기 합격 전 Draft/검증 후보로 표시합니다.
+서명 불일치로 개인 앱을 삭제하지 않습니다. 새 source의 실제 기기 합격 전 검증 후보로 표시합니다.
 
 ---
 

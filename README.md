@@ -3,7 +3,7 @@
 > «나의 일상과 시간, 기록과 작업을 하나의 흐름으로.»
 
 **v0.3.1 검증 후보**입니다. Issue #13의 동기화 실패·초기 설정 충돌·모바일 메뉴를
-수정했습니다. 개발 브랜치는 `version/v0.3.1`이며 main 반영은 PR 검토 후 진행합니다.
+수정했습니다. PR #15는 main에 병합됐으며 실제 기기 검수는 남아 있습니다.
 
 - 서버가 명확히 거부한 항목은 기기에 보관하고 독립 항목 전송과 Cloud 수신을 이어갑니다.
 - Cloud 동기화 화면에서 실패 내용/현재 내용을 비교하고 **최신 내용으로 재시도**합니다.
@@ -16,7 +16,7 @@
 [동기화 사용 안내](docs/cloud-sync.md), [검증 및 설치 파일](docs/verification.md)을 참고하세요.
 Node 51개·Rust 20개, 실제 SQLite/PostgreSQL 및 브라우저 검사는 통과했습니다.
 Windows/Android 설치 파일과 실제 기기 검수 범위는 검증 문서에서 확인합니다.
-검토용 PR: [#15](https://github.com/kkt0830/timora/pull/15).
+병합된 PR: [#15](https://github.com/kkt0830/timora/pull/15).
 
 **운영 Web: v0.2**, https://timora-sfj2.netlify.app . 이번 개발에서 Netlify production을
 재배포하지 않았습니다. 자동 동기화용 Supabase metadata·trigger·RLS·RPC는
