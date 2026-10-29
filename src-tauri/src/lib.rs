@@ -712,6 +712,7 @@ pub fn valid_avatar_name(name: &str) -> bool {
         .is_some_and(|id| Uuid::parse_str(id).is_ok() && id.len() == 36)
 }
 
+mod backup;
 mod profile;
 mod snapshot;
 mod sync;

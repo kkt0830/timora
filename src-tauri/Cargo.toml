@@ -30,6 +30,9 @@ tauri = { version = "2", optional = true , features = [] }
 tauri-plugin-opener = { version = "2", optional = true }
 tauri-plugin-dialog = { version = "2", optional = true }
 tauri-plugin-fs = { version = "2", optional = true }
+zip = { version = "2.4.2", default-features = false }
+sha2 = "0.10"
+tempfile = "3"
 
 [build-dependencies]
 tauri-build = { version = "2", optional = true , features = [] }
