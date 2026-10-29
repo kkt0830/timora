@@ -105,6 +105,22 @@ fn all_entities_and_identity_persist_after_closing_the_real_file() {
 }
 
 #[test]
+fn missing_identity_returns_error_without_panicking_or_reinitializing() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("db");
+    let db = open_fixture(&path);
+    let external = Connection::open(&path).unwrap();
+    external.execute("DELETE FROM local_identity", []).unwrap();
+    let error = db.account().unwrap_err();
+    assert!(error.contains("삭제하지 말고"));
+    assert!(db.info().is_err());
+    let count: i64 = external
+        .query_row("SELECT count(*) FROM local_identity", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
 fn native_validation_and_foreign_keys_prevent_invalid_writes() {
     let dir = tempdir().unwrap();
     let mut db = open_fixture(&dir.path().join("db"));

@@ -116,7 +116,9 @@ impl Database {
             "SELECT cursor,last_success FROM native_sync_control WHERE singleton=1",
             &[],
         )?
-        .remove(0);
+        .into_iter()
+        .next()
+        .ok_or_else(|| "동기화 상태가 없습니다. DB를 삭제하지 말고 진단해 주세요.".to_string())?;
         Ok(
             json!({"pending":pending,"failed_count":failures.len(),"failures":failures,"conflicts":conflicts,"conflict_count":count,"cursor":control["cursor"],"last_success":control["last_success"]}),
         )

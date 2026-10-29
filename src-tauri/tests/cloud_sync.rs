@@ -53,6 +53,58 @@ fn ack(db: &mut Database, op: &Value, rev: &str) {
     )
     .unwrap();
 }
+
+#[test]
+fn imported_note_can_be_edited_offline_and_sent_after_restart() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut db = Database::open(&path).unwrap();
+    db.bind_verified_account(
+        &json!({"id":A,"email":"test@example.com"}),
+        "https://test.supabase.co",
+    )
+    .unwrap();
+    let id = uuid::Uuid::new_v4().to_string();
+    let stamp = "2026-01-01T00:00:00Z";
+    let snapshot = json!({
+        "projects": [], "tasks": [], "events": [], "library_items": [], "inbox_items": [],
+        "notes": [{"id":id,"user_id":A,"title":"Note","content":"imported","project_id":null,"created_at":stamp,"updated_at":stamp}],
+        "settings": {"user_id":A,"workspace_name":"Cloud","appearance":"system","display_name":"","avatar_url":null,"updated_at":stamp}
+    });
+    db.import(A, snapshot).unwrap();
+    assert_eq!(db.sync_status().unwrap()["pending"], 0);
+    db.save("notes", note("edited offline"), Some(id.clone()))
+        .unwrap();
+    let op = db.sync_next(A).unwrap();
+    assert_eq!(op["payload"]["content"], "edited offline");
+    assert_eq!(op["base_updated_at"], stamp);
+    drop(db);
+    let mut db = Database::open(&path).unwrap();
+    assert_eq!(db.sync_next(A).unwrap(), op);
+    ack(&mut db, &op, "2");
+    assert_eq!(db.sync_status().unwrap()["pending"], 0);
+    assert_eq!(db.load().unwrap()["notes"][0]["content"], "edited offline");
+}
+
+#[test]
+fn missing_sync_control_returns_error_and_preserves_queued_data() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut db = Database::open(&path).unwrap();
+    bind(&mut db);
+    db.save("notes", note("preserve"), None).unwrap();
+    let external = rusqlite::Connection::open(&path).unwrap();
+    external
+        .execute("DELETE FROM native_sync_control", [])
+        .unwrap();
+    let error = db.sync_status().unwrap_err();
+    assert!(error.contains("삭제하지 말고"));
+    let count: i64 = external
+        .query_row("SELECT count(*) FROM native_sync_outbox", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(db.load().unwrap()["notes"][0]["content"], "preserve");
+}
 #[test]
 fn queue_survives_restart_rolls_back_invalid_writes_and_rebases_later_edits() {
     let dir = tempdir().unwrap();
