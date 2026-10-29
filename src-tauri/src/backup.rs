@@ -14,6 +14,18 @@ const MAX_DB: u64 = 512 * 1024 * 1024;
 const MAX_AVATAR: u64 = 1024 * 1024;
 const MAX_MANIFEST: u64 = 16 * 1024;
 
+/// Only non-secret, aggregate information is exposed for confirmation.
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct BackupPreview {
+    pub app_version: String,
+    pub created_at: String,
+    pub database_schema_version: u64,
+    pub records: std::collections::BTreeMap<String, u64>,
+    pub pending_changes: u64,
+    pub conflicts: u64,
+    pub has_profile_image: bool,
+}
+
 fn digest<R: Read>(mut reader: R, mut output: impl Write, limit: u64) -> Result<(u64, String)> {
     let mut hash = Sha256::new();
     let mut size = 0u64;
@@ -97,6 +109,11 @@ fn valid_db(path: &Path) -> Result<Option<String>> {
 
 #[allow(dead_code)]
 pub(crate) fn validate_archive<R: Read + Seek>(reader: R) -> Result<()> {
+    inspect_archive(reader).map(|_| ())
+}
+
+#[allow(dead_code)]
+pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview> {
     let mut zip = ZipArchive::new(reader).map_err(|_| "백업 ZIP이 손상되었습니다.")?;
     if !(2..=3).contains(&zip.len()) {
         return Err("백업 파일 구성이 올바르지 않습니다.".into());
@@ -130,6 +147,17 @@ pub(crate) fn validate_archive<R: Read + Seek>(reader: R) -> Result<()> {
     {
         return Err("지원하지 않는 백업 형식입니다.".into());
     }
+    let app_version = manifest["app_version"]
+        .as_str()
+        .filter(|s| !s.is_empty() && s.len() <= 64)
+        .ok_or("백업 앱 버전 오류")?
+        .to_string();
+    let created_at = manifest["created_at"]
+        .as_str()
+        .filter(|s| s.len() <= 64)
+        .ok_or("백업 생성 시간 오류")?
+        .to_string();
+    chrono::DateTime::parse_from_rfc3339(&created_at).map_err(|_| "백업 생성 시간 오류")?;
     let files = manifest["files"].as_object().ok_or("백업 파일 목록 오류")?;
     let entries: BTreeSet<String> = names
         .iter()
@@ -180,7 +208,7 @@ pub(crate) fn validate_archive<R: Read + Seek>(reader: R) -> Result<()> {
         }
     }
     let avatar = valid_db(&db_path)?;
-    let expected = avatar.map(|n| format!("profile/{n}"));
+    let expected = avatar.as_ref().map(|n| format!("profile/{n}"));
     if entries
         .iter()
         .find(|n| n.starts_with("profile/"))
@@ -189,7 +217,35 @@ pub(crate) fn validate_archive<R: Read + Seek>(reader: R) -> Result<()> {
     {
         return Err("백업 프로필 사진이 일치하지 않습니다.".into());
     }
-    Ok(())
+    let db =
+        rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|_| "백업 DB를 열 수 없습니다.")?;
+    db.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA query_only=ON;")
+        .map_err(|_| "백업 DB 검사 설정 오류")?;
+    let mut records = std::collections::BTreeMap::new();
+    for table in TABLES {
+        let count: u64 = db
+            .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
+            .map_err(|_| "백업 항목 수를 읽을 수 없습니다.")?;
+        records.insert(table.to_string(), count);
+    }
+    let pending_changes: u64 = db
+        .query_row("SELECT count(*) FROM native_sync_outbox", [], |r| r.get(0))
+        .map_err(|_| "백업 대기 변경 수를 읽을 수 없습니다.")?;
+    let conflicts: u64 = db
+        .query_row("SELECT count(*) FROM native_sync_conflicts", [], |r| {
+            r.get(0)
+        })
+        .map_err(|_| "백업 충돌 수를 읽을 수 없습니다.")?;
+    Ok(BackupPreview {
+        app_version,
+        created_at,
+        database_schema_version: 4,
+        records,
+        pending_changes,
+        conflicts,
+        has_profile_image: avatar.is_some(),
+    })
 }
 
 impl Database {
@@ -296,12 +352,48 @@ mod tests {
         let destination = dir.path().join("backup.zip");
         db.export_archive(&profile, &destination).unwrap();
         validate_archive(File::open(&destination).unwrap()).unwrap();
+        let preview = inspect_archive(File::open(&destination).unwrap()).unwrap();
+        assert_eq!(preview.records["notes"], 1);
+        assert_eq!(preview.pending_changes, 1);
+        assert_eq!(preview.conflicts, 0);
+        assert!(preview.has_profile_image);
+        assert_eq!(preview.database_schema_version, 4);
+        assert!(!serde_json::to_string(&preview)
+            .unwrap()
+            .contains("fixture@example.com"));
         let mut zip = ZipArchive::new(File::open(&destination).unwrap()).unwrap();
         let avatar = db.avatar_name().unwrap().unwrap();
         assert!(zip.by_name(&format!("profile/{avatar}")).is_ok());
         let before = std::fs::read(&destination).unwrap();
         assert!(db.export_archive(&profile, &destination).is_err());
         assert_eq!(std::fs::read(&destination).unwrap(), before);
+    }
+
+    #[test]
+    fn preview_requires_valid_date_and_complete_validation() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = fixture(dir.path());
+        let destination = dir.path().join("backup.zip");
+        db.export_archive(&dir.path().join("profile"), &destination)
+            .unwrap();
+        let mut original = ZipArchive::new(File::open(destination).unwrap()).unwrap();
+        let mut db_bytes = Vec::new();
+        original
+            .by_name("database/timora.db")
+            .unwrap()
+            .read_to_end(&mut db_bytes)
+            .unwrap();
+        let mut manifest: serde_json::Value =
+            serde_json::from_reader(original.by_name("manifest.json").unwrap()).unwrap();
+        manifest["created_at"] = json!("not-a-date");
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        let opts = SimpleFileOptions::default();
+        writer.start_file("database/timora.db", opts).unwrap();
+        writer.write_all(&db_bytes).unwrap();
+        writer.start_file("manifest.json", opts).unwrap();
+        serde_json::to_writer(&mut writer, &manifest).unwrap();
+        let archive = writer.finish().unwrap().into_inner();
+        assert!(inspect_archive(Cursor::new(archive)).is_err());
     }
 
     #[test]
