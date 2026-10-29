@@ -57,14 +57,14 @@ try{
  await page.goto('http://127.0.0.1:4176/#/profile');await page.getByRole('button',{name:'사진 제거',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.profile-summary img'));await page.reload();await page.getByRole('heading',{name:'로컬 이름',exact:true}).waitFor();assert.equal(await page.locator('.profile-summary img').count(),0);
   syncConflicts=[{entity_table:'tasks',id:data.tasks[0].id,local:data.tasks[0],remote:{revision:'2',deleted:false,payload:{...data.tasks[0],title:'Cloud task',description:'long-content-'.repeat(100)}}}];
   await page.goto('http://127.0.0.1:4176/#/sync');await page.getByRole('heading',{name:'Cloud 동기화',exact:true,level:1}).waitFor();
-  await page.getByRole('button',{name:'지금 동기화',exact:true}).click();await page.getByText('전송 대기 1개 · 충돌 1개',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'지금 동기화',exact:true}).click();await page.getByText('전송 대기 1개 · 전송 실패 0개 · 충돌 1개',{exact:true}).waitFor();
   await page.getByText('Cloud 내용',{exact:true}).click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-  await page.getByRole('button',{name:'Cloud 내용 사용',exact:true}).click();await page.getByText('전송 대기 0개 · 충돌 0개',{exact:true}).waitFor();assert.equal(data.tasks[0].title,'Cloud task');
+  await page.getByRole('button',{name:'Cloud 내용 사용',exact:true}).click();await page.getByText('전송 대기 0개 · 전송 실패 0개 · 충돌 0개',{exact:true}).waitFor();assert.equal(data.tasks[0].title,'Cloud task');
   await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{get:()=>false,configurable:true});window.dispatchEvent(new Event('offline'));});
   await page.getByRole('heading',{name:'오프라인 · 전송 대기 0개',exact:true}).waitFor();
  // Failed operation details remain visible and explicit retry uses the current intent.
  syncFailures=[{operation_id:'failed-fixture',entity_table:'tasks',id:data.tasks[0].id,action:'put',payload:data.tasks[0],local:data.tasks[0],last_error:'constraint fixture (23514)',failed_at:new Date().toISOString(),attempts:'1'}];
- await page.getByRole('button',{name:'지금 동기화',exact:true}).click();await page.getByText('constraint fixture (23514)',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'지금 동기화',exact:true}).click();await page.getByText('constraint fixture (23514)',{exact:true}).waitFor();await page.getByText('전송 대기 1개 · 전송 실패 1개 · 충돌 0개',{exact:true}).waitFor();
  await page.getByRole('button',{name:'최신 내용으로 재시도',exact:true}).click();await page.getByText('constraint fixture (23514)',{exact:true}).waitFor({state:'hidden'});
  await page.goto('http://127.0.0.1:4176/#/tasks');
  await page.setViewportSize({width:393,height:360});await page.getByRole('button',{name:'메뉴 열기',exact:true}).click();await page.getByRole('button',{name:'프로필 메뉴',exact:true}).click();
