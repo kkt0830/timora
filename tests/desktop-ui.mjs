@@ -88,6 +88,26 @@ try {
   assert.equal(data.tasks.length, 0);
   saveFailure = false; await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' }); await page.getByRole('button', { name: '로컬 작업', exact: true }).waitFor();
+  if (android) {
+    // Portrait tablets retain the sidebar and place Home's tasks in a narrow column.
+    const longTitle = '세로화면에서한글자씩줄바꿈되지않아야하는긴작업제목입니다';
+    const longTask = { id: crypto.randomUUID(), user_id: owner, title: longTitle, description: '', status: 'todo', priority: 'high', start_date: null, due_date: '2020-01-01', project_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    data.tasks.push(longTask);
+    const tablet = await context.newPage();
+    for (const width of [768, 800, 834, 1024]) {
+      await tablet.setViewportSize({ width, height: 1100 });
+      for (const route of ['/', '/tasks']) {
+        await tablet.goto(`http://127.0.0.1:4175/#${route}`);
+        const title = tablet.getByRole('button', { name: longTitle, exact: true });
+        await title.waitFor();
+        const layout = await title.evaluate(el => ({ title: el.getBoundingClientRect().width, main: el.parentElement.getBoundingClientRect().width, overflow: document.documentElement.scrollWidth > innerWidth + 1 }));
+        assert.ok(layout.main >= 120 && layout.title >= 120, `${route} at ${width}px: task title too narrow: ${JSON.stringify(layout)}`);
+        assert.equal(layout.overflow, false, `${route} at ${width}px overflows horizontally`);
+      }
+    }
+    await tablet.close();
+    data.tasks.splice(data.tasks.indexOf(longTask), 1);
+  }
   await page.reload(); await page.getByRole('button', { name: '로컬 작업', exact: true }).waitFor();
   if (android) {
     data.library_items.push({ id: crypto.randomUUID(), user_id: owner, title: 'Android 자료', description: '', url: 'https://example.com/android', type: 'website', project_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });

@@ -1058,6 +1058,19 @@ strong {
   .two-columns {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
+  /* Tablet portrait cards can be narrow even when the viewport is wide. */
+  .two-columns .task-row {
+    flex-wrap: wrap;
+  }
+  .two-columns .task-main {
+    flex-basis: calc(100% - 60px);
+  }
+  .two-columns .task-row .priority {
+    margin-left: 52px;
+  }
+  .two-columns .task-date {
+    margin-left: auto;
+  }
 }
 @media (max-width: 760px) {
   .sidebar-container {
