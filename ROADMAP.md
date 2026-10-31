@@ -1,5 +1,13 @@
 # Timora Roadmap
 
+## Current approved milestone — v0.4.0
+
+2026-10-31 사용자 요청으로 기존 v0.4~v1.0 계획과 알림을 **v0.4.0 Unified Workspace Expansion**에 통합했습니다. 하위 작업·반복·루틴·Calendar/Notes/Projects/Library 2.0·명언·GitHub·Relations·Backup/Restore·성능/접근성·배포/업데이트가 모두 같은 버전의 필수 범위입니다. 구현 및 검증 상태는 [요구사항 추적표](docs/v0.4/implementation.md), 상세 합격 조건은 [승인된 요청서](docs/v0.4/specification.md)를 따릅니다.
+
+아래 버전 표는 변경 전 계획과 과거 이력입니다. 완료 선언이나 미래 버전으로의 재연기를 뜻하지 않습니다.
+
+## Historical plan
+
 v0.1 Core Workspace → v0.2 Design & Experience를 보존합니다. 사용자의 v0.3 요청에
 따라 Windows/Android Local-first/Offline을 먼저 구현했습니다. 2026-10-11 사용자 요청으로 기본 자동 동기화를 v0.3에 추가하며 실기기 검증을 진행합니다.
 출시 날짜는 확정하지 않습니다.

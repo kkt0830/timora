@@ -1,3 +1,9 @@
+# Current v0.4.0 requirements
+
+2026-10-31 사용자 승인 범위: [Unified Workspace Expansion 전체 요구사항](docs/v0.4/specification.md). 안정적인 requirement ID, 구현/DB/동기화/UI/검증/차단 항목은 [추적표](docs/v0.4/implementation.md)에서 관리합니다. 이전 버전 범위 및 검증 이력은 아래 그대로 보존합니다. 새 계획은 완료된 기능을 의미하지 않습니다.
+
+---
+
 # Requirements — Timora v0.3.1
 
 현재 패치 범위는 [Issue #13](docs/issues/issue-13-v031.md)의 5개 결함과 관련 회귀입니다.
