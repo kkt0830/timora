@@ -1,8 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { taskGroup, inPeriod, calendarDays, datePreset, endOfWeek, endOfMonth, taskRangeLabel } from '../src/domain/task-groups.ts';
+import { taskGroup, inPeriod, calendarDays, datePreset, endOfWeek, endOfMonth, taskRangeLabel, upcomingDeadlines } from '../src/domain/task-groups.ts';
 import { todayTasks } from '../src/domain/dates.ts';
 const task = (start_date = null, due_date = null, status = 'todo') => ({ id: 't', title: 't', start_date, due_date, status });
+
+test('upcoming deadlines include only the next seven calendar days of unfinished tasks', () => {
+  for (const timezone of ['Asia/Seoul', 'America/New_York']) {
+    const previous = process.env.TZ; process.env.TZ = timezone;
+    try {
+      const rows = [
+        task(null, '2027-01-07'), task(null, '2027-01-06'),
+        task(null, '2027-01-01'), task(null, '2026-12-31'),
+        task(null, '2026-12-30'), task(null, '2027-01-02', 'done'), task(),
+      ];
+      assert.deepEqual(upcomingDeadlines(rows, '2026-12-31').map(t => t.due_date), ['2027-01-01', '2027-01-06', '2027-01-07']);
+      assert.deepEqual(upcomingDeadlines([task(null, '2024-02-29'), task(null, '2024-03-06'), task(null, '2024-03-07')], '2024-02-28').map(t => t.due_date), ['2024-02-29', '2024-03-06']);
+      const many = Array.from({ length: 7 }, (_, i) => ({ ...task(null, '2027-01-02'), id: String(i) }));
+      assert.equal(upcomingDeadlines(many, '2026-12-31').length, 5);
+      assert.equal(rows[0].due_date, '2027-01-07');
+    } finally { if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous; }
+  }
+});
 
 test('each task has one exclusive group with overdue and completed precedence', () => {
   const today = '2026-10-09';
