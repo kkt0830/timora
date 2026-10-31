@@ -6,6 +6,13 @@ export type PeriodFilter = 'all' | 'today' | 'week' | 'month';
 export function addDays(key: string, days: number): string { const d = localDate(key); return dateKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days)); }
 export function endOfWeek(key: string): string { const weekday = localDate(key).getDay(); return addDays(key, (7 - weekday) % 7); }
 export function endOfMonth(key: string): string { const d = localDate(key); return dateKey(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+// Home shows imminent deadlines, not every future task. Today is shown separately.
+export function upcomingDeadlines(tasks: Task[], today: string): Task[] {
+  const end = addDays(today, 7);
+  return tasks.filter(task => task.status !== 'done' && task.due_date !== null && task.due_date > today && task.due_date <= end)
+    .sort((a, b) => a.due_date!.localeCompare(b.due_date!))
+    .slice(0, 5);
+}
 export function calendarDays(start: string, end: string): number {
   const [sy, sm, sd] = start.split('-').map(Number); const [ey, em, ed] = end.split('-').map(Number);
   return Math.round((Date.UTC(ey, em - 1, ed) - Date.UTC(sy, sm - 1, sd)) / 86400000);
