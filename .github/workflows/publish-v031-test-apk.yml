@@ -1,0 +1,62 @@
+name: Publish v0.3.1 Android test APK
+on:
+  push:
+    branches: [automation/publish-v031-test-apk]
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: publish-v031-test-apk
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Validate release and successful source CI
+        run: |
+          set -euo pipefail
+          test "$GH_REPO" = "kkt0830/timora"
+          gh api "repos/$GH_REPO/actions/runs/40847127953" > "$RUNNER_TEMP/run.json"
+          gh api "repos/$GH_REPO/releases/tags/v0.3.1" > "$RUNNER_TEMP/release.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          path=Path(os.environ["RUNNER_TEMP"])
+          run=json.loads((path/"run.json").read_text())
+          release=json.loads((path/"release.json").read_text())
+          sha="e812c657279867d70b49735345d26d792064141e"
+          assert run["head_sha"] == sha and run["status"] == "completed" and run["conclusion"] == "success"
+          assert release["target_commitish"] == sha and release["prerelease"] and not release["draft"]
+          assert not any(a["name"] in ("Timora-v0.3.1-android-arm64-debug.apk","SHA256SUMS.txt") for a in release["assets"])
+          PY
+      - name: Download and verify Android CI artifact
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          gh api "repos/$GH_REPO/actions/artifacts/12886275718/zip" > android-ci.zip
+          echo '9480418b215198c925c250b786debc68f2236354ad6fc0bd82a0a660718488a5  android-ci.zip' | sha256sum -c -
+          unzip -p android-ci.zip arm64/debug/app-arm64-debug.apk > Timora-v0.3.1-android-arm64-debug.apk
+          echo '0ed723f554ba21874ec3a50d060c6ec69134aa1f8515fa359cbf1e6589f74db6  Timora-v0.3.1-android-arm64-debug.apk' | sha256sum -c -
+          unzip -tq Timora-v0.3.1-android-arm64-debug.apk
+          test "$(unzip -Z1 Timora-v0.3.1-android-arm64-debug.apk | grep '^lib/' | cut -d/ -f2 | sort -u)" = "arm64-v8a"
+          sha256sum Timora-v0.3.1-android-arm64-debug.apk > SHA256SUMS.txt
+      - name: Upload test APK and update release notes
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          gh release upload v0.3.1 Timora-v0.3.1-android-arm64-debug.apk SHA256SUMS.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          release=json.loads(Path("release.json").read_text())
+          body=release["body"]
+          old="Android APK나 Windows 설치 파일은 포함하지 않습니다."
+          assert old in body
+          body=body.replace(old,"Android ARM64 테스트 APK를 포함합니다. Windows 설치 파일은 포함하지 않습니다. 테스트 서명이므로 기존 앱과 서명이 다르면 덮어 설치할 수 없습니다. 기존 앱 삭제나 데이터 초기화로 해결하지 마세요.")
+          Path("release-notes.md").write_text(body)
+          PY
+          gh release edit v0.3.1 --notes-file release-notes.md
