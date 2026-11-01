@@ -1276,3 +1276,13 @@ html[data-platform="android"] .topbar {
 @media (max-width: 600px) { .sync-status span { display: none; } }
 
 .popover-panel::backdrop { background: transparent; }
+
+.subtask-editor { border-top: 1px solid var(--border, #ddd); padding-block: 16px; min-width: 0; }
+.subtask-editor ul { padding: 0; list-style: none; }
+.subtask-editor li { padding-block: 8px; border-bottom: 1px solid var(--border, #ddd); }
+.subtask-editor .subtask-title { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
+.subtask-title input[type="checkbox"] { width: 24px; min-width: 24px; height: 24px; }
+.subtask-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 8px; }
+.subtask-actions input { flex: 1 1 160px; min-width: 0; }
+.subtask-actions button { min-height: 44px; min-width: 44px; }
+.subtask-editor progress { width: 100%; margin-top: 12px; }

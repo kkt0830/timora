@@ -56,6 +56,7 @@ export function useAuth() { const value = useContext(AuthContext); if (!value) t
 interface WorkspaceState {
   data: WorkspaceData; loading: boolean; loaded: boolean; error: string; busy: boolean;
   reload: () => Promise<void>;
+  reorderSubtasks: (taskId: string, ids: string[]) => Promise<void>;
   save: <K extends EntityTable>(table: K, input: EntityInput<K>, id?: string) => Promise<void>;
   remove: (table: EntityTable, id: string) => Promise<void>;
   convert: (id: string, target: 'task' | 'note') => Promise<void>;
@@ -79,7 +80,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
     if (showLoading) setLoading(true); setError('');
     try { const next = await repository.load(account.id);
       if (!next.settings.display_name && typeof account.user_metadata?.display_name === 'string') next.settings.display_name = account.user_metadata.display_name.slice(0, 64);
-      if (mounted.current && version === generation.current) { setData(next); setLoaded(true); } }
+      if (mounted.current && version === generation.current) { setData({ ...emptyWorkspace(account.id), ...next }); setLoaded(true); } }
     catch (e) { if (mounted.current && version === generation.current) setError(messageOf(e)); }
     finally { if (mounted.current && version === generation.current) setLoading(false); }
   }, [account.id, account.user_metadata?.display_name, repository]);
@@ -113,6 +114,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   };
   const value: WorkspaceState = {
     data, loading, loaded, error, busy, reload,
+    reorderSubtasks: async (taskId, ids) => mutate(async () => { await repository.reorderSubtasks(account.id, taskId, ids); if (mounted.current) await reload(false); }),
     save: async (table, input, id) => mutate(async () => {
       const row = await repository.save(table, account.id, input, id);
       if (mounted.current) setData(previous => ({ ...previous, [table]: [row, ...previous[table].filter(item => item.id !== row.id)] }));
@@ -122,6 +124,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
       if (!mounted.current) return;
       setData(previous => {
         const next = { ...previous, [table]: previous[table].filter(item => item.id !== id) };
+        if (table === 'tasks') next.subtasks = previous.subtasks.filter(s => s.task_id !== id);
         if (table === 'projects') {
           next.tasks = previous.tasks.map(t => t.project_id === id ? { ...t, project_id: null } : t);
           next.notes = previous.notes.map(t => t.project_id === id ? { ...t, project_id: null } : t);

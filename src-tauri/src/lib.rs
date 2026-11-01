@@ -12,6 +12,8 @@ fn sql_error(e: rusqlite::Error) -> String {
 fn now() -> String {
     Utc::now().to_rfc3339()
 }
+pub const SCHEMA_VERSION: i64 = 5;
+pub const EXTENSION_TABLES: [&str; 1] = ["subtasks"];
 pub const TABLES: [&str; 6] = [
     "projects",
     "tasks",
@@ -22,6 +24,7 @@ pub const TABLES: [&str; 6] = [
 ];
 fn fields(table: &str) -> Result<&'static [&'static str]> {
     match table {
+        "subtasks" => Ok(&["task_id", "title", "status", "position"]),
         "projects" => Ok(&["name", "description", "status", "color"]),
         "tasks" => Ok(&[
             "title",
@@ -75,6 +78,18 @@ fn instant(s: &str) -> Result<DateTime<chrono::FixedOffset>> {
     DateTime::parse_from_rfc3339(s).map_err(|_| "일정 시간을 확인해 주세요.".into())
 }
 fn validate(table: &str, row: &Value) -> Result<()> {
+    if table == "subtasks" {
+        Uuid::parse_str(text(row, "task_id")?).map_err(|_| "Task ID를 확인해 주세요.")?;
+        limit(text(row, "title")?, 300, true)?;
+        choice(row, "status", &["todo", "done"])?;
+        if !row["position"]
+            .as_i64()
+            .is_some_and(|p| (0..=2147483647).contains(&p))
+        {
+            return Err("하위 작업 순서를 확인해 주세요.".into());
+        }
+        return Ok(());
+    }
     for key in fields(table)? {
         if ["project_id", "start_date", "due_date"].contains(key) && row[*key].is_null() {
             continue;
@@ -178,11 +193,12 @@ fn json_rows(conn: &Connection, query: &str, args: &[SqlValue]) -> Result<Vec<Va
         .query_map(params_from_iter(args), |row| {
             let mut result = Map::new();
             for (i, name) in names.iter().enumerate() {
-                let value: Option<String> = row.get(i)?;
-                result.insert(
-                    name.clone(),
-                    value.map(Value::String).unwrap_or(Value::Null),
-                );
+                let value = match row.get_ref(i)? {
+                    rusqlite::types::ValueRef::Null => Value::Null,
+                    rusqlite::types::ValueRef::Integer(n) => json!(n),
+                    _ => Value::String(row.get::<_, String>(i)?),
+                };
+                result.insert(name.clone(), value);
             }
             Ok(Value::Object(result))
         })
@@ -193,6 +209,8 @@ fn json_rows(conn: &Connection, query: &str, args: &[SqlValue]) -> Result<Vec<Va
 fn sql_value(value: &Value) -> Result<SqlValue> {
     if value.is_null() {
         Ok(SqlValue::Null)
+    } else if let Some(n) = value.as_i64() {
+        Ok(SqlValue::Integer(n))
     } else {
         Ok(SqlValue::Text(
             value.as_str().ok_or("입력 형식 오류")?.into(),
@@ -214,7 +232,7 @@ impl Database {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(sql_error)?;
-        if version > 4 {
+        if version > SCHEMA_VERSION {
             return Err(
                 "이 DB는 더 새로운 Timora 버전에서 생성됐습니다. 업데이트한 앱으로 열어 주세요."
                     .into(),
@@ -282,6 +300,14 @@ impl Database {
                     .map_err(sql_error)?;
             }
             tx.pragma_update(None, "user_version", 4)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 5 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/005_subtasks.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
@@ -402,7 +428,7 @@ impl Database {
     pub fn load(&self) -> Result<Value> {
         self.require_workspace()?;
         let mut data = Map::new();
-        for table in TABLES {
+        for table in TABLES.into_iter().chain(EXTENSION_TABLES) {
             data.insert(
                 table.into(),
                 Value::Array(json_rows(
@@ -554,6 +580,47 @@ impl Database {
             .map_err(sql_error)?;
         Ok(())
     }
+    pub fn reorder_subtasks(&mut self, task_id: &str, ids: Vec<String>) -> Result<()> {
+        self.require_workspace()?;
+        let owner = self.owner()?;
+        let tx = self.conn.transaction().map_err(sql_error)?;
+        let exists: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM tasks WHERE id=?1 AND user_id=?2)",
+                params![task_id, owner],
+                |r| r.get(0),
+            )
+            .map_err(sql_error)?;
+        if !exists {
+            return Err("Task를 찾을 수 없습니다.".into());
+        }
+        let rows = json_rows(
+            &tx,
+            "SELECT * FROM subtasks WHERE task_id=?1 ORDER BY id",
+            &[SqlValue::Text(task_id.into())],
+        )?;
+        let mut expected = ids.clone();
+        expected.sort();
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|r| r["id"].as_str().unwrap().to_string())
+            .collect();
+        if expected != actual {
+            return Err("하위 작업이 변경되었습니다. 다시 확인해 주세요.".into());
+        }
+        for (position, id) in ids.iter().enumerate() {
+            let mut row = rows
+                .iter()
+                .find(|r| r["id"].as_str() == Some(id))
+                .unwrap()
+                .clone();
+            if row["position"] != json!(position) {
+                row["position"] = json!(position);
+                Self::write(&tx, &owner, "subtasks", &row, id, true, false)?;
+            }
+        }
+        tx.commit().map_err(sql_error)
+    }
     pub fn remove(&mut self, table: &str, id: &str) -> Result<()> {
         self.require_workspace()?;
         let tx = self.conn.transaction().map_err(sql_error)?;
@@ -648,7 +715,7 @@ impl Database {
                 "이미 가져온 Workspace입니다. 이후 변경은 계정 연결과 Cloud 인증 상태를 확인한 뒤 자동 동기화로 반영해 주세요.".into(),
             );
         }
-        for table in TABLES {
+        for table in TABLES.into_iter().chain(EXTENSION_TABLES) {
             let count: i64 = tx
                 .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
                 .map_err(sql_error)?;
@@ -658,7 +725,10 @@ impl Database {
                 );
             }
         }
-        for table in TABLES {
+        for table in TABLES.into_iter().chain(EXTENSION_TABLES) {
+            if EXTENSION_TABLES.contains(&table) && snapshot.get(table).is_none() {
+                continue;
+            }
             for row in snapshot[table].as_array().ok_or("가져오기 형식 오류")? {
                 if text(row, "user_id")? != cloud_user_id {
                     return Err("다른 사용자 데이터는 가져올 수 없습니다.".into());
@@ -678,7 +748,7 @@ impl Database {
             [],
         )
         .map_err(sql_error)?;
-        for table in TABLES {
+        for table in TABLES.into_iter().chain(EXTENSION_TABLES) {
             tx.execute(&format!("INSERT OR REPLACE INTO native_sync_meta(entity_table,id,remote_updated_at) SELECT ?1,id,remote_updated_at FROM {table}"), [table]).map_err(sql_error)?;
         }
         tx.execute("INSERT OR REPLACE INTO native_sync_meta(entity_table,id,remote_updated_at) VALUES('workspace_settings','settings',?1)", [text(&snapshot["settings"],"updated_at")?]).map_err(sql_error)?;

@@ -321,6 +321,14 @@ async fn local_save(
     with_db(state, move |db| db.save(&table, input, id)).await
 }
 #[tauri::command]
+async fn local_subtasks_reorder(
+    state: tauri::State<'_, Arc<LocalState>>,
+    task_id: String,
+    ids: Vec<String>,
+) -> Result<(), String> {
+    with_db(state, move |db| db.reorder_subtasks(&task_id, ids)).await
+}
+#[tauri::command]
 async fn local_remove(
     state: tauri::State<'_, Arc<LocalState>>,
     table: String,
@@ -397,6 +405,7 @@ pub fn run() {
             local_load,
             local_save,
             local_remove,
+            local_subtasks_reorder,
             local_convert,
             local_settings,
             local_import,

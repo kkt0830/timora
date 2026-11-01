@@ -48,3 +48,13 @@ Production schema/data, main merges and official releases require explicit appro
 ## Resume checkpoint
 
 Start with the current branch status and matrix; do not reinitialize the project. Complete data/sync foundation before dependent workflows. Record actual test commands and failures below as work proceeds.
+
+## Checkpoint — 2026-11-01 (KST)
+
+Implemented subtask vertical slice: SQLite schema 5, owner-safe PostgreSQL table/RLS, version 2 capability negotiation and RPCs, legacy v1 feed filtering, CRUD/progress/manual parent completion, atomic full-permutation reorder, touch/keyboard buttons, native durable queue, parent-delete conflict protection. Backup validation accepts schema 4–5 and checks manifest/DB version agreement. Core v0.3 imports remain accepted without extension arrays.
+
+Verification: Node 53 tests PASS; Rust 37 tests PASS; production build PASS; Web browser fixture PASS; Android browser fixture including subtask creation/completion/reordering PASS. Isolated PostgreSQL 16: existing sync/core/profile SQL and new subtask RLS SQL PASS. Real two-SQLite/Rust + PostgreSQL integration PASS, including offline subtask completion, identical concurrent completion, reorder, owner isolation and explicit parent-delete conflict resolution. Auth is a fixture; this is not live Supabase/device acceptance.
+
+Matrix update: TIMORA-V04-TASK-001 implemented with automated coverage; real-device acceptance PENDING. TIMORA-V04-DATA-001 and SYNC-001 PARTIAL: subtask foundation only; remaining entity contracts are not implemented. All other outstanding matrix items remain outstanding. No v0.4 APK/installer produced, no production migration applied, no official release published. Application version stays 0.3.1 until release engineering is ready; this branch is not a completed v0.4 build.
+
+Next exact checkpoint: finish extended domain models and recurrence/routine persistence and contracts, then follow specification phases 2–8. Add explicit legacy schema-4 archive fixture coverage and native platform command compilation to CI evidence. Cloud v0.4 sync deliberately pauses with a server-update message until the new migration is approved and applied; local data and pending operations remain accessible. Web on legacy Cloud retains core functionality and disables subtask editing.

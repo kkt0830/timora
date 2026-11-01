@@ -1,3 +1,10 @@
+# Unreleased — v0.4.0 integration checkpoint
+
+- Unified v0.4 scope and requirement matrix: docs/v0.4/implementation.md.
+- Subtasks: independent completion, progress, rename/delete, atomic reorder and persistence; SQLite schema 5 and reviewed-only Cloud migration with owner isolation.
+- Versioned sync preserves old-client feeds; unsupported servers leave local records/queues intact.
+- Automated validation recorded in the matrix. Remaining v0.4 features and platform/release gates are pending.
+
 # Changelog
 
 ## 0.3.1 — Issue #13 안정화 (2026-10-20)

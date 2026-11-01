@@ -1,5 +1,5 @@
 import type { EntityTable, WorkspaceData } from './models.ts';
-export interface SearchResult { id: string; table: EntityTable; title: string; context: string; project: string; metadata: string }
+export interface SearchResult { id: string; table: Exclude<EntityTable, 'subtasks'>; title: string; context: string; project: string; metadata: string }
 export function searchWorkspace(data: WorkspaceData, query: string): SearchResult[] {
   const terms = query.trim().normalize('NFKC').toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return [];
