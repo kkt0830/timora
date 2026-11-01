@@ -95,6 +95,8 @@ begin
  request_hash=md5(jsonb_build_object('table',entity_table,'id',entity_id,'action',action,'payload',payload,'base_revision',base_revision,'base_updated_at',base_updated_at)::text);
  -- Serialize duplicate deliveries before the mutation. Lost responses can be retried safely.
  perform pg_advisory_xact_lock(hashtextextended(owner_id::text||operation_id::text,0));
+ -- Distinct devices may create the same deterministic occurrence simultaneously.
+ perform pg_advisory_xact_lock(hashtextextended(owner_id::text||entity_table||item_id::text,1));
  select * into receipt from public.sync_receipts r where r.user_id=owner_id and r.operation_id=sync_apply_v3.operation_id;
  if found then
   if receipt.request_hash<>request_hash then raise exception 'Operation ID reused with different content' using errcode='22023'; end if;
