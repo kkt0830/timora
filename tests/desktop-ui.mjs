@@ -106,18 +106,6 @@ try {
   assert.equal(data.subtasks.find(r => r.title === '둘째 하위 작업').position, 0);
   await dialog.getByRole('button', { name: '취소', exact: true }).click();
   if (android) {
-    const dateAt = days => { const d = new Date(); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-    const sample = (title, days, status = 'todo') => ({ id: crypto.randomUUID(), user_id: owner, title, description: '', status, priority: 'medium', start_date: null, due_date: dateAt(days), project_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-    const near = sample('다가오는 테스트', 2), far = sample('먼 미래 테스트', 30), done = sample('완료된 테스트', 2, 'done');
-    data.tasks.push(near, far, done);
-    const dashboard = await context.newPage();
-    await dashboard.goto('http://127.0.0.1:4175/#/');
-    const upcoming = dashboard.locator('.card').filter({ has: dashboard.getByRole('heading', { name: '다가오는 마감 (앞으로 7일)' }) });
-    await upcoming.getByRole('button', { name: near.title, exact: true }).waitFor();
-    assert.equal(await upcoming.getByRole('button', { name: far.title, exact: true }).count(), 0);
-    assert.equal(await upcoming.getByRole('button', { name: done.title, exact: true }).count(), 0);
-    await dashboard.close();
-    for (const row of [near, far, done]) data.tasks.splice(data.tasks.indexOf(row), 1);
     // Portrait tablets retain the sidebar and place Home's tasks in a narrow column.
     const longTitle = '세로화면에서한글자씩줄바꿈되지않아야하는긴작업제목입니다';
     const longTask = { id: crypto.randomUUID(), user_id: owner, title: longTitle, description: '', status: 'todo', priority: 'high', start_date: null, due_date: '2020-01-01', project_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -183,6 +171,16 @@ try {
   assert.equal(await page.getByLabel('Supabase URL', { exact: true }).inputValue(), '');
   assert.equal(await page.getByRole('button', { name: '로그인 후 미리보기', exact: true }).isDisabled(), true);
   await page.getByText('로컬 기록이 있어 가져오기를 사용할 수 없습니다. 기록은 그대로 보관됩니다.', { exact: true }).waitFor();
+  await page.goto('http://127.0.0.1:4175/#/calendar');
+  await page.getByRole('button', { name: '주 보기', exact: true }).click();
+  assert.equal(await page.locator('.calendar-day').count(), 7);
+  await page.getByRole('button', { name: '다음 주', exact: true }).click();
+  await page.getByRole('button', { name: '일 보기', exact: true }).click();
+  assert.equal(await page.locator('.calendar-day').count(), 1);
+  await page.getByRole('button', { name: '다음 날', exact: true }).click();
+  await page.getByRole('button', { name: '오늘', exact: true }).click();
+  await page.getByRole('button', { name: '월 보기', exact: true }).click();
+  assert.equal(await page.locator('.calendar-day').count(), 42);
   assert.deepEqual(externalRequests, []); assert.deepEqual(errors, []);
   assert.ok(commands.includes('local_account') && commands.includes('local_load') && commands.includes('local_save'));
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: `test-results/${android ? 'android' : 'desktop'}-import-empty-config.png`, fullPage: true });

@@ -1286,3 +1286,5 @@ html[data-platform="android"] .topbar {
 .subtask-actions input { flex: 1 1 160px; min-width: 0; }
 .subtask-actions button { min-height: 44px; min-width: 44px; }
 .subtask-editor progress { width: 100%; margin-top: 12px; }
+.calendar-grid.calendar-single { grid-template-columns: minmax(0, 1fr); }
+.calendar-single .calendar-day { min-height: 120px; }
