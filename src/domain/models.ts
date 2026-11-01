@@ -8,6 +8,8 @@ export interface Task extends OwnedEntity {
   priority: 'low' | 'medium' | 'high'; start_date: string | null; due_date: string | null; project_id: string | null;
 }
 export interface Subtask extends OwnedEntity { task_id: string; title: string; status: 'todo' | 'done'; position: number }
+export interface Routine extends OwnedEntity { title: string; description: string; frequency: 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly'; interval_days: number; start_date: string; end_date: string | null; occurrence_limit: number | null; weekdays: string; timezone: string; status: 'active' | 'paused' | 'archived'; reminder_time: string | null; category: string }
+export interface RoutineCompletion extends OwnedEntity { routine_id: string; local_date: string; status: 'todo' | 'done' }
 export interface Note extends OwnedEntity { title: string; content: string; project_id: string | null }
 export interface Project extends OwnedEntity { name: string; description: string; status: 'active' | 'paused' | 'completed'; color: string }
 export interface CalendarEvent extends OwnedEntity { title: string; description: string; start_at: string; end_at: string; project_id: string | null }
@@ -15,11 +17,11 @@ export type LibraryType = 'website' | 'article' | 'github' | 'video' | 'pdf' | '
 export interface LibraryItem extends OwnedEntity { title: string; url: string; type: LibraryType; description: string; project_id: string | null }
 export interface InboxItem extends OwnedEntity { content: string; type: 'unclassified' | ObjectKind }
 export interface WorkspaceSettings { user_id: string; workspace_name: string; appearance: 'light' | 'dark' | 'system'; display_name: string; avatar_url: string | null; updated_at: string }
-export interface EntityMap { subtasks: Subtask; tasks: Task; notes: Note; projects: Project; events: CalendarEvent; library_items: LibraryItem; inbox_items: InboxItem }
+export interface EntityMap { routines: Routine; routine_completions: RoutineCompletion; subtasks: Subtask; tasks: Task; notes: Note; projects: Project; events: CalendarEvent; library_items: LibraryItem; inbox_items: InboxItem }
 export type EntityTable = keyof EntityMap;
 export type EntityInput<K extends EntityTable> = Omit<EntityMap[K], keyof OwnedEntity>;
-export interface WorkspaceData { subtasks: Subtask[]; subtasks_available: boolean; tasks: Task[]; notes: Note[]; projects: Project[]; events: CalendarEvent[]; library_items: LibraryItem[]; inbox_items: InboxItem[]; settings: WorkspaceSettings }
+export interface WorkspaceData { routines: Routine[]; routine_completions: RoutineCompletion[]; routines_available: boolean; subtasks: Subtask[]; subtasks_available: boolean; tasks: Task[]; notes: Note[]; projects: Project[]; events: CalendarEvent[]; library_items: LibraryItem[]; inbox_items: InboxItem[]; settings: WorkspaceSettings }
 export const entityTables: EntityTable[] = ['tasks', 'notes', 'projects', 'events', 'library_items', 'inbox_items'];
 export function emptyWorkspace(user_id: string): WorkspaceData {
-  return { subtasks: [], subtasks_available: false, tasks: [], notes: [], projects: [], events: [], library_items: [], inbox_items: [], settings: { user_id, workspace_name: 'My Workspace', appearance: 'system', display_name: '', avatar_url: null, updated_at: '' } };
+  return { routines: [], routine_completions: [], routines_available: false, subtasks: [], subtasks_available: false, tasks: [], notes: [], projects: [], events: [], library_items: [], inbox_items: [], settings: { user_id, workspace_name: 'My Workspace', appearance: 'system', display_name: '', avatar_url: null, updated_at: '' } };
 }

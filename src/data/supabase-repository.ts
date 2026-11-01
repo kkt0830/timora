@@ -1,3 +1,4 @@
+import { routineCompletionId } from '../domain/routines.ts';
 import type { AuthService, WorkspaceRepository } from '../services/contracts.ts';
 import { emptyWorkspace, entityTables } from '../domain/models.ts';
 import type { EntityInput, EntityMap, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models.ts';
@@ -41,11 +42,22 @@ export class SupabaseRepository implements WorkspaceRepository {
         data.subtasks_available = true;
       }
     } catch (error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
+    try {
+      const capability = await this.request<{protocol:number}>('rpc/sync_capabilities_v3', { method:'POST', body:'{}' });
+      if (capability?.protocol === 3) { data.routines = await this.list('routines', userId); data.routine_completions = await this.list('routine_completions', userId); data.routines_available = true; }
+    } catch(error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
     return data;
   }
   async save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {
     validateInput(table, input);
     if (table === 'library_items' && /\s/.test(String((input as EntityInput<'library_items'>).url))) input = { ...input, url: new URL(String((input as EntityInput<'library_items'>).url)).href };
+    if (table === 'routine_completions') {
+      const completion = input as EntityInput<'routine_completions'>;
+      const stableId = await routineCompletionId(completion.routine_id, completion.local_date);
+      if (id && id !== stableId) throw new Error('루틴 완료 기록 ID 오류');
+      const rows = await this.request<EntityMap[K][]>('routine_completions?on_conflict=id', { method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=representation'}, body: JSON.stringify({...input,id:stableId,user_id:userId}) });
+      if (!rows[0]) throw new Error('루틴 완료 저장 실패'); return rows[0];
+    }
     const query = id ? `?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}` : '';
     const rows = await this.request<EntityMap[K][]>(`${table}${query}`, { method: id ? 'PATCH' : 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...input, user_id: userId }) });
     if (!rows[0]) throw new Error('항목이 없거나 수정 권한이 없습니다. 새로고침해 주세요.');

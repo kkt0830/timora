@@ -8,7 +8,7 @@ import { datePreset } from '../domain/task-groups';
 import { Dialog, Markdown } from './components';
 import { messageOf, useWorkspace } from './providers';
 
-export const labels: Record<EntityTable, string> = { subtasks: '하위 작업', tasks: '작업', notes: '노트', projects: '프로젝트', events: '일정', library_items: '자료', inbox_items: 'Inbox 기록' };
+export const labels: Record<EntityTable, string> = { routines: '루틴', routine_completions: '루틴 완료', subtasks: '하위 작업', tasks: '작업', notes: '노트', projects: '프로젝트', events: '일정', library_items: '자료', inbox_items: 'Inbox 기록' };
 export type EditorTarget = { table: EntityTable; item?: EntityMap[EntityTable]; projectId?: string; day?: string };
 
 function parseForm(table: EntityTable, form: FormData): EntityInput<EntityTable> {
@@ -16,7 +16,7 @@ function parseForm(table: EntityTable, form: FormData): EntityInput<EntityTable>
   const nullable = (key: string) => text(key) || null;
   const title = text('title').trim(); const project_id = nullable('project_id'); const description = text('description');
   switch (table) {
-    case 'subtasks': throw new Error('하위 작업은 Task 안에서 편집해 주세요.');
+    case 'routines': case 'routine_completions': case 'subtasks': throw new Error('하위 작업은 Task 안에서 편집해 주세요.');
     case 'tasks': return { title, description, status: text('status') as EntityMap['tasks']['status'], priority: text('priority') as EntityMap['tasks']['priority'], start_date: nullable('start_date'), due_date: nullable('due_date'), project_id };
     case 'notes': return { title, content: text('content'), project_id };
     case 'projects': return { name: title, description, status: text('status') as EntityMap['projects']['status'], color: text('color') };

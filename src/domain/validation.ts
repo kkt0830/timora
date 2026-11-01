@@ -1,3 +1,6 @@
+import { validateRecurrence } from './recurrence.ts';
+import { routineRule } from './routines.ts';
+import type { Routine } from './models.ts';
 import type { EntityInput, EntityTable } from './models.ts';
 
 export function safeUrl(value: string): string | null {
@@ -11,6 +14,11 @@ function validDate(value: unknown): boolean {
 }
 export function validateInput<K extends EntityTable>(table: K, input: EntityInput<K>): void {
   const row = input as unknown as Record<string, unknown>;
+  if (table === 'routine_completions') {
+    if (!/^[0-9a-f-]{36}$/i.test(String(row.routine_id)) || typeof row.local_date !== 'string' || !validDate(row.local_date) || !['todo','done'].includes(String(row.status))) throw new Error('루틴 완료 기록을 확인해 주세요.');
+    return;
+  }
+  if (table === 'routines') { validateRecurrence(routineRule(input as unknown as Routine)); if (!['active','paused','archived'].includes(String(row.status))) throw new Error('루틴 상태 오류'); }
   const label = table === 'projects' ? row.name : table === 'inbox_items' ? row.content : row.title;
   if (typeof label !== 'string' || !label.trim()) throw new Error('제목 또는 내용을 입력해 주세요.');
   if (label.length > (table === 'inbox_items' ? 20000 : 300)) throw new Error('제목은 300자, Inbox 내용은 20,000자 이내로 입력해 주세요.');

@@ -12,8 +12,8 @@ fn sql_error(e: rusqlite::Error) -> String {
 fn now() -> String {
     Utc::now().to_rfc3339()
 }
-pub const SCHEMA_VERSION: i64 = 5;
-pub const EXTENSION_TABLES: [&str; 1] = ["subtasks"];
+pub const SCHEMA_VERSION: i64 = 6;
+pub const EXTENSION_TABLES: [&str; 3] = ["subtasks", "routines", "routine_completions"];
 pub const TABLES: [&str; 6] = [
     "projects",
     "tasks",
@@ -24,6 +24,21 @@ pub const TABLES: [&str; 6] = [
 ];
 fn fields(table: &str) -> Result<&'static [&'static str]> {
     match table {
+        "routines" => Ok(&[
+            "title",
+            "description",
+            "frequency",
+            "interval_days",
+            "start_date",
+            "end_date",
+            "occurrence_limit",
+            "weekdays",
+            "timezone",
+            "status",
+            "reminder_time",
+            "category",
+        ]),
+        "routine_completions" => Ok(&["routine_id", "local_date", "status"]),
         "subtasks" => Ok(&["task_id", "title", "status", "position"]),
         "projects" => Ok(&["name", "description", "status", "color"]),
         "tasks" => Ok(&[
@@ -78,6 +93,56 @@ fn instant(s: &str) -> Result<DateTime<chrono::FixedOffset>> {
     DateTime::parse_from_rfc3339(s).map_err(|_| "일정 시간을 확인해 주세요.".into())
 }
 fn validate(table: &str, row: &Value) -> Result<()> {
+    if table == "routine_completions" {
+        Uuid::parse_str(text(row, "routine_id")?).map_err(|_| "루틴 ID 오류")?;
+        text(row, "local_date")?;
+        date(row, "local_date")?;
+        return choice(row, "status", &["todo", "done"]);
+    }
+    if table == "routines" {
+        limit(text(row, "title")?, 300, true)?;
+        limit(text(row, "description")?, 20000, false)?;
+        choice(
+            row,
+            "frequency",
+            &["daily", "weekdays", "weekly", "monthly", "yearly"],
+        )?;
+        choice(row, "status", &["active", "paused", "archived"])?;
+        text(row, "start_date")?;
+        date(row, "start_date")?;
+        date(row, "end_date")?;
+        if row["end_date"]
+            .as_str()
+            .is_some_and(|end| end < row["start_date"].as_str().unwrap())
+        {
+            return Err("반복 종료일 오류".into());
+        }
+        if !row["interval_days"]
+            .as_i64()
+            .is_some_and(|n| (1..=366).contains(&n))
+            || (!row["occurrence_limit"].is_null()
+                && !row["occurrence_limit"]
+                    .as_i64()
+                    .is_some_and(|n| (1..=10000).contains(&n)))
+        {
+            return Err("반복 간격/횟수 오류".into());
+        }
+        let days = text(row, "weekdays")?;
+        if !days.is_empty()
+            && days
+                .split(',')
+                .any(|d| !matches!(d, "0" | "1" | "2" | "3" | "4" | "5" | "6"))
+        {
+            return Err("반복 요일 오류".into());
+        }
+        limit(text(row, "timezone")?, 64, true)?;
+        limit(text(row, "category")?, 100, false)?;
+        if !row["reminder_time"].is_null() {
+            chrono::NaiveTime::parse_from_str(text(row, "reminder_time")?, "%H:%M")
+                .map_err(|_| "알림 시간 오류")?;
+        }
+        return Ok(());
+    }
     if table == "subtasks" {
         Uuid::parse_str(text(row, "task_id")?).map_err(|_| "Task ID를 확인해 주세요.")?;
         limit(text(row, "title")?, 300, true)?;
@@ -307,7 +372,15 @@ impl Database {
             let tx = conn.transaction().map_err(sql_error)?;
             tx.execute_batch(include_str!("../migrations/005_subtasks.sql"))
                 .map_err(sql_error)?;
-            tx.pragma_update(None, "user_version", SCHEMA_VERSION)
+            tx.pragma_update(None, "user_version", 5)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 6 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/006_routines.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 6)
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
@@ -457,6 +530,11 @@ impl Database {
         imported: bool,
     ) -> Result<Value> {
         validate(table, input)?;
+        if table == "routine_completions"
+            && id != completion_id(text(input, "routine_id")?, text(input, "local_date")?)
+        {
+            return Err("루틴 완료 기록 ID 오류".into());
+        }
         Uuid::parse_str(id).map_err(|_| "항목 ID를 확인해 주세요.")?;
         let columns = fields(table)?;
         let mut row = Map::new();
@@ -547,8 +625,25 @@ impl Database {
     pub fn save(&mut self, table: &str, input: Value, id: Option<String>) -> Result<Value> {
         self.require_workspace()?;
         let owner = self.owner()?;
-        let update = id.is_some();
-        let id = id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let mut update = id.is_some();
+        let id = if table == "routine_completions" {
+            validate(table, &input)?;
+            let expected = completion_id(text(&input, "routine_id")?, text(&input, "local_date")?);
+            if id.as_ref().is_some_and(|id| *id != expected) {
+                return Err("루틴 완료 기록 ID 오류".into());
+            }
+            update = self
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM routine_completions WHERE id=?1)",
+                    [&expected],
+                    |r| r.get(0),
+                )
+                .map_err(sql_error)?;
+            expected
+        } else {
+            id.unwrap_or_else(|| Uuid::new_v4().to_string())
+        };
         let tx = self.conn.transaction().map_err(sql_error)?;
         let row = Self::write(&tx, &owner, table, &input, &id, update, false)?;
         tx.commit().map_err(sql_error)?;
@@ -775,6 +870,12 @@ impl Database {
         .next()
         .ok_or_else(|| "Local 계정 정보가 없습니다. DB를 삭제하지 말고 진단해 주세요.".to_string())
     }
+}
+
+fn completion_id(routine_id: &str, date: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(format!("{}:{}", routine_id.to_lowercase(), date).as_bytes());
+    Uuid::from_slice(&hash[..16]).unwrap().to_string()
 }
 
 pub fn valid_avatar_name(name: &str) -> bool {

@@ -25,10 +25,10 @@ const operation={operation_id:'33333333-3333-4333-8333-333333333333',entity_tabl
 test('push is single-flight, retries a retained operation and acknowledges only a successful server reply',async()=>{
  const f=fixture([operation]);let fail=true;const bodies=[];
  const mock=test.mock.method(globalThis,'fetch',async(url,init)=>{
-  if(url.endsWith('sync_capabilities'))return response({protocol:2,entities:['subtasks']});
+  if(url.endsWith('sync_capabilities_v3'))return response({protocol:3,entities:['subtasks','routines','routine_completions']});
   if(url.endsWith('/user'))return response({id:A});
   const body=JSON.parse(init.body);bodies.push(body);
-  if(url.endsWith('sync_apply_v2')) {if(fail)throw Error('disconnected');return response({status:'applied',record:{}});}
+  if(url.endsWith('sync_apply_v3')) {if(fail)throw Error('disconnected');return response({status:'applied',record:{}});}
   return response({cursor:'1',records:[],dependencies:[],has_more:false});
  });
  try {
@@ -55,9 +55,9 @@ test('logout aborts pending responses and a new cycle can run without waiting fo
  const f=fixture([operation]);let release;let count=0;
  const old=new Promise(r=>release=r);
  const mock=test.mock.method(globalThis,'fetch',async url=>{
-  if(url.endsWith('sync_capabilities'))return response({protocol:2,entities:['subtasks']});
+  if(url.endsWith('sync_capabilities_v3'))return response({protocol:3,entities:['subtasks','routines','routine_completions']});
   if(url.endsWith('/user'))return ++count===1?old:response({id:A});
-  if(url.endsWith('sync_apply_v2'))return response({status:'applied',record:{}});
+  if(url.endsWith('sync_apply_v3'))return response({status:'applied',record:{}});
   return response({cursor:'1',records:[],dependencies:[],has_more:false});
  });
  try {const pending=f.service.wake();await new Promise(r=>setImmediate(r));f.service.stop();f.service.setAccount(account);await f.service.wake();release(response({id:A}));await pending;
@@ -79,13 +79,13 @@ test('a definitive data rejection is retained while independent uploads and pull
  const bad={...operation,operation_id:'bad'},good={...operation,operation_id:'good',id:'other-note'};
  const f=fixture([bad,good]);const seen=[];
  const mock=test.mock.method(globalThis,'fetch',async(url,init)=>{
-  if(url.endsWith('sync_capabilities'))return response({protocol:2,entities:['subtasks']});
+  if(url.endsWith('sync_capabilities_v3'))return response({protocol:3,entities:['subtasks','routines','routine_completions']});
   if(url.endsWith('/user'))return response({id:A});
   const body=JSON.parse(init.body);seen.push({url,body});
-  if(url.endsWith('sync_apply_v2'))return body.operation_id==='bad'?response({message:'constraint fixture',code:'23514'},400):response({status:'applied',record:{}});
+  if(url.endsWith('sync_apply_v3'))return body.operation_id==='bad'?response({message:'constraint fixture',code:'23514'},400):response({status:'applied',record:{}});
   return response({cursor:'1',records:[],dependencies:[],has_more:false});
  });
- try{await f.service.wake();assert.equal(f.state.phase,'idle');assert.equal(f.state.failed_count,1);assert.equal(f.queue.length,1);assert.equal(f.queue[0].operation_id,'bad');assert.ok(seen.some(r=>r.url.endsWith('sync_pull_v2')));await f.service.wake();assert.equal(seen.filter(r=>r.body.operation_id==='bad').length,1);}
+ try{await f.service.wake();assert.equal(f.state.phase,'idle');assert.equal(f.state.failed_count,1);assert.equal(f.queue.length,1);assert.equal(f.queue[0].operation_id,'bad');assert.ok(seen.some(r=>r.url.endsWith('sync_pull_v3')));await f.service.wake();assert.equal(seen.filter(r=>r.body.operation_id==='bad').length,1);}
  finally{mock.mock.restore();f.service.stop();}
 });
 test('RPC permission failures are errors, while expired authentication still requires reauthentication',async()=>{
@@ -103,9 +103,9 @@ test('generic RPC 400 is not classified as an authentication failure or discarde
 test('an unresolved foreign key rejection is isolated after pull instead of retrying forever',async()=>{
  const f=fixture([{...operation,operation_id:'missing-project'}]);
  const mock=test.mock.method(globalThis,'fetch',async url=>{
-  if(url.endsWith('sync_capabilities'))return response({protocol:2,entities:['subtasks']});
+  if(url.endsWith('sync_capabilities_v3'))return response({protocol:3,entities:['subtasks','routines','routine_completions']});
   if(url.endsWith('/user'))return response({id:A});
-  if(url.endsWith('sync_apply_v2'))return response({message:'missing dependency',code:'23503'},409);
+  if(url.endsWith('sync_apply_v3'))return response({message:'missing dependency',code:'23503'},409);
   return response({cursor:'1',records:[],dependencies:[],has_more:false});
  });
  try{await f.service.wake();assert.equal(f.state.phase,'idle');assert.equal(f.state.failed_count,1);assert.ok(f.calls.some(c=>c.command==='local_sync_page'));assert.ok(f.calls.some(c=>c.command==='local_sync_fail'));}
@@ -115,6 +115,6 @@ test('an unresolved foreign key rejection is isolated after pull instead of retr
 test('missing v2 server preserves queue and prevents writes while reporting upgrade requirement',async()=>{
  const f=fixture([operation]);const urls=[];
  const mock=test.mock.method(globalThis,'fetch',async url=>{urls.push(url);return url.endsWith('/user')?response({id:A}):response({message:'missing RPC',code:'PGRST202'},404);});
- try {await f.service.wake();assert.equal(f.state.phase,'error');assert.match(f.state.error,/서버 업데이트/);assert.equal(f.queue.length,1);assert.ok(!urls.some(url=>url.endsWith('sync_apply_v2')));}
+ try {await f.service.wake();assert.equal(f.state.phase,'error');assert.match(f.state.error,/서버 업데이트/);assert.equal(f.queue.length,1);assert.ok(!urls.some(url=>url.endsWith('sync_apply_v3')));}
  finally {mock.mock.restore();f.service.stop();}
 });

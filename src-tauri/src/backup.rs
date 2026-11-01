@@ -67,7 +67,11 @@ fn valid_db(path: &Path) -> Result<Option<String>> {
     for table in TABLES
         .iter()
         .copied()
-        .chain(EXTENSION_TABLES.into_iter().filter(|_| version >= 5))
+        .chain(
+            EXTENSION_TABLES
+                .into_iter()
+                .filter(|t| version >= if *t == "subtasks" { 5 } else { 6 }),
+        )
         .chain([
             "workspace_settings",
             "local_identity",
@@ -236,10 +240,11 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
         return Err("백업 manifest와 DB 버전이 다릅니다.".into());
     }
     let mut records = std::collections::BTreeMap::new();
-    for table in TABLES
-        .into_iter()
-        .chain(EXTENSION_TABLES.into_iter().filter(|_| version >= 5))
-    {
+    for table in TABLES.into_iter().chain(
+        EXTENSION_TABLES
+            .into_iter()
+            .filter(|t| version >= if *t == "subtasks" { 5 } else { 6 }),
+    ) {
         let count: u64 = db
             .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
             .map_err(|_| "백업 항목 수를 읽을 수 없습니다.")?;

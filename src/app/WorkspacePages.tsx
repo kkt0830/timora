@@ -1,3 +1,4 @@
+import { RoutinesPage } from './RoutinesPage';
 import { ProjectBoard } from './ProjectBoard';
 import { periodDays, shiftPeriod } from '../domain/calendar';
 import type { CalendarView } from '../domain/calendar';
@@ -61,7 +62,7 @@ export function TodayPage() {
   const { data } = useWorkspace(); const { open, editor } = useEditor(); const today = useToday();
   const tasks = todayTasks(data.tasks, today).sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done') || ({ high: 0, medium: 1, low: 2 }[a.priority] - { high: 0, medium: 1, low: 2 }[b.priority]));
   const events = data.events.filter(event => eventOnDay(event, today)).sort((a, b) => a.start_at.localeCompare(b.start_at));
-  return <><PageTitle eyebrow={today} title="Today" description="오늘 시작하거나 마감하는 작업, 기한이 지난 미완료 작업과 오늘의 일정을 모았습니다." action="새 작업" onAction={() => open({ table: 'tasks', day: today })} /><div className="two-columns"><div className="card"><SectionTitle title="오늘의 작업" count={tasks.length} /><TaskList tasks={tasks} open={open} /></div><div className="card upcoming-card"><SectionTitle title="오늘의 일정" count={events.length} /><EventList events={events} open={open} /><button className="text-link" type="button" onClick={() => open({ table: 'events', day: today })}>일정 추가</button></div></div><div className="card soft-card"><Sparkles size={20} /><div><h2>작업과 일정의 프로젝트 연결을 확인해 보세요</h2><p>프로젝트 이름을 누르면 관련 기록을 한곳에서 볼 수 있습니다.</p></div></div>{editor}</>;
+  return <><PageTitle eyebrow={today} title="Today" description="오늘 시작하거나 마감하는 작업, 기한이 지난 미완료 작업과 오늘의 일정을 모았습니다." action="새 작업" onAction={() => open({ table: 'tasks', day: today })} /><div className="two-columns"><div className="card"><SectionTitle title="오늘의 작업" count={tasks.length} /><TaskList tasks={tasks} open={open} /></div><div className="card upcoming-card"><SectionTitle title="오늘의 일정" count={events.length} /><EventList events={events} open={open} /><button className="text-link" type="button" onClick={() => open({ table: 'events', day: today })}>일정 추가</button></div></div><div className="card soft-card"><Sparkles size={20} /><div><h2>작업과 일정의 프로젝트 연결을 확인해 보세요</h2><p>프로젝트 이름을 누르면 관련 기록을 한곳에서 볼 수 있습니다.</p></div></div><RoutinesPage compact />{editor}</>;
 }
 export function InboxPage() {
   const { data, busy, save, convert } = useWorkspace(); const { open, editor } = useEditor();
