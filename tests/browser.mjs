@@ -148,7 +148,7 @@ try {
   assert.equal(await draft.inputValue(), 'unsaved note draft');
   assert.equal(await page.getByRole('dialog').isVisible(), true);
   failure = false;
-  await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^(취소|닫기)$/, exact: true }).click();
   await page.getByRole('button', { name: '다시 시도', exact: true }).click();
   await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
   await nav('Calendar'); await create('새 일정', 'Event A', async dialog => { await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' }); });
@@ -215,7 +215,7 @@ try {
   assert.equal(await search.inputValue(), '');
   await search.fill('bold');
   await page.getByRole('link', { name: /Note A/ }).click(); await visible(page.getByRole('dialog'));
-  await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^(취소|닫기)$/, exact: true }).click();
   await page.getByRole('button', { name: '프로필 메뉴', exact: true }).focus(); await page.keyboard.press('Enter');
   assert.equal(await page.getByRole('button', { name: '프로필 메뉴', exact: true }).getAttribute('aria-expanded'), 'true');
   await page.keyboard.press('Escape'); assert.equal(await page.getByRole('button', { name: '프로필 메뉴', exact: true }).getAttribute('aria-expanded'), 'false');

@@ -68,3 +68,9 @@ PR CI database passed. SQLite job failed formatting of the test driver; correcte
 ### Post-merge checkpoint — 2026-11-01
 
 Baseline main b6ae875 includes merged #21/#22. Fixed a duplicated upcoming-deadline fixture introduced by combining those branches (duplicate const declarations prevented browser tests from parsing). Added month/week/day Calendar selection, previous/next period, Today navigation and existing item detail editing. Date-only task semantics and instant-based event overlap stay unchanged. Node 57 tests, production build, Android and desktop browser fixtures PASS. Calendar time blocks/resizing and the other outstanding requirements remain unimplemented; this is not full Calendar 2.0 or v0.4 completion. No production schema, signing or release changes.
+
+### Implementation-first checkpoint — 2026-11-01
+
+Per user direction, full acceptance verification is deferred. Added existing-note debounced autosave through WorkspaceRepository, explicit save/retry, owner/note-scoped best-effort draft recovery, external-change stop, safe append-only starter templates, and local-vs-Cloud save messaging. New notes still require the initial explicit save. User-editable templates, tags, encrypted draft storage, automatic transient retry and per-note Cloud acknowledgement remain outstanding.
+
+Added Project Task board/list switch, three existing status columns, counts, priority/date/title sorting, card details, drag status changes and accessible touch/keyboard select alternatives. Status persists through the existing Task repository/sync. Manual card ordering remains outstanding; this board uses derived sort order. No new schema or production changes. TypeScript check passes; UI/acceptance checks deferred, no full feature/release completion claim.

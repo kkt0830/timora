@@ -1,3 +1,4 @@
+import { NoteAutosaveEditor } from './NoteAutosaveEditor';
 import { SubtaskEditor } from './SubtaskEditor';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -32,7 +33,7 @@ export function ProjectField({ value = '' }: { value?: string | null }) {
   const { data } = useWorkspace();
   return <label>프로젝트<select aria-label="프로젝트" name="project_id" defaultValue={value ?? ''}><option value="">개인 작업 / 연결 없음</option>{data.projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>;
 }
-export function EntityEditor({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
+function StandardEntityEditor({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
   const workspace = useWorkspace(); const { table, item } = target;
   const row = (item ?? {}) as Record<string, string | null | undefined>;
   const [error, setError] = useState('');
@@ -67,4 +68,8 @@ export function EntityEditor({ target, onClose }: { target: EditorTarget; onClos
     {error && <p className="error" role="alert">{error}</p>}
     <div className="dialog-actions">{item && <button type="button" className="danger-button" onClick={() => void remove()}>삭제</button>}<button type="button" onClick={onClose}>취소</button><button className="primary-button" type="submit">{workspace.busy ? '저장 중…' : '저장'}</button></div>
   </fieldset></form></Dialog>;
+}
+
+export function EntityEditor({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
+  return target.table === 'notes' && target.item ? <NoteAutosaveEditor key={target.item.id} note={target.item as EntityMap['notes']} onClose={onClose} /> : <StandardEntityEditor target={target} onClose={onClose} />;
 }
