@@ -125,7 +125,7 @@ impl Database {
     }
     pub fn sync_next(&self, cloud_id: &str) -> Result<Value> {
         self.sync_owner(cloud_id)?;
-        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE o.failed_at IS NULL AND NOT EXISTS(SELECT 1 FROM native_sync_outbox earlier WHERE earlier.entity_table=o.entity_table AND earlier.id=o.id AND earlier.seq<o.seq) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='projects' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.project_id')) ORDER BY seq LIMIT 1",&[])?;
+        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE o.failed_at IS NULL AND NOT EXISTS(SELECT 1 FROM native_sync_outbox earlier WHERE earlier.entity_table=o.entity_table AND earlier.id=o.id AND earlier.seq<o.seq) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='projects' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='tasks' AND c.id=json_extract(o.payload,'$.task_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='tasks' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.task_id')) ORDER BY seq LIMIT 1",&[])?;
         let Some(mut row) = rows.pop() else {
             return Ok(Value::Null);
         };
@@ -213,6 +213,13 @@ impl Database {
                 }
                 return Ok(());
             }
+            if table == "tasks" && record["deleted"] == true {
+                let dirty: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM native_sync_outbox WHERE entity_table='subtasks' AND (json_extract(payload,'$.task_id')=?1 OR id IN (SELECT id FROM subtasks WHERE task_id=?1)))", [&id], |r| r.get(0)).map_err(sql_error)?;
+                if dirty {
+                    conflict(conn, &table, &id, record)?;
+                    return Ok(());
+                }
+            }
             if table == "projects" && record["deleted"] == true {
                 let dirty:bool=conn.query_row("SELECT EXISTS(SELECT 1 FROM native_sync_outbox WHERE json_extract(payload,'$.project_id')=?1)",[&id],|r|r.get(0)).map_err(sql_error)?;
                 if dirty {
@@ -223,6 +230,11 @@ impl Database {
         }
         if record["deleted"] == true {
             if table != "workspace_settings" {
+                if table == "tasks" && force {
+                    // Explicitly accepting the parent deletion also accepts deletion of its checklist.
+                    conn.execute("DELETE FROM native_sync_outbox WHERE entity_table='subtasks' AND (json_extract(payload,'$.task_id')=?1 OR id IN (SELECT id FROM subtasks WHERE task_id=?1))", [&id]).map_err(sql_error)?;
+                    conn.execute("DELETE FROM native_sync_conflicts WHERE entity_table='subtasks' AND id IN (SELECT id FROM subtasks WHERE task_id=?1)", [&id]).map_err(sql_error)?;
+                }
                 conn.execute(&format!("DELETE FROM {table} WHERE id=?1"), [&id])
                     .map_err(sql_error)?;
                 // Choosing a deleted project also removes its link from queued child edits.

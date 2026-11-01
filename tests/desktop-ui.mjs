@@ -46,9 +46,11 @@ try {
     if (command === 'plugin:opener|open_url') { openedUrls.push(args.url); return null; }
     if (command === 'local_save') {
       if (saveFailure) throw new Error('Local DB 저장 실패 (fixture)');
-      const row = { ...args.input, id: crypto.randomUUID(), user_id: owner, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-      data[args.table].push(row); return row;
+      const row = { ...args.input, id: args.id ?? crypto.randomUUID(), user_id: owner, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      data[args.table] = data[args.table].filter(r => r.id !== row.id); data[args.table].push(row); return row;
     }
+    if (command === 'local_remove') { data[args.table] = data[args.table].filter(r => r.id !== args.id); return null; }
+    if (command === 'local_subtasks_reorder') { args.ids.forEach((id, position) => { data.subtasks.find(r => r.id === id).position = position; }); return null; }
     throw new Error(`Unexpected IPC ${command}`);
   });
   await context.addInitScript(() => { window.__TAURI_INTERNALS__ = { invoke: (command, args) => window.fixtureInvoke(command, args).catch(error => Promise.reject(error.message)) }; });
@@ -88,6 +90,18 @@ try {
   assert.equal(data.tasks.length, 0);
   saveFailure = false; await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' }); await page.getByRole('button', { name: '로컬 작업', exact: true }).waitFor();
+  await page.getByRole('button', { name: '로컬 작업', exact: true }).click();
+  await dialog.getByLabel('새 하위 작업', { exact: true }).fill('첫 하위 작업');
+  await dialog.getByRole('button', { name: '하위 작업 추가', exact: true }).click();
+  await dialog.getByLabel('첫 하위 작업', { exact: true }).check();
+  assert.equal(data.subtasks[0].status, 'done');
+  assert.equal(data.tasks[0].status, 'todo');
+  await dialog.getByLabel('새 하위 작업', { exact: true }).fill('둘째 하위 작업');
+  await dialog.getByRole('button', { name: '하위 작업 추가', exact: true }).click();
+  await dialog.getByRole('button', { name: '둘째 하위 작업 위로', exact: true }).click();
+  await dialog.getByRole('button', { name: '둘째 하위 작업 위로', exact: true }).waitFor();
+  assert.equal(data.subtasks.find(r => r.title === '둘째 하위 작업').position, 0);
+  await dialog.getByRole('button', { name: '취소', exact: true }).click();
   if (android) {
     // Portrait tablets retain the sidebar and place Home's tasks in a narrow column.
     const longTitle = '세로화면에서한글자씩줄바꿈되지않아야하는긴작업제목입니다';

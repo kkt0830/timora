@@ -107,7 +107,8 @@ export interface LocalInfo { id: string; cloud_user_id: string | null; imported_
 export class LocalWorkspaceRepository implements WorkspaceRepository {
   private invoke: LocalInvoke;
   constructor(invoke: LocalInvoke) { this.invoke = invoke; }
-  load(_userId: string): Promise<WorkspaceData> { return this.invoke('local_load'); }
+  reorderSubtasks(_userId: string, taskId: string, ids: string[]): Promise<void> { return this.invoke('local_subtasks_reorder', { taskId, ids }); }
+  async load(_userId: string): Promise<WorkspaceData> { const data = await this.invoke<WorkspaceData>('local_load'); return { ...data, subtasks: data.subtasks ?? [], subtasks_available: true }; }
   save<K extends EntityTable>(table: K, _userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {
     validateInput(table, input);
     if (table === 'library_items' && /\s/.test(String((input as EntityInput<'library_items'>).url))) input = { ...input, url: new URL(String((input as EntityInput<'library_items'>).url)).href };

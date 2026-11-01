@@ -39,6 +39,7 @@ fn main() {
                 a["id"].as_str().map(str::to_string),
             ),
             "local_remove" => db.remove(s("table"), s("id")).map(|_| Value::Null),
+            "local_subtasks_reorder" => db.reorder_subtasks(s("taskId"), serde_json::from_value(a["ids"].clone()).unwrap()).map(|_| Value::Null),
             "local_load" => db.load(),
             _ => Err("Unknown isolated test command".into()),
         };

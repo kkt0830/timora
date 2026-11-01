@@ -33,9 +33,9 @@ globalThis.fetch=(url,init)=> {
  const body=JSON.parse(init.body);const task=tail.then(async()=>{
   await pg.query('begin');
   try {await pg.query('set local role authenticated');await pg.query("select set_config('request.jwt.claim.sub',$1,true)",[owner]);
-   const sql=url.endsWith('sync_apply')?'select public.sync_apply($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull($1,$2) result';
-   const params=url.endsWith('sync_apply')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
-   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
+   const sql=url.endsWith('sync_capabilities')?'select public.sync_capabilities() result':url.endsWith('sync_apply_v2')?'select public.sync_apply_v2($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull_v2($1,$2) result';
+   const params=url.endsWith('sync_capabilities')?[]:url.endsWith('sync_apply_v2')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
+   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply_v2') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
   }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message,code:e.code}),{status:/^(22|23)/.test(e.code??'')?400:500});}
  });tail=task.catch(()=>{});return task;
 };
@@ -65,6 +65,33 @@ try {
  for(const [table,input] of Object.entries({tasks:{title:'T',description:'',status:'todo',priority:'high',start_date:null,due_date:'2026-10-12',project_id:project.id},events:{title:'E',description:'',start_at:'2026-10-12T09:00:00Z',end_at:'2026-10-12T10:00:00Z',project_id:project.id},library_items:{title:'L',description:'',url:'https://example.com',type:'article',project_id:project.id},inbox_items:{content:'Capture',type:'unclassified'}}))await phone.invoke('local_save',{table,input});
  await sync(phone);await sync(tablet);
  for(const table of ['projects','tasks','events','library_items','inbox_items'])assert.equal((await load(tablet,table)).length,1,table);
+ // Subtasks share parent IDs, commit offline, converge on duplicate completion and reorder.
+ const parent=(await load(phone,'tasks'))[0];
+ disconnected=true;
+ const sub=await phone.invoke('local_save',{table:'subtasks',input:{task_id:parent.id,title:'Offline checklist',status:'todo',position:0}});
+ await phone.invoke('local_save',{table:'subtasks',id:sub.id,input:{...sub,status:'done'}});
+ disconnected=false;await sync(phone);await sync(tablet);
+ assert.equal((await load(tablet,'subtasks'))[0].status,'done');
+ assert.equal((await load(tablet,'tasks'))[0].status,'todo');
+ const sub2=await tablet.invoke('local_save',{table:'subtasks',input:{task_id:parent.id,title:'second',status:'todo',position:1}});
+ await sync(tablet);await sync(phone);
+ await phone.invoke('local_save',{table:'subtasks',id:sub2.id,input:{...sub2,status:'done'}});
+ await tablet.invoke('local_save',{table:'subtasks',id:sub2.id,input:{...sub2,status:'done'}});
+ await sync(phone);await sync(tablet);assert.equal(tablet.state.conflict_count,0);
+ await phone.invoke('local_subtasks_reorder',{taskId:parent.id,ids:[sub2.id,sub.id]});await sync(phone);await sync(tablet);
+ assert.equal((await load(tablet,'subtasks')).find(s=>s.id===sub2.id).position,0);
+ await sync(other);assert.equal((await load(other,'subtasks')).length,0);
+ // Unsynced checklist survives deletion of its parent on another device until explicit choice.
+ const doomed=await phone.invoke('local_save',{table:'tasks',input:{...parent,title:'delete conflict'}});
+ const dirty=await phone.invoke('local_save',{table:'subtasks',input:{task_id:doomed.id,title:'keep offline',status:'todo',position:0}});
+ await sync(phone);await sync(tablet);
+ await tablet.invoke('local_remove',{table:'tasks',id:doomed.id});await sync(tablet);
+ await phone.invoke('local_save',{table:'subtasks',id:dirty.id,input:{...dirty,title:'unsent change'}});
+ await sync(phone);assert.ok(phone.state.conflicts.some(c=>c.entity_table==='tasks'&&c.id===doomed.id));
+ assert.equal((await load(phone,'subtasks')).find(s=>s.id===dirty.id).title,'unsent change');
+ await phone.service.resolve('tasks',doomed.id,'cloud');await sync(phone);
+ assert.ok(!(await load(phone,'subtasks')).some(s=>s.id===dirty.id));assert.equal(phone.state.failed_count,0);
+ console.log('PASS: subtasks offline CRUD, parent independence, concurrent completion, reordered persistence, owner isolation and parent deletion conflict');
  // Remote parent delete while a device has an unsent child edit must become a
  // recoverable conflict rather than block all future pull behind a FK error.
  await tablet.invoke('local_remove',{table:'projects',id:project.id});await sync(tablet);
