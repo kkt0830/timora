@@ -64,3 +64,7 @@ Next exact checkpoint: finish extended domain models and recurrence/routine pers
 Added tested date-only recurrence calculator (daily/weekdays/weekly/monthly/yearly, custom intervals, end/count, pause, timezone day selection, bounded enumeration). Month-end and leap-day invalid dates are skipped. This is domain logic only: persisted rules/occurrences, deterministic UUID identity, routine UI and synchronization are still NOT implemented.
 
 PR CI database passed. SQLite job failed formatting of the test driver; corrected. Web CI passed unit/build/Web browser but failed desktop UI; local desktop rerun passed. Subtask UI assertions now wait for rendered committed state to avoid observing pending asynchronous writes. CI rerun remains PENDING. CI log blob hosts were blocked by environment policy; job steps/annotations were accessible. No claim of full CI/platform acceptance.
+
+### Post-merge checkpoint — 2026-11-01
+
+Baseline main b6ae875 includes merged #21/#22. Fixed a duplicated upcoming-deadline fixture introduced by combining those branches (duplicate const declarations prevented browser tests from parsing). Added month/week/day Calendar selection, previous/next period, Today navigation and existing item detail editing. Date-only task semantics and instant-based event overlap stay unchanged. Node 57 tests, production build, Android and desktop browser fixtures PASS. Calendar time blocks/resizing and the other outstanding requirements remain unimplemented; this is not full Calendar 2.0 or v0.4 completion. No production schema, signing or release changes.
