@@ -46,9 +46,11 @@ try {
     if (command === 'plugin:opener|open_url') { openedUrls.push(args.url); return null; }
     if (command === 'local_save') {
       if (saveFailure) throw new Error('Local DB 저장 실패 (fixture)');
-      const row = { ...args.input, id: crypto.randomUUID(), user_id: owner, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-      data[args.table].push(row); return row;
+      const row = { ...args.input, id: args.id ?? crypto.randomUUID(), user_id: owner, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      data[args.table] = data[args.table].filter(r => r.id !== row.id); data[args.table].push(row); return row;
     }
+    if (command === 'local_remove') { data[args.table] = data[args.table].filter(r => r.id !== args.id); return null; }
+    if (command === 'local_subtasks_reorder') { args.ids.forEach((id, position) => { data.subtasks.find(r => r.id === id).position = position; }); return null; }
     throw new Error(`Unexpected IPC ${command}`);
   });
   await context.addInitScript(() => { window.__TAURI_INTERNALS__ = { invoke: (command, args) => window.fixtureInvoke(command, args).catch(error => Promise.reject(error.message)) }; });
@@ -88,6 +90,21 @@ try {
   assert.equal(data.tasks.length, 0);
   saveFailure = false; await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' }); await page.getByRole('button', { name: '로컬 작업', exact: true }).waitFor();
+  await page.getByRole('button', { name: '로컬 작업', exact: true }).click();
+  await dialog.getByLabel('새 하위 작업', { exact: true }).fill('첫 하위 작업');
+  await dialog.getByRole('button', { name: '하위 작업 추가', exact: true }).click();
+  // Controlled checkbox reflects the committed IPC result asynchronously.
+  await dialog.getByLabel('첫 하위 작업', { exact: true }).click();
+  await dialog.getByRole('heading', { name: '하위 작업 1/1 · 100%', exact: true }).waitFor();
+  assert.equal(await dialog.getByLabel('첫 하위 작업', { exact: true }).isChecked(), true);
+  assert.equal(data.subtasks[0].status, 'done');
+  assert.equal(data.tasks[0].status, 'todo');
+  await dialog.getByLabel('새 하위 작업', { exact: true }).fill('둘째 하위 작업');
+  await dialog.getByRole('button', { name: '하위 작업 추가', exact: true }).click();
+  await dialog.getByRole('button', { name: '둘째 하위 작업 위로', exact: true }).click();
+  await dialog.locator('.subtask-editor li').first().getByText('둘째 하위 작업', { exact: true }).waitFor(); 
+  assert.equal(data.subtasks.find(r => r.title === '둘째 하위 작업').position, 0);
+  await dialog.getByRole('button', { name: '취소', exact: true }).click();
   if (android) {
     const dateAt = days => { const d = new Date(); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
     const sample = (title, days, status = 'todo') => ({ id: crypto.randomUUID(), user_id: owner, title, description: '', status, priority: 'medium', start_date: null, due_date: dateAt(days), project_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
@@ -119,6 +136,18 @@ try {
     }
     await tablet.close();
     data.tasks.splice(data.tasks.indexOf(longTask), 1);
+    const dateAt = days => { const d = new Date(); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const sample = (title, days, status = 'todo') => ({ id: crypto.randomUUID(), user_id: owner, title, description: '', status, priority: 'medium', start_date: null, due_date: dateAt(days), project_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    const near = sample('다가오는 테스트', 2), far = sample('먼 미래 테스트', 30), done = sample('완료된 테스트', 2, 'done');
+    data.tasks.push(near, far, done);
+    const dashboard = await context.newPage();
+    await dashboard.goto('http://127.0.0.1:4175/#/');
+    const upcoming = dashboard.locator('.card').filter({ has: dashboard.getByRole('heading', { name: '다가오는 마감 (앞으로 7일)' }) });
+    await upcoming.getByRole('button', { name: near.title, exact: true }).waitFor();
+    assert.equal(await upcoming.getByRole('button', { name: far.title, exact: true }).count(), 0);
+    assert.equal(await upcoming.getByRole('button', { name: done.title, exact: true }).count(), 0);
+    await dashboard.close();
+    for (const row of [near, far, done]) data.tasks.splice(data.tasks.indexOf(row), 1);
   }
   await page.reload(); await page.getByRole('button', { name: '로컬 작업', exact: true }).waitFor();
   if (android) {

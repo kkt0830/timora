@@ -1,6 +1,6 @@
 //! Internal backup archive format. Not connected to the UI or restore yet.
 //! Checksums detect corruption, not malicious changes by an archive author.
-use crate::{Database, Result, TABLES};
+use crate::{Database, Result, EXTENSION_TABLES, SCHEMA_VERSION, TABLES};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
@@ -61,17 +61,22 @@ fn valid_db(path: &Path) -> Result<Option<String>> {
     let version: i64 = db
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .map_err(|_| "백업 DB 버전 오류")?;
-    if integrity != "ok" || version != 4 {
+    if integrity != "ok" || !(4..=SCHEMA_VERSION).contains(&version) {
         return Err("손상되었거나 지원하지 않는 백업 DB입니다.".into());
     }
-    for table in TABLES.iter().copied().chain([
-        "workspace_settings",
-        "local_identity",
-        "native_sync_control",
-        "native_sync_meta",
-        "native_sync_outbox",
-        "native_sync_conflicts",
-    ]) {
+    for table in TABLES
+        .iter()
+        .copied()
+        .chain(EXTENSION_TABLES.into_iter().filter(|_| version >= 5))
+        .chain([
+            "workspace_settings",
+            "local_identity",
+            "native_sync_control",
+            "native_sync_meta",
+            "native_sync_outbox",
+            "native_sync_conflicts",
+        ])
+    {
         let exists: i64 = db
             .query_row(
                 "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?1",
@@ -143,7 +148,9 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
     };
     if manifest["application"] != "Timora"
         || manifest["backup_format_version"] != 1
-        || manifest["database_schema_version"] != 4
+        || !manifest["database_schema_version"]
+            .as_i64()
+            .is_some_and(|v| (4..=SCHEMA_VERSION).contains(&v))
     {
         return Err("지원하지 않는 백업 형식입니다.".into());
     }
@@ -222,8 +229,17 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
             .map_err(|_| "백업 DB를 열 수 없습니다.")?;
     db.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA query_only=ON;")
         .map_err(|_| "백업 DB 검사 설정 오류")?;
+    let version: i64 = db
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .map_err(|_| "백업 버전 오류")?;
+    if manifest["database_schema_version"] != version {
+        return Err("백업 manifest와 DB 버전이 다릅니다.".into());
+    }
     let mut records = std::collections::BTreeMap::new();
-    for table in TABLES {
+    for table in TABLES
+        .into_iter()
+        .chain(EXTENSION_TABLES.into_iter().filter(|_| version >= 5))
+    {
         let count: u64 = db
             .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
             .map_err(|_| "백업 항목 수를 읽을 수 없습니다.")?;
@@ -240,7 +256,7 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
     Ok(BackupPreview {
         app_version,
         created_at,
-        database_schema_version: 4,
+        database_schema_version: version as u64,
         records,
         pending_changes,
         conflicts,
@@ -302,7 +318,7 @@ impl Database {
             writer
                 .start_file("manifest.json", options)
                 .map_err(|_| "백업 정보 생성 오류")?;
-            serde_json::to_writer(&mut writer, &serde_json::json!({"application":"Timora","backup_format_version":1,"app_version":env!("CARGO_PKG_VERSION"),"created_at":chrono::Utc::now().to_rfc3339(),"database_schema_version":4,"files":files})).map_err(|_| "백업 정보 저장 오류")?;
+            serde_json::to_writer(&mut writer, &serde_json::json!({"application":"Timora","backup_format_version":1,"app_version":env!("CARGO_PKG_VERSION"),"created_at":chrono::Utc::now().to_rfc3339(),"database_schema_version":SCHEMA_VERSION,"files":files})).map_err(|_| "백업 정보 저장 오류")?;
             let mut file = writer.finish().map_err(|_| "백업 ZIP 완료 오류")?;
             file.flush()
                 .and_then(|_| file.sync_all())
@@ -357,7 +373,7 @@ mod tests {
         assert_eq!(preview.pending_changes, 1);
         assert_eq!(preview.conflicts, 0);
         assert!(preview.has_profile_image);
-        assert_eq!(preview.database_schema_version, 4);
+        assert_eq!(preview.database_schema_version, SCHEMA_VERSION as u64);
         assert!(!serde_json::to_string(&preview)
             .unwrap()
             .contains("fixture@example.com"));

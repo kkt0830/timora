@@ -14,6 +14,9 @@ export function validateInput<K extends EntityTable>(table: K, input: EntityInpu
   const label = table === 'projects' ? row.name : table === 'inbox_items' ? row.content : row.title;
   if (typeof label !== 'string' || !label.trim()) throw new Error('제목 또는 내용을 입력해 주세요.');
   if (label.length > (table === 'inbox_items' ? 20000 : 300)) throw new Error('제목은 300자, Inbox 내용은 20,000자 이내로 입력해 주세요.');
+  if (table === 'subtasks') {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(row.task_id)) || !['todo', 'done'].includes(String(row.status)) || !Number.isInteger(row.position) || Number(row.position) < 0 || Number(row.position) > 2147483647) throw new Error('하위 작업의 연결·상태·순서를 확인해 주세요.');
+  }
   if (table === 'tasks') {
     if (!['todo', 'in_progress', 'done'].includes(String(row.status)) || !['low', 'medium', 'high'].includes(String(row.priority))) throw new Error('작업 상태 또는 우선순위가 올바르지 않습니다.');
     if (!validDate(row.start_date) || !validDate(row.due_date)) throw new Error('올바른 날짜를 입력해 주세요.');

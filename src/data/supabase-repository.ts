@@ -26,12 +26,21 @@ export class SupabaseRepository implements WorkspaceRepository {
       if (rows.length < 500) return all;
     }
   }
+  async reorderSubtasks(_userId: string, taskId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_subtasks', { method: 'POST', body: JSON.stringify({ parent_id: taskId, ordered_ids: ids }) }); }
   async load(userId: string): Promise<WorkspaceData> {
     const data = emptyWorkspace(userId);
     const rows = await Promise.all(entityTables.map(table => this.list(table, userId)));
     entityTables.forEach((table, index) => { Object.assign(data, { [table]: rows[index] }); });
     const settings = await this.request<WorkspaceSettings[]>(`workspace_settings?user_id=eq.${encodeURIComponent(userId)}&select=*`);
     if (settings[0]) data.settings = { ...data.settings, ...settings[0] };
+    // Legacy Cloud continues serving core data; never pretend extension sync is ready.
+    try {
+      const capability = await this.request<{ protocol?: number; entities?: string[] }>('rpc/sync_capabilities', { method: 'POST', body: '{}' });
+      if (capability?.protocol === 2 && capability.entities?.includes('subtasks')) {
+        data.subtasks = await this.list('subtasks', userId);
+        data.subtasks_available = true;
+      }
+    } catch (error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
     return data;
   }
   async save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {

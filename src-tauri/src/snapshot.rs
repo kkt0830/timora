@@ -1,6 +1,6 @@
 //! Private staging for a future backup. Never expose this raw snapshot as a
 //! finished backup: it still needs a manifest, asset packaging and restore guard.
-use crate::{sql_error, Database, Result, TABLES};
+use crate::{sql_error, Database, Result, EXTENSION_TABLES, SCHEMA_VERSION, TABLES};
 use rusqlite::{Connection, OpenFlags};
 use std::{io::Write, path::Path};
 
@@ -29,10 +29,10 @@ impl Database {
             let version: i64 = check
                 .pragma_query_value(None, "user_version", |row| row.get(0))
                 .map_err(sql_error)?;
-            if version != 4 {
+            if version != SCHEMA_VERSION {
                 return Err("지원하지 않는 백업 DB 버전입니다.".into());
             }
-            for table in TABLES.iter().copied().chain([
+            for table in TABLES.iter().copied().chain(EXTENSION_TABLES).chain([
                 "workspace_settings",
                 "local_identity",
                 "native_sync_control",
