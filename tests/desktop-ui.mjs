@@ -102,7 +102,7 @@ try {
   await dialog.getByLabel('새 하위 작업', { exact: true }).fill('둘째 하위 작업');
   await dialog.getByRole('button', { name: '하위 작업 추가', exact: true }).click();
   await dialog.getByRole('button', { name: '둘째 하위 작업 위로', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('.subtask-editor li')?.textContent.includes('둘째 하위 작업')); 
+  await dialog.locator('.subtask-editor li').first().getByText('둘째 하위 작업', { exact: true }).waitFor(); 
   assert.equal(data.subtasks.find(r => r.title === '둘째 하위 작업').position, 0);
   await dialog.getByRole('button', { name: '취소', exact: true }).click();
   if (android) {
