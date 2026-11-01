@@ -58,3 +58,9 @@ Verification: Node 53 tests PASS; Rust 37 tests PASS; production build PASS; Web
 Matrix update: TIMORA-V04-TASK-001 implemented with automated coverage; real-device acceptance PENDING. TIMORA-V04-DATA-001 and SYNC-001 PARTIAL: subtask foundation only; remaining entity contracts are not implemented. All other outstanding matrix items remain outstanding. No v0.4 APK/installer produced, no production migration applied, no official release published. Application version stays 0.3.1 until release engineering is ready; this branch is not a completed v0.4 build.
 
 Next exact checkpoint: finish extended domain models and recurrence/routine persistence and contracts, then follow specification phases 2–8. Add explicit legacy schema-4 archive fixture coverage and native platform command compilation to CI evidence. Cloud v0.4 sync deliberately pauses with a server-update message until the new migration is approved and applied; local data and pending operations remain accessible. Web on legacy Cloud retains core functionality and disables subtask editing.
+
+### Continued implementation — 2026-11-01
+
+Added tested date-only recurrence calculator (daily/weekdays/weekly/monthly/yearly, custom intervals, end/count, pause, timezone day selection, bounded enumeration). Month-end and leap-day invalid dates are skipped. This is domain logic only: persisted rules/occurrences, deterministic UUID identity, routine UI and synchronization are still NOT implemented.
+
+PR CI database passed. SQLite job failed formatting of the test driver; corrected. Web CI passed unit/build/Web browser but failed desktop UI; local desktop rerun passed. Subtask UI assertions now wait for rendered committed state to avoid observing pending asynchronous writes. CI rerun remains PENDING. CI log blob hosts were blocked by environment policy; job steps/annotations were accessible. No claim of full CI/platform acceptance.
