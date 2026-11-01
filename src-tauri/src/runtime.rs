@@ -308,6 +308,129 @@ async fn local_remove_avatar(state: tauri::State<'_, Arc<LocalState>>) -> Result
     .map_err(|_| "사진 제거 오류".to_string())?
 }
 #[tauri::command]
+async fn local_export_backup(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<LocalState>>,
+) -> Result<Option<crate::backup::BackupPreview>, String> {
+    let state = Arc::clone(state.inner());
+    let epoch = state.auth_epoch.load(Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || {
+        let temp = tempfile::tempdir().map_err(|_| "백업 임시 폴더 오류")?;
+        let archive = temp.path().join("backup.zip");
+        locked_db(&state, |db| {
+            let profile = state.path.parent().ok_or("백업 경로 오류")?.join("profile");
+            db.export_archive(&profile, &archive)
+        })?;
+        let preview = crate::backup::inspect_archive(
+            std::fs::File::open(&archive).map_err(|_| "백업 읽기 오류")?,
+        )?;
+        let selected = app
+            .dialog()
+            .file()
+            .set_title("Timora 백업 저장")
+            .set_file_name("Timora-backup.zip")
+            .add_filter("Timora ZIP", &["zip"])
+            .blocking_save_file();
+        let Some(selected) = selected else {
+            return Ok(None);
+        };
+        if let tauri_plugin_dialog::FilePath::Path(path) = &selected {
+            if path.extension().and_then(|v| v.to_str()) != Some("zip") {
+                return Err("ZIP 파일로 저장해 주세요.".into());
+            }
+            let parent = path
+                .parent()
+                .and_then(|p| p.canonicalize().ok())
+                .ok_or("저장 폴더 확인 실패")?;
+            if parent.starts_with(
+                state
+                    .path
+                    .parent()
+                    .ok_or("DB 경로 오류")?
+                    .canonicalize()
+                    .map_err(|_| "DB 경로 확인 오류")?,
+            ) {
+                return Err("앱 데이터 폴더 밖에 저장해 주세요.".into());
+            }
+        }
+        locked_db(&state, |db| {
+            db.require_workspace()?;
+            if state.auth_epoch.load(Ordering::SeqCst) != epoch {
+                return Err("로그인 상태가 변경되어 백업 저장을 취소했습니다.".into());
+            }
+            let mut source = std::fs::File::open(&archive).map_err(|_| "백업 읽기 오류")?;
+            let mut destination = match selected {
+                tauri_plugin_dialog::FilePath::Path(path) => std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(path),
+                uri => app.fs().open(
+                    uri,
+                    tauri_plugin_fs::OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .clone(),
+                ),
+            }
+            .map_err(|_| "새 백업 파일을 만들 수 없습니다. 다른 파일 이름을 선택해 주세요.")?;
+            std::io::copy(&mut source, &mut destination)
+                .map_err(|_| "백업 복사 실패. 불완전한 내보내기 파일은 사용하지 마세요.")?;
+            destination
+                .sync_all()
+                .map_err(|_| "백업 파일 저장 완료 확인 실패")?;
+            Ok(Some(preview))
+        })
+    })
+    .await
+    .map_err(|_| "백업 작업 오류".to_string())?
+}
+#[tauri::command]
+async fn local_inspect_backup(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<LocalState>>,
+) -> Result<Option<crate::backup::BackupPreview>, String> {
+    let state = Arc::clone(state.inner());
+    let epoch = state.auth_epoch.load(Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || {
+        locked_db(&state, |db| db.require_workspace())?;
+        let Some(selected) = app
+            .dialog()
+            .file()
+            .set_title("Timora 백업 검사")
+            .add_filter("Timora ZIP", &["zip"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let mut input = app
+            .fs()
+            .open(
+                selected,
+                tauri_plugin_fs::OpenOptions::new().read(true).clone(),
+            )
+            .map_err(|_| "백업 파일 열기 실패")?
+            .take(514 * 1024 * 1024 + 1);
+        let mut file = tempfile::tempfile().map_err(|_| "백업 임시 파일 오류")?;
+        let size = std::io::copy(&mut input, &mut file).map_err(|_| "백업 읽기 오류")?;
+        if size > 514 * 1024 * 1024 {
+            return Err("백업 크기 제한 초과".into());
+        }
+        std::io::Seek::rewind(&mut file).map_err(|_| "백업 읽기 오류")?;
+        let preview = crate::backup::inspect_archive(file)?;
+        locked_db(&state, |db| {
+            db.require_workspace()?;
+            if state.auth_epoch.load(Ordering::SeqCst) != epoch {
+                return Err("로그인 상태가 변경되었습니다.".into());
+            }
+            Ok(Some(preview))
+        })
+    })
+    .await
+    .map_err(|_| "백업 검사 오류".to_string())?
+}
+
+#[tauri::command]
 async fn local_load(state: tauri::State<'_, Arc<LocalState>>) -> Result<Value, String> {
     with_db(state, move |db| db.load()).await
 }
@@ -403,6 +526,8 @@ pub fn run() {
             local_pick_avatar,
             local_remove_avatar,
             local_load,
+            local_export_backup,
+            local_inspect_backup,
             local_save,
             local_remove,
             local_subtasks_reorder,
