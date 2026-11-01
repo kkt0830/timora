@@ -93,8 +93,10 @@ try {
   await page.getByRole('button', { name: '로컬 작업', exact: true }).click();
   await dialog.getByLabel('새 하위 작업', { exact: true }).fill('첫 하위 작업');
   await dialog.getByRole('button', { name: '하위 작업 추가', exact: true }).click();
-  await dialog.getByLabel('첫 하위 작업', { exact: true }).check();
+  // Controlled checkbox reflects the committed IPC result asynchronously.
+  await dialog.getByLabel('첫 하위 작업', { exact: true }).click();
   await dialog.getByRole('heading', { name: '하위 작업 1/1 · 100%', exact: true }).waitFor();
+  assert.equal(await dialog.getByLabel('첫 하위 작업', { exact: true }).isChecked(), true);
   assert.equal(data.subtasks[0].status, 'done');
   assert.equal(data.tasks[0].status, 'todo');
   await dialog.getByLabel('새 하위 작업', { exact: true }).fill('둘째 하위 작업');
