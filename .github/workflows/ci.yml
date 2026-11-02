@@ -69,6 +69,7 @@ jobs:
       - run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261010030830_native_workspace_sync.sql
       - run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261031000000_v04_subtasks.sql
       - run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261101000000_routines.sql
+      - run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261102000000_workspace_tools.sql
       - run: psql -v ON_ERROR_STOP=1 -f tests/subtasks-rls.sql
       - run: psql -v ON_ERROR_STOP=1 -f tests/sync.sql
       - run: psql -v ON_ERROR_STOP=1 -f tests/rls.sql

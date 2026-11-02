@@ -1,3 +1,4 @@
+import { TemplatePicker } from './NoteTools';
 import { NoteAutosaveEditor } from './NoteAutosaveEditor';
 import { SubtaskEditor } from './SubtaskEditor';
 import { useState } from 'react';
@@ -8,7 +9,7 @@ import { datePreset } from '../domain/task-groups';
 import { Dialog, Markdown } from './components';
 import { messageOf, useWorkspace } from './providers';
 
-export const labels: Record<EntityTable, string> = { routines: '루틴', routine_completions: '루틴 완료', subtasks: '하위 작업', tasks: '작업', notes: '노트', projects: '프로젝트', events: '일정', library_items: '자료', inbox_items: 'Inbox 기록' };
+export const labels: Record<EntityTable, string> = { tags:'태그', note_tags:'노트 태그', note_templates:'템플릿', task_blocks:'시간 블록', board_positions:'보드 순서', routines: '루틴', routine_completions: '루틴 완료', subtasks: '하위 작업', tasks: '작업', notes: '노트', projects: '프로젝트', events: '일정', library_items: '자료', inbox_items: 'Inbox 기록' };
 export type EditorTarget = { table: EntityTable; item?: EntityMap[EntityTable]; projectId?: string; day?: string };
 
 function parseForm(table: EntityTable, form: FormData): EntityInput<EntityTable> {
@@ -16,7 +17,7 @@ function parseForm(table: EntityTable, form: FormData): EntityInput<EntityTable>
   const nullable = (key: string) => text(key) || null;
   const title = text('title').trim(); const project_id = nullable('project_id'); const description = text('description');
   switch (table) {
-    case 'routines': case 'routine_completions': case 'subtasks': throw new Error('하위 작업은 Task 안에서 편집해 주세요.');
+    case 'tags': case 'note_tags': case 'note_templates': case 'task_blocks': case 'board_positions': case 'routines': case 'routine_completions': case 'subtasks': throw new Error('하위 작업은 Task 안에서 편집해 주세요.');
     case 'tasks': return { title, description, status: text('status') as EntityMap['tasks']['status'], priority: text('priority') as EntityMap['tasks']['priority'], start_date: nullable('start_date'), due_date: nullable('due_date'), project_id };
     case 'notes': return { title, content: text('content'), project_id };
     case 'projects': return { name: title, description, status: text('status') as EntityMap['projects']['status'], color: text('color') };
@@ -60,7 +61,7 @@ function StandardEntityEditor({ target, onClose }: { target: EditorTarget; onClo
     {['tasks', 'projects', 'events', 'library_items'].includes(table) && <label>설명<textarea name="description" defaultValue={row.description ?? ''} rows={3} /></label>}
     {table === 'tasks' && <><div className="form-grid"><label>상태<select aria-label="상태" name="status" defaultValue={row.status ?? 'todo'}><option value="todo">미완료</option><option value="in_progress">진행 중</option><option value="done">완료</option></select></label><label>우선순위<select aria-label="우선순위" name="priority" defaultValue={row.priority ?? 'medium'}><option value="high">높음</option><option value="medium">보통</option><option value="low">낮음</option></select></label></div><div className="period-filters" aria-label="날짜 프리셋">{(['today', 'tomorrow', 'week', 'month'] as const).map(preset => <button type="button" key={preset} onClick={() => setDates(datePreset(dateKey(), preset))}>{{ today: '오늘', tomorrow: '내일', week: '이번 주', month: '이번 달' }[preset]}</button>)}</div><div className="form-grid"><label>시작일<input type="date" name="start_date" value={dates.start_date} onChange={event => setDates({ ...dates, start_date: event.target.value })} /></label><label>마감일<input type="date" name="due_date" value={dates.due_date} onChange={event => setDates({ ...dates, due_date: event.target.value })} /></label></div></>}
     {table === 'tasks' && (item ? <SubtaskEditor taskId={item.id} /> : <small>Task를 저장한 뒤 하위 작업을 추가할 수 있습니다.</small>)}
-    {table === 'notes' && <><div className="editor-tabs"><button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>Markdown 편집</button><button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>미리보기</button></div><label hidden={preview}>내용<textarea name="content" value={content} onChange={event => setContent(event.target.value)} rows={14} maxLength={1000000} className="markdown-input" /></label>{preview && <Markdown content={content} />}<small>제목, 목록, 인용, 코드 블록, 굵은 글씨, 링크를 미리 볼 수 있습니다. HTML은 실행하지 않습니다.</small></>}
+    {table === 'notes' && <><div className="editor-tabs"><button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>Markdown 편집</button><button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>미리보기</button></div><label hidden={preview}>내용<textarea name="content" value={content} onChange={event => setContent(event.target.value)} rows={14} maxLength={1000000} className="markdown-input" /></label>{preview && <Markdown content={content} />}<TemplatePicker append={text=>setContent(value=>value+(value?'\n\n':'')+text)}/><small>제목, 목록, 인용, 코드 블록, 굵은 글씨, 링크를 미리 볼 수 있습니다. HTML은 실행하지 않습니다.</small></>}
     {table === 'projects' && <div className="form-grid"><label>상태<select aria-label="상태" name="status" defaultValue={row.status ?? 'active'}><option value="active">진행 중</option><option value="paused">보류</option><option value="completed">완료</option></select></label><label>프로젝트 색상<input name="color" type="color" defaultValue={row.color ?? '#0066cc'} /></label></div>}
     {table === 'events' && <><div className="form-grid"><label>시작<input name="start_at" type="datetime-local" defaultValue={row.start_at ? localDateTime(row.start_at) : `${day}T09:00`} required /></label><label>종료<input name="end_at" type="datetime-local" defaultValue={row.end_at ? localDateTime(row.end_at) : `${day}T10:00`} required /></label></div><small>현재 기기의 시간대로 입력하고 표시합니다.</small></>}
     {table === 'library_items' && <><label>URL<input name="url" type="url" defaultValue={row.url ?? ''} required placeholder="https://…" /></label><label>자료 종류<select aria-label="자료 종류" name="type" defaultValue={row.type ?? 'website'}>{Object.entries({ website: 'Website', article: 'Article', github: 'GitHub Repository', video: 'Video', pdf: 'PDF', file: 'File URL', other: 'Other' }).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></>}

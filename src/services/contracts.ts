@@ -11,6 +11,7 @@ export interface AuthService {
   token(forceRefresh?: boolean): Promise<string>;
 }
 export interface WorkspaceRepository {
+  reorderBoard(userId: string, projectId: string, ids: string[]): Promise<void>;
   reorderSubtasks(userId: string, taskId: string, ids: string[]): Promise<void>;
   load(userId: string): Promise<WorkspaceData>;
   save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]>;

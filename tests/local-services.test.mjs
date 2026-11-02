@@ -42,7 +42,7 @@ test('Cloud preview reads owner-filtered data and logs out; it never writes enti
     assert.ok(result.data.settings.updated_at);
     const rest = calls.filter(row => row.url.includes('/rest/v1/') && !row.url.includes('/rpc/'));
     assert.equal(rest.length, 7);
-    assert.ok(calls.filter(row => row.url.includes('/rpc/')).every(row => row.url.endsWith('/sync_capabilities') || row.url.endsWith('/sync_capabilities_v3')));
+    assert.ok(calls.filter(row => row.url.includes('/rpc/')).every(row => row.url.endsWith('/sync_capabilities') || row.url.endsWith('/sync_capabilities_v3') || row.url.endsWith('/sync_capabilities_v4')));
     assert.ok(rest.every(row => row.method === 'GET' && row.url.includes(`user_id=eq.${user.id}`)));
     assert.ok(calls.some(row => row.url.includes('/logout')));
     assert.ok(calls.every(row => !new URL(row.url).pathname.includes('//')));

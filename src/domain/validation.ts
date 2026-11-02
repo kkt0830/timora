@@ -14,6 +14,16 @@ function validDate(value: unknown): boolean {
 }
 export function validateInput<K extends EntityTable>(table: K, input: EntityInput<K>): void {
   const row = input as unknown as Record<string, unknown>;
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  if (table === 'tags') { if (typeof row.name !== 'string' || !row.name.trim() || row.name.length>80 || !/^#[0-9a-f]{6}$/i.test(String(row.color))) throw new Error('태그 이름·색상을 확인해 주세요.'); return; }
+  if (table === 'note_templates') { if (typeof row.title !== 'string' || !row.title.trim() || row.title.length>300 || typeof row.content !== 'string' || row.content.length>1000000) throw new Error('템플릿 제목·내용을 확인해 주세요.'); return; }
+  if (table === 'note_tags') { if (!uuid(row.note_id) || !uuid(row.tag_id)) throw new Error('태그 연결을 확인해 주세요.'); return; }
+  if (table === 'task_blocks' || table === 'board_positions') {
+    if (!uuid(row.task_id)) throw new Error('Task 연결을 확인해 주세요.');
+    if (table === 'board_positions' && (!Number.isInteger(row.position) || Number(row.position)<0 || Number(row.position)>2147483647)) throw new Error('보드 순서 오류');
+    if (table === 'task_blocks' && (!Number.isFinite(Date.parse(String(row.start_at))) || !Number.isFinite(Date.parse(String(row.end_at))) || Date.parse(String(row.start_at))>=Date.parse(String(row.end_at)))) throw new Error('종료 시간은 시작 이후여야 합니다.');
+    return;
+  }
   if (table === 'routine_completions') {
     if (!/^[0-9a-f-]{36}$/i.test(String(row.routine_id)) || typeof row.local_date !== 'string' || !validDate(row.local_date) || !['todo','done'].includes(String(row.status))) throw new Error('루틴 완료 기록을 확인해 주세요.');
     return;

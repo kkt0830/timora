@@ -1,3 +1,4 @@
+import { NoteTags, TemplatePicker } from './NoteTools';
 import { ApiError } from '../data/http';
 import { useEffect, useRef, useState } from 'react';
 import type { Note } from '../domain/models';
@@ -5,12 +6,6 @@ import { Dialog, Markdown } from './components';
 import { messageOf, useAuth, useWorkspace } from './providers';
 type Draft = { title: string; content: string; project_id: string | null };
 const textOf = (note: Draft) => JSON.stringify({ title: note.title, content: note.content, project_id: note.project_id });
-const templates = {
-  '일반 노트': '# 제목\n\n',
-  '개발 기록': '## 목표\n\n## 작업 내용\n\n## 배운 점\n\n## 다음 작업\n',
-  '독서 기록': '## 책\n\n## 핵심 내용\n\n## 나의 생각\n',
-  '회의록': '## 참석자\n\n## 논의 내용\n\n## 결정 사항\n\n## 후속 작업\n',
-};
 export function NoteAutosaveEditor({ note, onClose }: { note: Note; onClose: () => void }) {
   const workspace = useWorkspace(); const { account } = useAuth();
   const key = `timora:note-draft:${account!.id}:${note.id}`;
@@ -71,7 +66,8 @@ export function NoteAutosaveEditor({ note, onClose }: { note: Note; onClose: () 
     <div className="editor-tabs"><button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>Markdown 편집</button><button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>미리보기</button></div>
     <label hidden={preview}>내용<textarea name="content" rows={14} maxLength={1000000} className="markdown-input" value={draft.content} onChange={e => setDraft({ ...draft, content: e.target.value })} /></label>{preview && <Markdown content={draft.content} />}
     <label>프로젝트<select name="project_id" value={draft.project_id ?? ''} onChange={e => setDraft({ ...draft, project_id: e.target.value || null })}><option value="">연결 없음</option>{workspace.data.projects.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
-    <details><summary>기본 템플릿 추가</summary><small>기존 내용 뒤에 추가합니다.</small><div className="period-filters">{Object.entries(templates).map(([name, content]) => <button type="button" key={name} onClick={() => setDraft({ ...draft, content: `${draft.content}${draft.content ? '\n\n' : ''}${content}` })}>{name}</button>)}</div></details>
+    <NoteTags noteId={note.id}/><TemplatePicker append={text=>setDraft(value=>({...value,content:value.content+(value.content?'\n\n':'')+text}))}/>
+
     <p role="status">{saving ? '저장 중…' : changed ? '저장 대기 중' : notice || '저장된 노트'}{notice && changed ? ` · ${notice}` : ''}</p>
     {error && <p role="alert" className="error">{error}<button type="button" onClick={() => { retries.current = 0; setError(''); setAttempt(n => n + 1); }}>다시 저장</button></p>}
     <div className="dialog-actions"><button className="danger-button" disabled={saving || workspace.busy} onClick={() => { if (window.confirm('이 노트를 삭제할까요?')) { setSaving(true); void workspace.remove('notes', note.id).then(() => { try { localStorage.removeItem(key); } catch {} onClose(); }).catch(e => { setError(messageOf(e)); setSaving(false); }); } }}>삭제</button><button type="button" disabled={saving} onClick={close}>닫기</button><button type="button" disabled={saving || conflict || !!recovery || workspace.busy} onClick={() => { void save().then(() => { if (textOf(current.current) === committed.current) onClose(); }); }}>저장</button></div>

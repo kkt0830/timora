@@ -56,6 +56,7 @@ export function useAuth() { const value = useContext(AuthContext); if (!value) t
 interface WorkspaceState {
   data: WorkspaceData; loading: boolean; loaded: boolean; error: string; busy: boolean;
   reload: () => Promise<void>;
+  reorderBoard: (projectId: string, ids: string[]) => Promise<void>;
   reorderSubtasks: (taskId: string, ids: string[]) => Promise<void>;
   save: <K extends EntityTable>(table: K, input: EntityInput<K>, id?: string) => Promise<void>;
   remove: (table: EntityTable, id: string) => Promise<void>;
@@ -114,6 +115,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   };
   const value: WorkspaceState = {
     data, loading, loaded, error, busy, reload,
+    reorderBoard: async (projectId, ids) => mutate(async () => { await repository.reorderBoard(account.id, projectId, ids); if (mounted.current) await reload(false); }),
     reorderSubtasks: async (taskId, ids) => mutate(async () => { await repository.reorderSubtasks(account.id, taskId, ids); if (mounted.current) await reload(false); }),
     save: async (table, input, id) => mutate(async () => {
       const row = await repository.save(table, account.id, input, id);
@@ -124,7 +126,9 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
       if (!mounted.current) return;
       setData(previous => {
         const next = { ...previous, [table]: previous[table].filter(item => item.id !== id) };
-        if (table === 'tasks') next.subtasks = previous.subtasks.filter(s => s.task_id !== id);
+        if (table === 'tasks') { next.subtasks = previous.subtasks.filter(s => s.task_id !== id); next.task_blocks = previous.task_blocks.filter(s=>s.task_id!==id); next.board_positions = previous.board_positions.filter(s=>s.task_id!==id); }
+        if (table === 'notes') next.note_tags = previous.note_tags.filter(s=>s.note_id!==id);
+        if (table === 'tags') next.note_tags = previous.note_tags.filter(s=>s.tag_id!==id);
         if (table === 'projects') {
           next.tasks = previous.tasks.map(t => t.project_id === id ? { ...t, project_id: null } : t);
           next.notes = previous.notes.map(t => t.project_id === id ? { ...t, project_id: null } : t);

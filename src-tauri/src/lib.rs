@@ -12,8 +12,17 @@ fn sql_error(e: rusqlite::Error) -> String {
 fn now() -> String {
     Utc::now().to_rfc3339()
 }
-pub const SCHEMA_VERSION: i64 = 6;
-pub const EXTENSION_TABLES: [&str; 3] = ["subtasks", "routines", "routine_completions"];
+pub const SCHEMA_VERSION: i64 = 7;
+pub const EXTENSION_TABLES: [&str; 8] = [
+    "subtasks",
+    "routines",
+    "routine_completions",
+    "tags",
+    "note_templates",
+    "note_tags",
+    "task_blocks",
+    "board_positions",
+];
 pub const TABLES: [&str; 6] = [
     "projects",
     "tasks",
@@ -24,6 +33,11 @@ pub const TABLES: [&str; 6] = [
 ];
 fn fields(table: &str) -> Result<&'static [&'static str]> {
     match table {
+        "tags" => Ok(&["name", "color"]),
+        "note_templates" => Ok(&["title", "content"]),
+        "note_tags" => Ok(&["note_id", "tag_id"]),
+        "task_blocks" => Ok(&["task_id", "start_at", "end_at"]),
+        "board_positions" => Ok(&["task_id", "position"]),
         "routines" => Ok(&[
             "title",
             "description",
@@ -93,6 +107,43 @@ fn instant(s: &str) -> Result<DateTime<chrono::FixedOffset>> {
     DateTime::parse_from_rfc3339(s).map_err(|_| "일정 시간을 확인해 주세요.".into())
 }
 fn validate(table: &str, row: &Value) -> Result<()> {
+    if table == "tags" {
+        limit(text(row, "name")?, 80, true)?;
+        let color = text(row, "color")?;
+        if color.len() != 7
+            || !color.starts_with('#')
+            || !color[1..].bytes().all(|c| c.is_ascii_hexdigit())
+        {
+            return Err("태그 색상 오류".into());
+        }
+        return Ok(());
+    }
+    if table == "note_templates" {
+        limit(text(row, "title")?, 300, true)?;
+        return limit(text(row, "content")?, 1000000, false);
+    }
+    if table == "note_tags" {
+        for key in ["note_id", "tag_id"] {
+            Uuid::parse_str(text(row, key)?).map_err(|_| "노트 태그 연결 오류")?;
+        }
+        return Ok(());
+    }
+    if table == "task_blocks" || table == "board_positions" {
+        Uuid::parse_str(text(row, "task_id")?).map_err(|_| "Task ID 오류")?;
+        if table == "task_blocks"
+            && instant(text(row, "start_at")?)? >= instant(text(row, "end_at")?)?
+        {
+            return Err("종료 시간은 시작 이후여야 합니다.".into());
+        }
+        if table == "board_positions"
+            && !row["position"]
+                .as_i64()
+                .is_some_and(|n| (0..=2147483647).contains(&n))
+        {
+            return Err("보드 순서 오류".into());
+        }
+        return Ok(());
+    }
     if table == "routine_completions" {
         Uuid::parse_str(text(row, "routine_id")?).map_err(|_| "루틴 ID 오류")?;
         text(row, "local_date")?;
@@ -384,6 +435,14 @@ impl Database {
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
+        if version < 7 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/007_workspace_tools.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 7)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
         conn.query_row("SELECT id FROM local_identity WHERE singleton=1", [], |r| {
             r.get::<_, String>(0)
         })
@@ -535,6 +594,14 @@ impl Database {
         {
             return Err("루틴 완료 기록 ID 오류".into());
         }
+        if table == "note_tags"
+            && id != completion_id(text(input, "note_id")?, text(input, "tag_id")?)
+        {
+            return Err("노트 태그 ID 오류".into());
+        }
+        if table == "board_positions" && id != text(input, "task_id")? {
+            return Err("보드 순서 ID 오류".into());
+        }
         Uuid::parse_str(id).map_err(|_| "항목 ID를 확인해 주세요.")?;
         let columns = fields(table)?;
         let mut row = Map::new();
@@ -626,16 +693,20 @@ impl Database {
         self.require_workspace()?;
         let owner = self.owner()?;
         let mut update = id.is_some();
-        let id = if table == "routine_completions" {
+        let id = if ["routine_completions", "note_tags", "board_positions"].contains(&table) {
             validate(table, &input)?;
-            let expected = completion_id(text(&input, "routine_id")?, text(&input, "local_date")?);
+            let expected = match table {
+                "note_tags" => completion_id(text(&input, "note_id")?, text(&input, "tag_id")?),
+                "board_positions" => text(&input, "task_id")?.to_string(),
+                _ => completion_id(text(&input, "routine_id")?, text(&input, "local_date")?),
+            };
             if id.as_ref().is_some_and(|id| *id != expected) {
                 return Err("루틴 완료 기록 ID 오류".into());
             }
             update = self
                 .conn
                 .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM routine_completions WHERE id=?1)",
+                    &format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE id=?1)"),
                     [&expected],
                     |r| r.get(0),
                 )
@@ -674,6 +745,57 @@ impl Database {
         conn.execute(&format!("DELETE FROM {table} WHERE id=?1"), [id])
             .map_err(sql_error)?;
         Ok(())
+    }
+    pub fn reorder_board(&mut self, project_id: &str, ids: Vec<String>) -> Result<()> {
+        self.require_workspace()?;
+        let owner = self.owner()?;
+        let tx = self.conn.transaction().map_err(sql_error)?;
+        let exists: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM projects WHERE id=?1 AND user_id=?2)",
+                params![project_id, owner],
+                |r| r.get(0),
+            )
+            .map_err(sql_error)?;
+        if !exists {
+            return Err("프로젝트를 찾을 수 없습니다.".into());
+        }
+        let rows = json_rows(
+            &tx,
+            "SELECT id FROM tasks WHERE project_id=?1 AND user_id=?2 ORDER BY id",
+            &[
+                SqlValue::Text(project_id.into()),
+                SqlValue::Text(owner.clone()),
+            ],
+        )?;
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|r| r["id"].as_str().unwrap().to_string())
+            .collect();
+        let mut expected = ids.clone();
+        expected.sort();
+        if actual != expected {
+            return Err("프로젝트 작업이 변경되었습니다. 새로고침 후 다시 정렬해 주세요.".into());
+        }
+        for (position, id) in ids.iter().enumerate() {
+            let update: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM board_positions WHERE id=?1)",
+                    [id],
+                    |r| r.get(0),
+                )
+                .map_err(sql_error)?;
+            Self::write(
+                &tx,
+                &owner,
+                "board_positions",
+                &json!({"task_id":id,"position":position}),
+                id,
+                update,
+                false,
+            )?;
+        }
+        tx.commit().map_err(sql_error)
     }
     pub fn reorder_subtasks(&mut self, task_id: &str, ids: Vec<String>) -> Result<()> {
         self.require_workspace()?;

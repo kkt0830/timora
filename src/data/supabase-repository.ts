@@ -1,6 +1,6 @@
 import { routineCompletionId } from '../domain/routines.ts';
 import type { AuthService, WorkspaceRepository } from '../services/contracts.ts';
-import { emptyWorkspace, entityTables } from '../domain/models.ts';
+import { emptyWorkspace, entityTables, workspaceToolTables } from '../domain/models.ts';
 import type { EntityInput, EntityMap, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models.ts';
 import { displayName, safeAvatarUrl } from '../domain/identity.ts';
 import { validateInput } from '../domain/validation.ts';
@@ -27,6 +27,7 @@ export class SupabaseRepository implements WorkspaceRepository {
       if (rows.length < 500) return all;
     }
   }
+  async reorderBoard(_userId: string, projectId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_board', { method: 'POST', body: JSON.stringify({ parent_id: projectId, ordered_ids: ids }) }); }
   async reorderSubtasks(_userId: string, taskId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_subtasks', { method: 'POST', body: JSON.stringify({ parent_id: taskId, ordered_ids: ids }) }); }
   async load(userId: string): Promise<WorkspaceData> {
     const data = emptyWorkspace(userId);
@@ -46,11 +47,22 @@ export class SupabaseRepository implements WorkspaceRepository {
       const capability = await this.request<{protocol:number}>('rpc/sync_capabilities_v3', { method:'POST', body:'{}' });
       if (capability?.protocol === 3) { data.routines = await this.list('routines', userId); data.routine_completions = await this.list('routine_completions', userId); data.routines_available = true; }
     } catch(error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
+    try {
+      const capability = await this.request<{protocol:number}>('rpc/sync_capabilities_v4', {method:'POST',body:'{}'});
+      if (capability?.protocol === 4) { for (const table of workspaceToolTables) Object.assign(data,{[table]:await this.list(table,userId)}); data.tools_available = true; }
+    } catch(error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
     return data;
   }
   async save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {
     validateInput(table, input);
     if (table === 'library_items' && /\s/.test(String((input as EntityInput<'library_items'>).url))) input = { ...input, url: new URL(String((input as EntityInput<'library_items'>).url)).href };
+    if (table === 'note_tags' || table === 'board_positions') {
+      const row = input as unknown as EntityInput<'note_tags'> & EntityInput<'board_positions'>;
+      const stableId = table === 'note_tags' ? await routineCompletionId(row.note_id, row.tag_id) : row.task_id;
+      if (id && id !== stableId) throw new Error('연결 ID 오류');
+      const rows = await this.request<EntityMap[K][]>(`${table}?on_conflict=id`, {method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({...input,id:stableId,user_id:userId})});
+      if (!rows[0]) throw new Error('연결 저장 실패'); return rows[0];
+    }
     if (table === 'routine_completions') {
       const completion = input as EntityInput<'routine_completions'>;
       const stableId = await routineCompletionId(completion.routine_id, completion.local_date);

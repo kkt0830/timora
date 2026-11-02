@@ -33,9 +33,9 @@ globalThis.fetch=(url,init)=> {
  const body=JSON.parse(init.body);const task=tail.then(async()=>{
   await pg.query('begin');
   try {await pg.query('set local role authenticated');await pg.query("select set_config('request.jwt.claim.sub',$1,true)",[owner]);
-   const sql=url.endsWith('sync_capabilities_v3')?'select public.sync_capabilities_v3() result':url.endsWith('sync_apply_v3')?'select public.sync_apply_v3($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull_v3($1,$2) result';
-   const params=url.endsWith('sync_capabilities_v3')?[]:url.endsWith('sync_apply_v3')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
-   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply_v3') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
+   const sql=url.endsWith('sync_capabilities_v4')?'select public.sync_capabilities_v4() result':url.endsWith('sync_apply_v4')?'select public.sync_apply_v4($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull_v4($1,$2) result';
+   const params=url.endsWith('sync_capabilities_v4')?[]:url.endsWith('sync_apply_v4')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
+   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply_v4') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
   }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message,code:e.code}),{status:/^(22|23)/.test(e.code??'')?400:500});}
  });tail=task.catch(()=>{});return task;
 };
@@ -65,6 +65,20 @@ try {
  for(const [table,input] of Object.entries({tasks:{title:'T',description:'',status:'todo',priority:'high',start_date:null,due_date:'2026-10-12',project_id:project.id},events:{title:'E',description:'',start_at:'2026-10-12T09:00:00Z',end_at:'2026-10-12T10:00:00Z',project_id:project.id},library_items:{title:'L',description:'',url:'https://example.com',type:'article',project_id:project.id},inbox_items:{content:'Capture',type:'unclassified'}}))await phone.invoke('local_save',{table,input});
  await sync(phone);await sync(tablet);
  for(const table of ['projects','tasks','events','library_items','inbox_items'])assert.equal((await load(tablet,table)).length,1,table);
+ // Workspace tools use owner-safe dependencies and preserve source data when links are deleted.
+ const tagged=await phone.invoke('local_save',{table:'notes',input:{title:'Tagged',content:'source',project_id:project.id}});
+ const tag=await phone.invoke('local_save',{table:'tags',input:{name:'개발',color:'#5271ff'}});
+ const link=await phone.invoke('local_save',{table:'note_tags',input:{note_id:tagged.id,tag_id:tag.id}});
+ await phone.invoke('local_save',{table:'note_templates',input:{title:'Meeting',content:'# Agenda'}});
+ const taskForBlock=(await load(phone,'tasks'))[0];
+ await phone.invoke('local_save',{table:'task_blocks',input:{task_id:taskForBlock.id,start_at:'2026-11-02T01:00:00Z',end_at:'2026-11-02T02:00:00Z'}});
+ await phone.invoke('local_save',{table:'board_positions',input:{task_id:taskForBlock.id,position:0}});
+ await sync(phone);await sync(tablet);for(const table of ['tags','note_tags','note_templates','task_blocks','board_positions'])assert.equal((await load(tablet,table)).length,1,table);
+ await sync(other);assert.equal((await load(other,'tags')).length,0);
+ const sameLink=await tablet.invoke('local_save',{table:'note_tags',input:{note_id:tagged.id,tag_id:tag.id}});assert.equal(sameLink.id,link.id);await sync(tablet);await sync(phone);
+ await phone.invoke('local_remove',{table:'tags',id:tag.id});await sync(phone);await sync(tablet);assert.equal((await load(tablet,'note_tags')).length,0);assert.equal((await load(tablet,'notes')).find(n=>n.id===tagged.id).content,'source');
+ await phone.invoke('local_remove',{table:'notes',id:tagged.id});await sync(phone);await sync(tablet);
+ console.log('PASS: note tags, templates, time blocks, board positions and owner isolation');
  // Routine rules and per-day completion converge using the same deterministic identity.
  const routine=await phone.invoke('local_save',{table:'routines',input:{title:'물 마시기',description:'',frequency:'daily',interval_days:1,start_date:'2026-01-01',end_date:null,occurrence_limit:null,weekdays:'',timezone:'Asia/Seoul',status:'active',reminder_time:null,category:''}});
  await sync(phone);await sync(tablet);
