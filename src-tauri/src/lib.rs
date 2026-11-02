@@ -12,8 +12,8 @@ fn sql_error(e: rusqlite::Error) -> String {
 fn now() -> String {
     Utc::now().to_rfc3339()
 }
-pub const SCHEMA_VERSION: i64 = 7;
-pub const EXTENSION_TABLES: [&str; 8] = [
+pub const SCHEMA_VERSION: i64 = 10;
+pub const EXTENSION_TABLES: [&str; 12] = [
     "subtasks",
     "routines",
     "routine_completions",
@@ -22,6 +22,10 @@ pub const EXTENSION_TABLES: [&str; 8] = [
     "note_tags",
     "task_blocks",
     "board_positions",
+    "task_recurrences",
+    "task_occurrences",
+    "object_relations",
+    "user_quotes",
 ];
 pub const TABLES: [&str; 6] = [
     "projects",
@@ -33,11 +37,36 @@ pub const TABLES: [&str; 6] = [
 ];
 fn fields(table: &str) -> Result<&'static [&'static str]> {
     match table {
+        "object_relations" => Ok(&[
+            "source_id",
+            "source_kind",
+            "target_id",
+            "target_kind",
+            "kind",
+        ]),
+        "user_quotes" => Ok(&["content", "author", "favorite"]),
         "tags" => Ok(&["name", "color"]),
         "note_templates" => Ok(&["title", "content"]),
         "note_tags" => Ok(&["note_id", "tag_id"]),
         "task_blocks" => Ok(&["task_id", "start_at", "end_at"]),
         "board_positions" => Ok(&["task_id", "position"]),
+        "task_occurrences" => Ok(&["recurrence_id", "local_date", "task_id"]),
+        "task_recurrences" => Ok(&[
+            "title",
+            "description",
+            "frequency",
+            "interval_days",
+            "start_date",
+            "end_date",
+            "occurrence_limit",
+            "weekdays",
+            "timezone",
+            "status",
+            "reminder_time",
+            "category",
+            "priority",
+            "project_id",
+        ]),
         "routines" => Ok(&[
             "title",
             "description",
@@ -107,6 +136,24 @@ fn instant(s: &str) -> Result<DateTime<chrono::FixedOffset>> {
     DateTime::parse_from_rfc3339(s).map_err(|_| "일정 시간을 확인해 주세요.".into())
 }
 fn validate(table: &str, row: &Value) -> Result<()> {
+    if table == "object_relations" {
+        for key in ["source_id", "target_id"] {
+            Uuid::parse_str(text(row, key)?).map_err(|_| "연결 대상 ID 오류")?;
+        }
+        for key in ["source_kind", "target_kind"] {
+            choice(row, key, &["task", "note", "project", "event", "resource"])?;
+        }
+        return choice(row, "kind", &["references", "belongs_to", "depends_on"]);
+    }
+    if table == "user_quotes" {
+        limit(text(row, "content")?, 2000, true)?;
+        limit(text(row, "author")?, 200, false)?;
+        if !matches!(row["favorite"].as_i64(), Some(0) | Some(1)) {
+            return Err("즐겨찾기 값 오류".into());
+        }
+        return Ok(());
+    }
+
     if table == "tags" {
         limit(text(row, "name")?, 80, true)?;
         let color = text(row, "color")?;
@@ -150,7 +197,19 @@ fn validate(table: &str, row: &Value) -> Result<()> {
         date(row, "local_date")?;
         return choice(row, "status", &["todo", "done"]);
     }
-    if table == "routines" {
+    if table == "task_occurrences" {
+        Uuid::parse_str(text(row, "recurrence_id")?).map_err(|_| "반복 ID 오류")?;
+        Uuid::parse_str(text(row, "task_id")?).map_err(|_| "Task ID 오류")?;
+        text(row, "local_date")?;
+        return date(row, "local_date");
+    }
+    if table == "task_recurrences" {
+        choice(row, "priority", &["low", "medium", "high"])?;
+        if let Some(id) = row["project_id"].as_str() {
+            Uuid::parse_str(id).map_err(|_| "Project ID 오류")?;
+        }
+    }
+    if table == "routines" || table == "task_recurrences" {
         limit(text(row, "title")?, 300, true)?;
         limit(text(row, "description")?, 20000, false)?;
         choice(
@@ -440,6 +499,30 @@ impl Database {
             tx.execute_batch(include_str!("../migrations/007_workspace_tools.sql"))
                 .map_err(sql_error)?;
             tx.pragma_update(None, "user_version", 7)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 8 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/008_recurring_tasks.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 8)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 9 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/009_relations_quotes.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 9)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 10 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/010_restore_guard.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 10)
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
@@ -738,7 +821,13 @@ impl Database {
             .map_err(sql_error)?;
         }
         if table == "projects" {
-            for child in ["tasks", "notes", "events", "library_items"] {
+            for child in [
+                "tasks",
+                "notes",
+                "events",
+                "library_items",
+                "task_recurrences",
+            ] {
                 conn.execute(&format!("UPDATE {child} SET project_id=NULL,updated_at=?1,sync_state=CASE WHEN remote_updated_at IS NULL THEN 'local' ELSE 'modified' END WHERE project_id=?2"),params![now(),id]).map_err(sql_error)?;
             }
         }
@@ -1018,3 +1107,7 @@ mod runtime;
 mod session_vault;
 #[cfg(feature = "desktop")]
 pub use runtime::run;
+
+mod recurring;
+
+mod restore;

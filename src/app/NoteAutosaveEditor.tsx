@@ -1,3 +1,4 @@
+import { Relations } from './Relations';
 import { NoteTags, TemplatePicker } from './NoteTools';
 import { ApiError } from '../data/http';
 import { useEffect, useRef, useState } from 'react';
@@ -66,7 +67,7 @@ export function NoteAutosaveEditor({ note, onClose }: { note: Note; onClose: () 
     <div className="editor-tabs"><button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>Markdown 편집</button><button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>미리보기</button></div>
     <label hidden={preview}>내용<textarea name="content" rows={14} maxLength={1000000} className="markdown-input" value={draft.content} onChange={e => setDraft({ ...draft, content: e.target.value })} /></label>{preview && <Markdown content={draft.content} />}
     <label>프로젝트<select name="project_id" value={draft.project_id ?? ''} onChange={e => setDraft({ ...draft, project_id: e.target.value || null })}><option value="">연결 없음</option>{workspace.data.projects.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
-    <NoteTags noteId={note.id}/><TemplatePicker append={text=>setDraft(value=>({...value,content:value.content+(value.content?'\n\n':'')+text}))}/>
+    <Relations id={note.id} kind="note"/><NoteTags noteId={note.id}/><TemplatePicker append={text=>setDraft(value=>({...value,content:value.content+(value.content?'\n\n':'')+text}))}/>
 
     <p role="status">{saving ? '저장 중…' : changed ? '저장 대기 중' : notice || '저장된 노트'}{notice && changed ? ` · ${notice}` : ''}</p>
     {error && <p role="alert" className="error">{error}<button type="button" onClick={() => { retries.current = 0; setError(''); setAttempt(n => n + 1); }}>다시 저장</button></p>}

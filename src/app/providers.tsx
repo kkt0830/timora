@@ -56,6 +56,7 @@ export function useAuth() { const value = useContext(AuthContext); if (!value) t
 interface WorkspaceState {
   data: WorkspaceData; loading: boolean; loaded: boolean; error: string; busy: boolean;
   reload: () => Promise<void>;
+  generateTasks: (ruleId: string, revision: string, days: string[]) => Promise<void>;
   reorderBoard: (projectId: string, ids: string[]) => Promise<void>;
   reorderSubtasks: (taskId: string, ids: string[]) => Promise<void>;
   save: <K extends EntityTable>(table: K, input: EntityInput<K>, id?: string) => Promise<void>;
@@ -115,6 +116,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   };
   const value: WorkspaceState = {
     data, loading, loaded, error, busy, reload,
+    generateTasks: async (ruleId, revision, days) => mutate(async () => { await repository.generateTasks(account.id,ruleId,revision,days); if(mounted.current) await reload(false); }),
     reorderBoard: async (projectId, ids) => mutate(async () => { await repository.reorderBoard(account.id, projectId, ids); if (mounted.current) await reload(false); }),
     reorderSubtasks: async (taskId, ids) => mutate(async () => { await repository.reorderSubtasks(account.id, taskId, ids); if (mounted.current) await reload(false); }),
     save: async (table, input, id) => mutate(async () => {
@@ -127,9 +129,12 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
       setData(previous => {
         const next = { ...previous, [table]: previous[table].filter(item => item.id !== id) };
         if (table === 'tasks') { next.subtasks = previous.subtasks.filter(s => s.task_id !== id); next.task_blocks = previous.task_blocks.filter(s=>s.task_id!==id); next.board_positions = previous.board_positions.filter(s=>s.task_id!==id); }
+        const kind = ({tasks:'task',notes:'note',projects:'project',events:'event',library_items:'resource'} as Record<string,string>)[table];
+        if(kind) next.object_relations = previous.object_relations.filter(r=>!(r.source_id===id&&r.source_kind===kind)&&!(r.target_id===id&&r.target_kind===kind));
         if (table === 'notes') next.note_tags = previous.note_tags.filter(s=>s.note_id!==id);
         if (table === 'tags') next.note_tags = previous.note_tags.filter(s=>s.tag_id!==id);
         if (table === 'projects') {
+          next.task_recurrences = previous.task_recurrences.map(r=>r.project_id===id?{...r,project_id:null}:r);
           next.tasks = previous.tasks.map(t => t.project_id === id ? { ...t, project_id: null } : t);
           next.notes = previous.notes.map(t => t.project_id === id ? { ...t, project_id: null } : t);
           next.events = previous.events.map(t => t.project_id === id ? { ...t, project_id: null } : t);

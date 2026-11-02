@@ -68,6 +68,17 @@ fn rebase(conn: &Connection, table: &str, id: &str, record: &Value) -> Result<()
 
 impl Database {
     fn sync_owner(&self, cloud_id: &str) -> Result<String> {
+        let hold: bool = self
+            .conn
+            .query_row(
+                "SELECT hold FROM local_restore_state WHERE singleton=1",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(sql_error)?;
+        if hold {
+            return Err("백업 복원 후 Cloud 동기화가 중지되었습니다. Backup에서 복원 내용을 확인한 후 다시 시작해 주세요.".into());
+        }
         self.require_workspace()?;
         let identity = self.identity()?;
         if identity["access_state"] != "signed_in"
@@ -125,7 +136,7 @@ impl Database {
     }
     pub fn sync_next(&self, cloud_id: &str) -> Result<Value> {
         self.sync_owner(cloud_id)?;
-        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE o.failed_at IS NULL AND NOT EXISTS(SELECT 1 FROM native_sync_outbox earlier WHERE earlier.entity_table=o.entity_table AND earlier.id=o.id AND earlier.seq<o.seq) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='projects' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='tasks' AND c.id=json_extract(o.payload,'$.task_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='tasks' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.task_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='routines' AND parent.id=json_extract(o.payload,'$.routine_id') AND parent.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts parent WHERE parent.entity_table='routines' AND parent.id=json_extract(o.payload,'$.routine_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='notes' AND parent.id=json_extract(o.payload,'$.note_id') AND parent.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts parent WHERE parent.entity_table='notes' AND parent.id=json_extract(o.payload,'$.note_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='tags' AND parent.id=json_extract(o.payload,'$.tag_id') AND parent.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts parent WHERE parent.entity_table='tags' AND parent.id=json_extract(o.payload,'$.tag_id')) ORDER BY seq LIMIT 1",&[])?;
+        let mut rows=json_rows(&self.conn,"SELECT operation_id,entity_table,id,action,payload,base_revision,base_updated_at FROM native_sync_outbox o WHERE o.failed_at IS NULL AND NOT EXISTS(SELECT 1 FROM native_sync_outbox earlier WHERE earlier.entity_table=o.entity_table AND earlier.id=o.id AND earlier.seq<o.seq) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table=o.entity_table AND c.id=o.id) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='projects' AND c.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='projects' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.project_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts c WHERE c.entity_table='tasks' AND c.id=json_extract(o.payload,'$.task_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='tasks' AND parent.action='put' AND parent.id=json_extract(o.payload,'$.task_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='routines' AND parent.id=json_extract(o.payload,'$.routine_id') AND parent.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts parent WHERE parent.entity_table='routines' AND parent.id=json_extract(o.payload,'$.routine_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='notes' AND parent.id=json_extract(o.payload,'$.note_id') AND parent.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts parent WHERE parent.entity_table='notes' AND parent.id=json_extract(o.payload,'$.note_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='tags' AND parent.id=json_extract(o.payload,'$.tag_id') AND parent.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts parent WHERE parent.entity_table='tags' AND parent.id=json_extract(o.payload,'$.tag_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox parent WHERE parent.entity_table='task_recurrences' AND parent.id=json_extract(o.payload,'$.recurrence_id') AND parent.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts parent WHERE parent.entity_table='task_recurrences' AND parent.id=json_extract(o.payload,'$.recurrence_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox p WHERE p.entity_table=CASE json_extract(o.payload,'$.source_kind') WHEN 'task' THEN 'tasks' WHEN 'note' THEN 'notes' WHEN 'project' THEN 'projects' WHEN 'event' THEN 'events' WHEN 'resource' THEN 'library_items' END AND p.id=json_extract(o.payload,'$.source_id') AND p.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts p WHERE p.entity_table=CASE json_extract(o.payload,'$.source_kind') WHEN 'task' THEN 'tasks' WHEN 'note' THEN 'notes' WHEN 'project' THEN 'projects' WHEN 'event' THEN 'events' WHEN 'resource' THEN 'library_items' END AND p.id=json_extract(o.payload,'$.source_id')) AND NOT EXISTS(SELECT 1 FROM native_sync_outbox p WHERE p.entity_table=CASE json_extract(o.payload,'$.target_kind') WHEN 'task' THEN 'tasks' WHEN 'note' THEN 'notes' WHEN 'project' THEN 'projects' WHEN 'event' THEN 'events' WHEN 'resource' THEN 'library_items' END AND p.id=json_extract(o.payload,'$.target_id') AND p.action='put') AND NOT EXISTS(SELECT 1 FROM native_sync_conflicts p WHERE p.entity_table=CASE json_extract(o.payload,'$.target_kind') WHEN 'task' THEN 'tasks' WHEN 'note' THEN 'notes' WHEN 'project' THEN 'projects' WHEN 'event' THEN 'events' WHEN 'resource' THEN 'library_items' END AND p.id=json_extract(o.payload,'$.target_id')) ORDER BY seq LIMIT 1",&[])?;
         let Some(mut row) = rows.pop() else {
             return Ok(Value::Null);
         };
@@ -173,6 +184,14 @@ impl Database {
         force: bool,
     ) -> Result<()> {
         let (table, id) = key(record, cloud_id)?;
+        let endpoint_kind = match table.as_str() {
+            "tasks" => Some("task"),
+            "notes" => Some("note"),
+            "projects" => Some("project"),
+            "events" => Some("event"),
+            "library_items" => Some("resource"),
+            _ => None,
+        };
         if !force {
             let known: Option<String> = conn
                 .query_row(
@@ -231,6 +250,15 @@ impl Database {
                     }
                 }
             }
+            if record["deleted"] == true {
+                if let Some(kind) = endpoint_kind {
+                    let dirty:bool=conn.query_row("SELECT EXISTS(SELECT 1 FROM native_sync_outbox WHERE entity_table='object_relations' AND ((json_extract(payload,'$.source_id')=?1 AND json_extract(payload,'$.source_kind')=?2) OR (json_extract(payload,'$.target_id')=?1 AND json_extract(payload,'$.target_kind')=?2) OR id IN(SELECT id FROM object_relations WHERE (source_id=?1 AND source_kind=?2) OR (target_id=?1 AND target_kind=?2))))",params![id,kind],|r|r.get(0)).map_err(sql_error)?;
+                    if dirty {
+                        conflict(conn, &table, &id, record)?;
+                        return Ok(());
+                    }
+                }
+            }
             if table == "projects" && record["deleted"] == true {
                 let dirty:bool=conn.query_row("SELECT EXISTS(SELECT 1 FROM native_sync_outbox WHERE json_extract(payload,'$.project_id')=?1)",[&id],|r|r.get(0)).map_err(sql_error)?;
                 if dirty {
@@ -242,6 +270,11 @@ impl Database {
         if record["deleted"] == true {
             if table != "workspace_settings" {
                 if force {
+                    if let Some(kind) = endpoint_kind {
+                        conn.execute("DELETE FROM native_sync_outbox WHERE entity_table='object_relations' AND ((json_extract(payload,'$.source_id')=?1 AND json_extract(payload,'$.source_kind')=?2) OR (json_extract(payload,'$.target_id')=?1 AND json_extract(payload,'$.target_kind')=?2) OR id IN(SELECT id FROM object_relations WHERE (source_id=?1 AND source_kind=?2) OR (target_id=?1 AND target_kind=?2)))",params![id,kind]).map_err(sql_error)?;
+                        conn.execute("DELETE FROM native_sync_conflicts WHERE entity_table='object_relations' AND id IN(SELECT id FROM object_relations WHERE (source_id=?1 AND source_kind=?2) OR (target_id=?1 AND target_kind=?2))",params![id,kind]).map_err(sql_error)?;
+                    }
+
                     for (parent, child, key) in [
                         ("tasks", "subtasks", "task_id"),
                         ("tasks", "task_blocks", "task_id"),
@@ -256,6 +289,13 @@ impl Database {
                         conn.execute(&format!("DELETE FROM native_sync_conflicts WHERE entity_table='{child}' AND id IN (SELECT id FROM {child} WHERE {key}=?1)"),[&id]).map_err(sql_error)?;
                     }
                 }
+                if table == "projects" {
+                    conn.execute(
+                        "UPDATE task_recurrences SET project_id=NULL WHERE project_id=?1",
+                        [&id],
+                    )
+                    .map_err(sql_error)?;
+                }
                 conn.execute(&format!("DELETE FROM {table} WHERE id=?1"), [&id])
                     .map_err(sql_error)?;
                 // Choosing a deleted project also removes its link from queued child edits.
@@ -268,6 +308,19 @@ impl Database {
             Self::settings(conn, owner, &record["payload"], true)?;
         } else {
             let payload = &record["payload"];
+            if table == "object_relations" {
+                for (key, kind) in [("source_id", "source_kind"), ("target_id", "target_kind")] {
+                    let exists:bool=conn.query_row("SELECT EXISTS(SELECT 1 FROM object_nodes WHERE id=?1 AND user_id=?2 AND kind=?3)",params![text(payload,key)?,owner,text(payload,kind)?],|r|r.get(0)).map_err(sql_error)?;
+                    if !exists {
+                        if force {
+                            return Err("먼저 연결 대상의 충돌을 해결해 주세요.".into());
+                        }
+                        conflict(conn, &table, &id, record)?;
+                        return Ok(());
+                    }
+                }
+            }
+
             if let Some(project) = payload["project_id"].as_str() {
                 let exists: bool = conn
                     .query_row(

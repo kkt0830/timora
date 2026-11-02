@@ -72,19 +72,19 @@ export class CloudSyncService {
         catch (error) { if (!(error instanceof ApiError) || error.status !== 401 || !current()) throw error; return apiRequest<T>(this.config, `/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(body), signal }, await this.auth.token(true)); }
       };
       let capability: { protocol?: number; entities?: string[] };
-      try { capability = await request('sync_capabilities_v4', {}); }
+      try { capability = await request('sync_capabilities_v6', {}); }
       catch (error) {
         if (error instanceof ApiError && error.status === 404) throw new Error('Cloud가 v0.4 동기화를 아직 지원하지 않습니다. 서버 업데이트가 필요합니다. 로컬 기록과 전송 대기는 보존됩니다.');
         throw error;
       }
-      if (capability?.protocol !== 4 || !capability.entities?.includes('subtasks')) throw new Error('지원하지 않는 Cloud 동기화 버전입니다. 앱과 서버 버전을 확인해 주세요. 로컬 기록은 계속 사용할 수 있습니다.');
+      if (capability?.protocol !== 6 || !capability.entities?.includes('subtasks')) throw new Error('지원하지 않는 Cloud 동기화 버전입니다. 앱과 서버 버전을 확인해 주세요. 로컬 기록은 계속 사용할 수 있습니다.');
       // Push first: a lost acknowledgement retries its receipt before pull can call it a conflict.
       let dependencyError: { error: ApiError; operation: Operation } | null = null;
       for (let delivered = 0; current() && delivered < 200; delivered++) {
         const operation = await this.invoke<Operation | null>('local_sync_next', { cloudUserId: account.cloud_user_id });
         if (!operation) break;
         let response: unknown;
-        try { response = await request('sync_apply_v4', { operation_id: operation.operation_id, entity_table: operation.entity_table, entity_id: operation.id, action: operation.action, payload: operation.payload, base_revision: operation.base_revision, base_updated_at: operation.base_updated_at }); }
+        try { response = await request('sync_apply_v6', { operation_id: operation.operation_id, entity_table: operation.entity_table, entity_id: operation.id, action: operation.action, payload: operation.payload, base_revision: operation.base_revision, base_updated_at: operation.base_updated_at }); }
         catch (error) {
           // A project may have been deleted elsewhere while its child was edited
           // offline. Pull that deletion so native can preserve both as a conflict.
@@ -103,7 +103,7 @@ export class CloudSyncService {
       }
       for (let batches = 0; current() && batches < 50; batches++) {
         const snapshot = await this.invoke<SyncSnapshot>('local_sync_status');
-        const page = await request<Page>('sync_pull_v4', { after_revision: snapshot.cursor, batch_size: 200 });
+        const page = await request<Page>('sync_pull_v6', { after_revision: snapshot.cursor, batch_size: 200 });
         if (!current()) return;
         await this.invoke('local_sync_page', { cloudUserId: account.cloud_user_id, after: snapshot.cursor, page });
         if (!page.has_more) break;

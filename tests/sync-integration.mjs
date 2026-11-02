@@ -33,9 +33,9 @@ globalThis.fetch=(url,init)=> {
  const body=JSON.parse(init.body);const task=tail.then(async()=>{
   await pg.query('begin');
   try {await pg.query('set local role authenticated');await pg.query("select set_config('request.jwt.claim.sub',$1,true)",[owner]);
-   const sql=url.endsWith('sync_capabilities_v4')?'select public.sync_capabilities_v4() result':url.endsWith('sync_apply_v4')?'select public.sync_apply_v4($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull_v4($1,$2) result';
-   const params=url.endsWith('sync_capabilities_v4')?[]:url.endsWith('sync_apply_v4')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
-   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply_v4') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
+   const sql=url.endsWith('sync_capabilities_v6')?'select public.sync_capabilities_v6() result':url.endsWith('sync_apply_v6')?'select public.sync_apply_v6($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull_v6($1,$2) result';
+   const params=url.endsWith('sync_capabilities_v6')?[]:url.endsWith('sync_apply_v6')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
+   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply_v6') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
   }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message,code:e.code}),{status:/^(22|23)/.test(e.code??'')?400:500});}
  });tail=task.catch(()=>{});return task;
 };
@@ -79,6 +79,27 @@ try {
  await phone.invoke('local_remove',{table:'tags',id:tag.id});await sync(phone);await sync(tablet);assert.equal((await load(tablet,'note_tags')).length,0);assert.equal((await load(tablet,'notes')).find(n=>n.id===tagged.id).content,'source');
  await phone.invoke('local_remove',{table:'notes',id:tagged.id});await sync(phone);await sync(tablet);
  console.log('PASS: note tags, templates, time blocks, board positions and owner isolation');
+ // Object links carry parent dependencies and disappear when an endpoint is deleted.
+ const linkedNote=await phone.invoke('local_save',{table:'notes',input:{title:'Linked',content:'',project_id:project.id}});
+ const relation=await phone.invoke('local_save',{table:'object_relations',input:{source_id:linkedNote.id,source_kind:'note',target_id:taskForBlock.id,target_kind:'task',kind:'depends_on'}});
+ await phone.invoke('local_save',{table:'user_quotes',input:{content:'One step',author:'Timora fixture',favorite:1}});
+ await sync(phone);await sync(tablet);assert.equal((await load(tablet,'object_relations')).length,1);assert.equal((await load(tablet,'user_quotes'))[0].favorite,1);
+ await assert.rejects(tablet.invoke('local_save',{table:'object_relations',input:{source_id:taskForBlock.id,source_kind:'task',target_id:linkedNote.id,target_kind:'note',kind:'depends_on'}}));
+ await phone.invoke('local_remove',{table:'notes',id:linkedNote.id});await sync(phone);await sync(tablet);assert.equal((await load(tablet,'object_relations')).length,0);
+ await sync(other);assert.equal((await load(other,'user_quotes')).length,0);
+ console.log('PASS: relations, dependency cycles, endpoint cascade, quotes and owner isolation');
+ // Two devices generate the same recurrence offline; both Task and occurrence converge.
+ const rule=await phone.invoke('local_save',{table:'task_recurrences',input:{title:'Recurring',description:'',frequency:'daily',interval_days:1,start_date:'2026-11-01',end_date:null,occurrence_limit:5,weekdays:'',timezone:'Asia/Seoul',status:'active',reminder_time:null,category:'',priority:'medium',project_id:project.id}});
+ await sync(phone);await sync(tablet);
+ const rp=(await load(phone,'task_recurrences'))[0],rt=(await load(tablet,'task_recurrences'))[0];
+ for(const [d,r] of [[phone,rp],[tablet,rt]])await d.invoke('local_generate_tasks',{ruleId:r.id,revision:r.updated_at,days:['2026-11-02']});
+ await sync(phone);await sync(tablet);assert.equal(tablet.state.conflict_count,0);assert.equal((await load(tablet,'task_occurrences')).length,1);
+ const occurrence=(await load(phone,'task_occurrences'))[0];const generated=(await load(phone,'tasks')).find(t=>t.id===occurrence.task_id);
+ await phone.invoke('local_save',{table:'tasks',id:generated.id,input:{...generated,status:'done'}});await sync(phone);await sync(tablet);
+ await phone.invoke('local_save',{table:'task_recurrences',id:rp.id,input:{...rp,status:'archived'}});await sync(phone);await sync(tablet);
+ assert.equal((await load(tablet,'tasks')).find(t=>t.id===generated.id).status,'done');
+ await sync(other);assert.equal((await load(other,'task_occurrences')).length,0);
+ console.log('PASS: deterministic Task recurrence generation, concurrent offline convergence and completed history');
  // Routine rules and per-day completion converge using the same deterministic identity.
  const routine=await phone.invoke('local_save',{table:'routines',input:{title:'물 마시기',description:'',frequency:'daily',interval_days:1,start_date:'2026-01-01',end_date:null,occurrence_limit:null,weekdays:'',timezone:'Asia/Seoul',status:'active',reminder_time:null,category:''}});
  await sync(phone);await sync(tablet);
@@ -94,13 +115,13 @@ try {
  await sync(other);assert.equal((await load(other,'routines')).length,0);assert.equal((await load(other,'routine_completions')).length,0);
  console.log('PASS: routine persistence, deterministic concurrent completion, undo, schedule history preservation and owner isolation');
  // Subtasks share parent IDs, commit offline, converge on duplicate completion and reorder.
- const parent=(await load(phone,'tasks'))[0];
+ const parent=(await load(phone,'tasks')).find(t=>t.title==='T');
  disconnected=true;
  const sub=await phone.invoke('local_save',{table:'subtasks',input:{task_id:parent.id,title:'Offline checklist',status:'todo',position:0}});
  await phone.invoke('local_save',{table:'subtasks',id:sub.id,input:{...sub,status:'done'}});
  disconnected=false;await sync(phone);await sync(tablet);
  assert.equal((await load(tablet,'subtasks'))[0].status,'done');
- assert.equal((await load(tablet,'tasks'))[0].status,'todo');
+ assert.equal((await load(tablet,'tasks')).find(t=>t.id===parent.id).status,'todo');
  const sub2=await tablet.invoke('local_save',{table:'subtasks',input:{task_id:parent.id,title:'second',status:'todo',position:1}});
  await sync(tablet);await sync(phone);
  await phone.invoke('local_save',{table:'subtasks',id:sub2.id,input:{...sub2,status:'done'}});

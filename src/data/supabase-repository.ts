@@ -27,6 +27,7 @@ export class SupabaseRepository implements WorkspaceRepository {
       if (rows.length < 500) return all;
     }
   }
+  async generateTasks(_userId: string, ruleId: string, revision: string, days: string[]): Promise<void> { await this.request('rpc/generate_recurring_tasks', {method:'POST',body:JSON.stringify({rule_id:ruleId,expected_updated_at:revision,requested_days:days})}); }
   async reorderBoard(_userId: string, projectId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_board', { method: 'POST', body: JSON.stringify({ parent_id: projectId, ordered_ids: ids }) }); }
   async reorderSubtasks(_userId: string, taskId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_subtasks', { method: 'POST', body: JSON.stringify({ parent_id: taskId, ordered_ids: ids }) }); }
   async load(userId: string): Promise<WorkspaceData> {
@@ -51,6 +52,8 @@ export class SupabaseRepository implements WorkspaceRepository {
       const capability = await this.request<{protocol:number}>('rpc/sync_capabilities_v4', {method:'POST',body:'{}'});
       if (capability?.protocol === 4) { for (const table of workspaceToolTables) Object.assign(data,{[table]:await this.list(table,userId)}); data.tools_available = true; }
     } catch(error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
+    try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v5',{method:'POST',body:'{}'}); if(capability?.protocol===5){data.task_recurrences=await this.list('task_recurrences',userId);data.task_occurrences=await this.list('task_occurrences',userId);data.recurrence_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
+    try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v6',{method:'POST',body:'{}'});if(capability?.protocol===6){data.object_relations=await this.list('object_relations',userId);data.user_quotes=await this.list('user_quotes',userId);data.extras_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
     return data;
   }
   async save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {

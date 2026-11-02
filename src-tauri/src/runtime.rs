@@ -431,6 +431,106 @@ async fn local_inspect_backup(
 }
 
 #[tauri::command]
+async fn local_restore_backup(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<LocalState>>,
+) -> Result<Option<crate::backup::BackupPreview>, String> {
+    let state = Arc::clone(state.inner());
+    let epoch = state.auth_epoch.load(Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || {
+        locked_db(&state, |db| db.require_workspace())?;
+        let Some(selected) = app
+            .dialog()
+            .file()
+            .set_title("Timora 백업 복원")
+            .add_filter("Timora ZIP", &["zip"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let mut input = app
+            .fs()
+            .open(
+                selected,
+                tauri_plugin_fs::OpenOptions::new().read(true).clone(),
+            )
+            .map_err(|_| "백업 파일 열기 실패")?
+            .take(514 * 1024 * 1024 + 1);
+        let mut file = tempfile::tempfile().map_err(|_| "백업 임시 파일 오류")?;
+        let size = std::io::copy(&mut input, &mut file).map_err(|_| "백업 읽기 오류")?;
+        if size > 514 * 1024 * 1024 {
+            return Err("백업 크기 제한 초과".into());
+        }
+        std::io::Seek::rewind(&mut file).map_err(|_| "백업 읽기 오류")?;
+        let preview = crate::backup::inspect_archive(&mut file)?;
+        let total:u64=preview.records.values().sum();
+        if !app.dialog().message(format!("{}에 만든 백업 ({}개 기록)으로 이 기기의 내용을 복원합니다. 현재 내용은 복구용 백업에 보관하고 Cloud 동기화는 중지합니다. 계속할까요?",preview.created_at,total)).title("Timora 백업 복원").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom("복원".into(),"취소".into())).blocking_show(){return Ok(None);}
+        std::io::Seek::rewind(&mut file).map_err(|_|"백업 읽기 오류")?;
+        locked_db(&state, |db| {
+            db.require_workspace()?;
+            if state.auth_epoch.load(Ordering::SeqCst) != epoch {
+                return Err("로그인 상태가 변경되었습니다.".into());
+            }
+            let base=state.path.parent().ok_or("DB 경로 오류")?;
+            db.restore_archive(file,&base.join("profile"),&base.join("recovery")).map(Some)
+        })
+    })
+    .await
+    .map_err(|_| "백업 검사 오류".to_string())?
+}
+
+#[tauri::command]
+async fn local_undo_restore(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<LocalState>>,
+) -> Result<Option<crate::backup::BackupPreview>, String> {
+    let state = Arc::clone(state.inner());
+    let epoch = state.auth_epoch.load(Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || {
+        if !app
+            .dialog()
+            .message("직전 복원 전의 기록으로 되돌릴까요? 현재 내용도 새 복구용 백업에 보관합니다.")
+            .title("복원 되돌리기")
+            .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel)
+            .blocking_show()
+        {
+            return Ok(None);
+        }
+        locked_db(&state, |db| {
+            db.require_workspace()?;
+            if epoch != state.auth_epoch.load(Ordering::SeqCst) {
+                return Err("로그인 상태가 변경되었습니다.".into());
+            }
+            let status = db.restore_status()?;
+            let name = crate::text(&status, "recovery_name")?;
+            let id = name
+                .strip_prefix("before-restore-")
+                .and_then(|n| n.strip_suffix(".zip"))
+                .ok_or("복구 백업 이름 오류")?;
+            uuid::Uuid::parse_str(id).map_err(|_| "복구 백업 이름 오류")?;
+            let base = state.path.parent().ok_or("DB 경로 오류")?;
+            let recovery = base.join("recovery");
+            let file = std::fs::File::open(recovery.join(name))
+                .map_err(|_| "복구용 백업을 찾을 수 없습니다.")?;
+            db.restore_archive(file, &base.join("profile"), &recovery)
+                .map(Some)
+        })
+    })
+    .await
+    .map_err(|_| "복원 되돌리기 오류".to_string())?
+}
+#[tauri::command]
+async fn local_backup_state(state: tauri::State<'_, Arc<LocalState>>) -> Result<Value, String> {
+    with_db(state, |db| db.restore_status()).await
+}
+#[tauri::command]
+async fn local_resume_after_restore(
+    state: tauri::State<'_, Arc<LocalState>>,
+) -> Result<(), String> {
+    with_db(state, |db| db.resume_restored_sync()).await
+}
+
+#[tauri::command]
 async fn local_load(state: tauri::State<'_, Arc<LocalState>>) -> Result<Value, String> {
     with_db(state, move |db| db.load()).await
 }
@@ -442,6 +542,18 @@ async fn local_save(
     id: Option<String>,
 ) -> Result<Value, String> {
     with_db(state, move |db| db.save(&table, input, id)).await
+}
+#[tauri::command]
+async fn local_generate_tasks(
+    state: tauri::State<'_, Arc<LocalState>>,
+    rule_id: String,
+    revision: String,
+    days: Vec<String>,
+) -> Result<(), String> {
+    with_db(state, move |db| {
+        db.generate_tasks(&rule_id, &revision, days)
+    })
+    .await
 }
 #[tauri::command]
 async fn local_board_reorder(
@@ -504,6 +616,7 @@ async fn local_info(state: tauri::State<'_, Arc<LocalState>>) -> Result<Value, S
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(crate::session_vault::init())
@@ -536,10 +649,15 @@ pub fn run() {
             local_load,
             local_export_backup,
             local_inspect_backup,
+            local_restore_backup,
+            local_backup_state,
+            local_undo_restore,
+            local_resume_after_restore,
             local_save,
             local_remove,
             local_subtasks_reorder,
             local_board_reorder,
+            local_generate_tasks,
             local_convert,
             local_settings,
             local_import,

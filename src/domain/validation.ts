@@ -15,6 +15,8 @@ function validDate(value: unknown): boolean {
 export function validateInput<K extends EntityTable>(table: K, input: EntityInput<K>): void {
   const row = input as unknown as Record<string, unknown>;
   const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  if (table === 'object_relations') { if (!uuid(row.source_id)||!uuid(row.target_id)||!['task','note','project','event','resource'].includes(String(row.source_kind))||!['task','note','project','event','resource'].includes(String(row.target_kind))||!['references','belongs_to','depends_on'].includes(String(row.kind))||(row.source_id===row.target_id&&row.source_kind===row.target_kind)) throw new Error('관계의 종류와 대상을 확인해 주세요.'); return; }
+  if (table === 'user_quotes') { if(typeof row.content!=='string'||!row.content.trim()||row.content.length>2000||typeof row.author!=='string'||row.author.length>200||![0,1].includes(Number(row.favorite))) throw new Error('문구·출처를 확인해 주세요.');return; }
   if (table === 'tags') { if (typeof row.name !== 'string' || !row.name.trim() || row.name.length>80 || !/^#[0-9a-f]{6}$/i.test(String(row.color))) throw new Error('태그 이름·색상을 확인해 주세요.'); return; }
   if (table === 'note_templates') { if (typeof row.title !== 'string' || !row.title.trim() || row.title.length>300 || typeof row.content !== 'string' || row.content.length>1000000) throw new Error('템플릿 제목·내용을 확인해 주세요.'); return; }
   if (table === 'note_tags') { if (!uuid(row.note_id) || !uuid(row.tag_id)) throw new Error('태그 연결을 확인해 주세요.'); return; }
@@ -28,7 +30,9 @@ export function validateInput<K extends EntityTable>(table: K, input: EntityInpu
     if (!/^[0-9a-f-]{36}$/i.test(String(row.routine_id)) || typeof row.local_date !== 'string' || !validDate(row.local_date) || !['todo','done'].includes(String(row.status))) throw new Error('루틴 완료 기록을 확인해 주세요.');
     return;
   }
-  if (table === 'routines') { validateRecurrence(routineRule(input as unknown as Routine)); if (!['active','paused','archived'].includes(String(row.status))) throw new Error('루틴 상태 오류'); }
+  if (table === 'task_occurrences') { if (!uuid(row.recurrence_id) || !uuid(row.task_id) || typeof row.local_date !== 'string' || !validDate(row.local_date)) throw new Error('반복 회차 오류'); return; }
+  if (table === 'task_recurrences' && (!['low','medium','high'].includes(String(row.priority)) || (row.project_id !== null && !uuid(row.project_id)))) throw new Error('반복 작업 우선순위·프로젝트 오류');
+  if (table === 'routines' || table === 'task_recurrences') { validateRecurrence(routineRule(input as unknown as Routine)); if (!['active','paused','archived'].includes(String(row.status))) throw new Error('루틴 상태 오류'); }
   const label = table === 'projects' ? row.name : table === 'inbox_items' ? row.content : row.title;
   if (typeof label !== 'string' || !label.trim()) throw new Error('제목 또는 내용을 입력해 주세요.');
   if (label.length > (table === 'inbox_items' ? 20000 : 300)) throw new Error('제목은 300자, Inbox 내용은 20,000자 이내로 입력해 주세요.');

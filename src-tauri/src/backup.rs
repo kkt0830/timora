@@ -72,6 +72,8 @@ fn valid_db(path: &Path) -> Result<Option<String>> {
                 >= match *t {
                     "subtasks" => 5,
                     "routines" | "routine_completions" => 6,
+                    "task_recurrences" | "task_occurrences" => 8,
+                    "object_relations" | "user_quotes" => 9,
                     _ => 7,
                 }
         }))
@@ -250,6 +252,8 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
                 >= match *t {
                     "subtasks" => 5,
                     "routines" | "routine_completions" => 6,
+                    "task_recurrences" | "task_occurrences" => 8,
+                    "object_relations" | "user_quotes" => 9,
                     _ => 7,
                 }
         }))

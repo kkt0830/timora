@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { EntityInput, Routine } from '../domain/models';
+import type { EntityInput, Routine, TaskRecurrence } from '../domain/models';
 import { dateInZone, occurrences } from '../domain/recurrence';
 import { routineRule } from '../domain/routines';
 import { messageOf, useWorkspace } from './providers';
@@ -37,18 +37,19 @@ export function RoutinesPage({ compact = false }: { compact?: boolean }) {
     {editing && <RoutineEditor key={editing==='new'?'new':editing.id} routine={editing==='new'?undefined:editing} onClose={()=>setEditing(null)} />}
   </section>;
 }
-function RoutineEditor({routine:r,onClose}:{routine?:Routine;onClose:()=>void}) {
-  const {save,busy}=useWorkspace();const [error,setError]=useState('');
+export function RoutineEditor({routine:r,onClose,recurring=false}:{routine?:Routine | TaskRecurrence;onClose:()=>void;recurring?:boolean}) {
+  const {save,busy,data}=useWorkspace();const [error,setError]=useState('');
   async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const text=(key:string)=>String(f.get(key)??'');setError('');
     const input:EntityInput<'routines'>={title:text('title').trim(),description:text('description'),frequency:text('frequency') as Routine['frequency'],interval_days:Number(text('interval_days')),start_date:text('start_date'),end_date:text('end_date')||null,occurrence_limit:text('occurrence_limit')?Number(text('occurrence_limit')):null,weekdays:f.getAll('weekdays').map(String).join(','),timezone:text('timezone'),status:r?.status??'active',reminder_time:text('reminder_time')||null,category:text('category')};
-    try{await save('routines',input,r?.id);onClose();}catch(e){setError(messageOf(e));}}
-  return <Dialog title={r?'루틴 수정':'새 루틴'} busy={busy} onClose={onClose}><form onSubmit={submit}><fieldset disabled={busy}>
+    try{if(recurring)await save('task_recurrences',{...input,priority:text('priority') as TaskRecurrence['priority'],project_id:text('project_id')||null},r?.id);else await save('routines',input,r?.id);onClose();}catch(e){setError(messageOf(e));}}
+  return <Dialog title={recurring?(r?'반복 작업 수정':'새 반복 작업'):(r?'루틴 수정':'새 루틴')} busy={busy} onClose={onClose}><form onSubmit={submit}><fieldset disabled={busy}>
     <label>이름<input name="title" required maxLength={300} defaultValue={r?.title??''}/></label><label>설명<textarea name="description" maxLength={20000} defaultValue={r?.description??''}/></label>
     <div className="form-grid"><label>반복<select name="frequency" defaultValue={r?.frequency??'daily'}>{Object.entries(frequencies).map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label><label>반복 간격<input name="interval_days" type="number" min={1} max={366} required defaultValue={r?.interval_days??1}/></label></div>
     <small>매일은 N일, 매주는 N주, 매월은 N개월 간격입니다. 매월 31일처럼 없는 날짜는 건너뜁니다.</small>
     <fieldset><legend>매주 반복할 요일 (미선택 시 시작일 요일)</legend>{['일','월','화','수','목','금','토'].map((d,i)=><label key={d} style={{display:'inline-flex',marginRight:12}}><input type="checkbox" name="weekdays" value={i} defaultChecked={r?.weekdays.split(',').includes(String(i))??false}/>{d}</label>)}</fieldset>
     <div className="form-grid"><label>시작일<input name="start_date" type="date" required defaultValue={r?.start_date??dateInZone(new Date(),Intl.DateTimeFormat().resolvedOptions().timeZone)}/></label><label>종료일<input name="end_date" type="date" defaultValue={r?.end_date??''}/></label></div>
-    <label>최대 반복 횟수<input name="occurrence_limit" type="number" min={1} max={10000} defaultValue={r?.occurrence_limit??''}/></label><label>시간대<input name="timezone" required maxLength={64} defaultValue={r?.timezone??Intl.DateTimeFormat().resolvedOptions().timeZone}/></label><label>분류<input name="category" maxLength={100} defaultValue={r?.category??''}/></label><label>선호 알림 시간<input name="reminder_time" type="time" defaultValue={r?.reminder_time??''}/></label><small>알림 시간은 저장됩니다. 기기 알림 예약 기능은 아직 연결되지 않았습니다.</small>
+    {recurring&&<><label>우선순위<select name="priority" defaultValue={r&&'priority' in r?r.priority:'medium'}><option value="high">높음</option><option value="medium">보통</option><option value="low">낮음</option></select></label><label>프로젝트<select name="project_id" defaultValue={r&&'project_id' in r?r.project_id??'':''}><option value="">연결 없음</option>{data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><p>변경한 규칙은 이후 생성하는 회차에 적용합니다. 이미 생성한 작업과 완료 이력은 그대로 유지합니다.</p></>}
+    <label>최대 반복 횟수<input name="occurrence_limit" type="number" min={1} max={10000} defaultValue={r?.occurrence_limit??''}/></label><label>시간대<input name="timezone" required maxLength={64} defaultValue={r?.timezone??Intl.DateTimeFormat().resolvedOptions().timeZone}/></label><label>분류<input name="category" maxLength={100} defaultValue={r?.category??''}/></label><label>선호 알림 시간<input name="reminder_time" type="time" defaultValue={r?.reminder_time??''}/></label><small>Notifications에서 이 기기의 알림을 켜면 이 시각을 사용합니다.</small>
     {error&&<p role="alert" className="error">{error}</p>}<div className="dialog-actions"><button type="button" onClick={onClose}>취소</button><button type="submit">저장</button></div>
   </fieldset></form></Dialog>;
 }

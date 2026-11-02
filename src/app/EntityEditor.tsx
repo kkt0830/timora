@@ -1,3 +1,4 @@
+import { Relations, objectKinds } from './Relations';
 import { TemplatePicker } from './NoteTools';
 import { NoteAutosaveEditor } from './NoteAutosaveEditor';
 import { SubtaskEditor } from './SubtaskEditor';
@@ -9,7 +10,7 @@ import { datePreset } from '../domain/task-groups';
 import { Dialog, Markdown } from './components';
 import { messageOf, useWorkspace } from './providers';
 
-export const labels: Record<EntityTable, string> = { tags:'태그', note_tags:'노트 태그', note_templates:'템플릿', task_blocks:'시간 블록', board_positions:'보드 순서', routines: '루틴', routine_completions: '루틴 완료', subtasks: '하위 작업', tasks: '작업', notes: '노트', projects: '프로젝트', events: '일정', library_items: '자료', inbox_items: 'Inbox 기록' };
+export const labels: Record<EntityTable, string> = { object_relations:'관계', user_quotes:'문구', task_recurrences:'반복 작업', task_occurrences:'반복 회차', tags:'태그', note_tags:'노트 태그', note_templates:'템플릿', task_blocks:'시간 블록', board_positions:'보드 순서', routines: '루틴', routine_completions: '루틴 완료', subtasks: '하위 작업', tasks: '작업', notes: '노트', projects: '프로젝트', events: '일정', library_items: '자료', inbox_items: 'Inbox 기록' };
 export type EditorTarget = { table: EntityTable; item?: EntityMap[EntityTable]; projectId?: string; day?: string };
 
 function parseForm(table: EntityTable, form: FormData): EntityInput<EntityTable> {
@@ -17,7 +18,7 @@ function parseForm(table: EntityTable, form: FormData): EntityInput<EntityTable>
   const nullable = (key: string) => text(key) || null;
   const title = text('title').trim(); const project_id = nullable('project_id'); const description = text('description');
   switch (table) {
-    case 'tags': case 'note_tags': case 'note_templates': case 'task_blocks': case 'board_positions': case 'routines': case 'routine_completions': case 'subtasks': throw new Error('하위 작업은 Task 안에서 편집해 주세요.');
+    case 'object_relations': case 'user_quotes': case 'task_recurrences': case 'task_occurrences': case 'tags': case 'note_tags': case 'note_templates': case 'task_blocks': case 'board_positions': case 'routines': case 'routine_completions': case 'subtasks': throw new Error('하위 작업은 Task 안에서 편집해 주세요.');
     case 'tasks': return { title, description, status: text('status') as EntityMap['tasks']['status'], priority: text('priority') as EntityMap['tasks']['priority'], start_date: nullable('start_date'), due_date: nullable('due_date'), project_id };
     case 'notes': return { title, content: text('content'), project_id };
     case 'projects': return { name: title, description, status: text('status') as EntityMap['projects']['status'], color: text('color') };
@@ -68,7 +69,7 @@ function StandardEntityEditor({ target, onClose }: { target: EditorTarget; onClo
     {!['projects', 'inbox_items'].includes(table) && <ProjectField value={row.project_id ?? target.projectId} />}
     {error && <p className="error" role="alert">{error}</p>}
     <div className="dialog-actions">{item && <button type="button" className="danger-button" onClick={() => void remove()}>삭제</button>}<button type="button" onClick={onClose}>취소</button><button className="primary-button" type="submit">{workspace.busy ? '저장 중…' : '저장'}</button></div>
-  </fieldset></form></Dialog>;
+  </fieldset></form>{item&&objectKinds[table]&&<Relations id={item.id} kind={objectKinds[table]!}/>}</Dialog>;
 }
 
 export function EntityEditor({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
