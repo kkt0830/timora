@@ -88,3 +88,7 @@ User confirmed no Android signing key or GitHub OAuth/App registration exists. A
 ### Backup UI checkpoint
 
 Added native system-picker backup export and archive inspection with aggregate metadata UI, logout-epoch checks, bounded archive reads, private temporary files and desktop create-new export. JavaScript receives no arbitrary filesystem permission. Used official Tauri dialog/fs Rust source to confirm picker/open APIs. Actual Android/Windows picker behavior is PENDING. Restore remains unimplemented and is explicitly labelled unavailable; archive inspection never replaces the active database. Native compilation status is tracked separately from TypeScript.
+
+### Autosave regression checkpoint — 2026-11-02
+
+Added bounded exponential retry (three retries) for transient HTTP autosave failures; authorization/validation errors remain explicit manual failures. Restored named editor controls and scoped close-button selectors. Browser regression now explicitly recovers the retained draft before editing and saving it; the full Web fixture passes. TypeScript passes. PR platform evidence: Windows, SQLite and database checks passed; Android APK/AAB build steps passed but emulator smoke failed. Detailed CI log access is unavailable, so the Android failure cause remains undetermined. Tags/templates persistence and the other outstanding matrix features are still pending; no production migration or release was performed.

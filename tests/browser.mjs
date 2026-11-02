@@ -148,7 +148,8 @@ try {
   assert.equal(await draft.inputValue(), 'unsaved note draft');
   assert.equal(await page.getByRole('dialog').isVisible(), true);
   failure = false;
-  await page.getByRole('dialog').getByRole('button', { name: /^(취소|닫기)$/, exact: true }).click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('dialog').locator('.dialog-actions').getByRole('button', { name: /^(취소|닫기)$/, exact: true }).click();
   await page.getByRole('button', { name: '다시 시도', exact: true }).click();
   await visible(page.getByRole('heading', { name: 'Notes', exact: true, level: 1 }));
   await nav('Calendar'); await create('새 일정', 'Event A', async dialog => { await dialog.getByLabel('프로젝트', { exact: true }).selectOption({ label: 'Project A' }); });
@@ -215,7 +216,7 @@ try {
   assert.equal(await search.inputValue(), '');
   await search.fill('bold');
   await page.getByRole('link', { name: /Note A/ }).click(); await visible(page.getByRole('dialog'));
-  await page.getByRole('dialog').getByRole('button', { name: /^(취소|닫기)$/, exact: true }).click();
+  await page.getByRole('dialog').locator('.dialog-actions').getByRole('button', { name: /^(취소|닫기)$/, exact: true }).click();
   await page.getByRole('button', { name: '프로필 메뉴', exact: true }).focus(); await page.keyboard.press('Enter');
   assert.equal(await page.getByRole('button', { name: '프로필 메뉴', exact: true }).getAttribute('aria-expanded'), 'true');
   await page.keyboard.press('Escape'); assert.equal(await page.getByRole('button', { name: '프로필 메뉴', exact: true }).getAttribute('aria-expanded'), 'false');
@@ -264,6 +265,10 @@ try {
   await page.setViewportSize({ width: 1365, height: 900 }); await page.goto('http://localhost:4173'); await login('a');
   for (const [label, title, edited] of [['Notes', 'Note A', 'Note edited'], ['Calendar', 'Event A', 'Event edited'], ['Library', 'Library A', 'Library edited']]) {
     await nav(label); await page.getByRole('button', { name: label === 'Notes' ? `${title} 수정 / 삭제` : title, exact: true }).click();
+    if (label === 'Notes') {
+      await page.getByRole('dialog').getByRole('button', { name: '초안 복구', exact: true }).click();
+      assert.equal(await page.getByRole('dialog').locator('textarea[name=content]').inputValue(), 'unsaved note draft');
+    }
     await page.getByRole('dialog').getByLabel('제목', { exact: true }).fill(edited);
     await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: edited, exact: true }).click();
