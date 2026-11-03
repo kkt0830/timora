@@ -26,3 +26,5 @@ src-tauri/gen/*
 *.jks
 *.keystore
 keystore.properties
+
+dist-windows/

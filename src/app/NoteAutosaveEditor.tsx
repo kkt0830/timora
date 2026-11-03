@@ -7,15 +7,16 @@ import { Dialog, Markdown } from './components';
 import { messageOf, useAuth, useWorkspace } from './providers';
 type Draft = { title: string; content: string; project_id: string | null };
 const textOf = (note: Draft) => JSON.stringify({ title: note.title, content: note.content, project_id: note.project_id });
-export function NoteAutosaveEditor({ note, onClose }: { note: Note; onClose: () => void }) {
+export function NoteAutosaveEditor({ note, onClose, initialDraft, initialPreview = false }: { note: Note; onClose: () => void; initialDraft?: Draft; initialPreview?: boolean }) {
   const workspace = useWorkspace(); const { account } = useAuth();
   const key = `timora:note-draft:${account!.id}:${note.id}`;
   const initial = { title: note.title, content: note.content, project_id: note.project_id };
-  const [draft, setDraft] = useState<Draft>(initial);
+  const [draft, setDraft] = useState<Draft>(initialDraft??initial);
   const [recovery, setRecovery] = useState<Draft | null>(() => {
+    if(initialDraft)return null;
     try { const v = JSON.parse(localStorage.getItem(key) ?? 'null'); return v && typeof v.title === 'string' && v.title.length <= 300 && typeof v.content === 'string' && v.content.length <= 1000000 && (v.project_id === null || typeof v.project_id === 'string') && textOf(v) !== textOf(initial) ? v : null; } catch { return null; }
   });
-  const [preview, setPreview] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [saving, setSaving] = useState(false), [attempt, setAttempt] = useState(0);
+  const [preview, setPreview] = useState(initialPreview), [error, setError] = useState(''), [notice, setNotice] = useState(''), [saving, setSaving] = useState(false), [attempt, setAttempt] = useState(0);
   const retries = useRef(0), retryTimer = useRef<number | undefined>(undefined);
   const committed = useRef(textOf(initial)), current = useRef(draft), inFlight = useRef(false), mounted = useRef(true);
   const [saved, setSaved] = useState(textOf(initial)); current.current = draft;
@@ -66,7 +67,7 @@ export function NoteAutosaveEditor({ note, onClose }: { note: Note; onClose: () 
     <label>제목<input name="title" value={draft.title} maxLength={300} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
     <div className="editor-tabs"><button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>Markdown 편집</button><button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>미리보기</button></div>
     <label hidden={preview}>내용<textarea name="content" rows={14} maxLength={1000000} className="markdown-input" value={draft.content} onChange={e => setDraft({ ...draft, content: e.target.value })} /></label>{preview && <Markdown content={draft.content} />}
-    <label>프로젝트<select name="project_id" value={draft.project_id ?? ''} onChange={e => setDraft({ ...draft, project_id: e.target.value || null })}><option value="">연결 없음</option>{workspace.data.projects.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+    <label>프로젝트<select aria-label="프로젝트" name="project_id" value={draft.project_id ?? ''} onChange={e => setDraft({ ...draft, project_id: e.target.value || null })}><option value="">연결 없음</option>{workspace.data.projects.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
     <Relations id={note.id} kind="note"/><NoteTags noteId={note.id}/><TemplatePicker append={text=>setDraft(value=>({...value,content:value.content+(value.content?'\n\n':'')+text}))}/>
 
     <p role="status">{saving ? '저장 중…' : changed ? '저장 대기 중' : notice || '저장된 노트'}{notice && changed ? ` · ${notice}` : ''}</p>

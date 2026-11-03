@@ -1,12 +1,13 @@
+import { Attachments } from './Attachments';
 import { DailyQuote } from './Quotes';
 import { TimeBlocks } from './TimeBlocks';
 import { NoteTools } from './NoteTools';
 import { RoutinesPage } from './RoutinesPage';
 import { ProjectBoard } from './ProjectBoard';
-import { periodDays, shiftPeriod } from '../domain/calendar';
+import { periodDays, shiftPeriod, indexCalendar } from '../domain/calendar';
 import type { CalendarView } from '../domain/calendar';
 import { runtimeLabel } from '../services/runtime';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import { NavLink, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, Inbox, ListTodo, FolderKanban, Sparkles } from 'lucide-react';
@@ -101,12 +102,14 @@ export function CalendarPage() {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [day, setDay] = useState(today);
   const [view, setView] = useState<CalendarView>('month');
-  const days = periodDays(view === 'month' ? dateKey(month) : day, view).map(localDate);
+  const period = view === 'month' ? dateKey(month) : day;
+  const days = useMemo(()=>periodDays(period,view).map(localDate),[period,view]);
+  const indexed=useMemo(()=>indexCalendar(data.events,data.tasks,days.map(dateKey)),[data.events,data.tasks,days]);
   function shift(amount: number) { const next = shiftPeriod(view === 'month' ? dateKey(month) : day, view, amount); setMonth(localDate(next)); setDay(next); }
   const events = data.events.filter(event => eventOnDay(event, day)).sort((a, b) => a.start_at.localeCompare(b.start_at));
   const tasks = data.tasks.filter(task => task.due_date === day);
   return <><PageTitle eyebrow="TIME" title="Calendar" description="일정과 Task 마감일을 함께 확인하세요. 날짜를 선택하면 상세 내용을 볼 수 있습니다." action="새 일정" onAction={() => open({ table: 'events', day })} /><div className="period-filters" aria-label="달력 보기">{(['month', 'week', 'day'] as const).map(v => <button type="button" key={v} aria-pressed={view === v} onClick={() => { setView(v); setMonth(localDate(day)); }}>{{ month: '월 보기', week: '주 보기', day: '일 보기' }[v]}</button>)}</div><div className="card calendar-card"><div className="calendar-head"><div><h2>{view === 'month' ? month.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }) : view === 'week' ? `${dateKey(days[0])} ~ ${dateKey(days[6])}` : day}</h2><span>기기 시간대: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span></div><div className="calendar-controls"><button type="button" aria-label={view === 'month' ? '이전 달' : view === 'week' ? '이전 주' : '이전 날'} onClick={() => shift(-1)}><ChevronLeft size={18} /></button><button type="button" onClick={() => { setMonth(new Date(localDate(today).getFullYear(), localDate(today).getMonth(), 1)); setDay(today); }}>오늘</button><button type="button" aria-label={view === 'month' ? '다음 달' : view === 'week' ? '다음 주' : '다음 날'} onClick={() => shift(1)}><ChevronRight size={18} /></button></div></div><div className="calendar-scroll"><div className={`calendar-grid${view === 'day' ? ' calendar-single' : ''}`}>{(view === 'day' ? [localDate(day).toLocaleDateString('ko-KR', { weekday: 'long' })] : ['일', '월', '화', '수', '목', '금', '토']).map(d => <div className="calendar-weekday" key={d}>{d}</div>)}{days.map(date => {
-    const key = dateKey(date); const dayEvents = data.events.filter(event => eventOnDay(event, key)); const dueTasks = data.tasks.filter(task => task.due_date === key);
+    const key = dateKey(date); const dayEvents = indexed.get(key)!.events; const dueTasks = indexed.get(key)!.tasks;
     return <button type="button" aria-label={`${key}, 일정 ${dayEvents.length}개, 마감 작업 ${dueTasks.length}개`} aria-pressed={day === key} className={`calendar-day${view === 'month' && date.getMonth() !== month.getMonth() ? ' dimmed' : ''}${key === today ? ' marked' : ''}${key === day ? ' selected-day' : ''}`} key={key} onClick={() => setDay(key)}><span>{date.getDate()}</span>{dayEvents.slice(0, 2).map(event => <small key={event.id}>{event.title}</small>)}{dueTasks.slice(0, 1).map(task => <small className="calendar-task" key={task.id}>✓ {task.title}</small>)}{dayEvents.length + dueTasks.length > Math.min(dayEvents.length, 2) + Math.min(dueTasks.length, 1) && <small>+{dayEvents.length + dueTasks.length - Math.min(dayEvents.length, 2) - Math.min(dueTasks.length, 1)}</small>}</button>;
   })}</div></div></div><div className="two-columns calendar-detail"><div className="card upcoming-card"><SectionTitle title={`${day} 일정`} count={events.length} /><EventList events={events} open={open} /><button className="text-link" type="button" onClick={() => open({ table: 'events', day })}>이 날짜에 일정 추가</button></div><div className="card"><SectionTitle title="마감 작업" count={tasks.length} /><TaskList tasks={tasks} open={open} /><button className="text-link" type="button" onClick={() => open({ table: 'tasks', day })}>마감 작업 추가</button></div></div><TimeBlocks day={day} open={open}/>{editor}</>;
 }
@@ -126,7 +129,7 @@ export function ProjectDetailPage() {
 export function LibraryPage() {
   const { data } = useWorkspace(); const { open, editor } = useEditor(); const [project, setProject] = useState('all'); const [type, setType] = useState('all');
   const items = data.library_items.filter(item => matchesProject(item.project_id, project) && (type === 'all' || item.type === type));
-  return <><PageTitle eyebrow="KEEP" title="Library" description="웹사이트, 자료, 영상과 파일의 URL을 저장하고 프로젝트와 연결하세요." action="자료 추가" onAction={() => open({ table: 'library_items' })} /><div className="filters"><ProjectFilter value={project} onChange={setProject} /><label>자료 종류<select aria-label="자료 종류" value={type} onChange={event => setType(event.target.value)}>{['all', 'website', 'article', 'github', 'video', 'pdf', 'file', 'other'].map(value => <option key={value} value={value}>{value === 'all' ? '전체' : value}</option>)}</select></label></div><div className="card"><SectionTitle title="보관한 자료" count={items.length} /><LibraryList items={items} open={open} /></div>{editor}</>;
+  return <><PageTitle eyebrow="KEEP" title="Library" description="웹사이트, 자료, 영상과 파일의 URL을 저장하고 프로젝트와 연결하세요." action="자료 추가" onAction={() => open({ table: 'library_items' })} /><div className="filters"><ProjectFilter value={project} onChange={setProject} /><label>자료 종류<select aria-label="자료 종류" value={type} onChange={event => setType(event.target.value)}>{['all', 'website', 'article', 'github', 'video', 'pdf', 'file', 'other'].map(value => <option key={value} value={value}>{value === 'all' ? '전체' : value}</option>)}</select></label></div><div className="card"><SectionTitle title="보관한 자료" count={items.length} /><LibraryList items={items} open={open} /></div><Attachments/>{editor}</>;
 }
 export function SettingsPage() {
   const auth = useAuth(); const { data, saveSettings, busy } = useWorkspace(); const [error, setError] = useState(''); const [notice, setNotice] = useState('');

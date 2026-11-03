@@ -4,7 +4,7 @@ import type { Account } from '../services/contracts';
 import { NativeProfileProvider } from './NativeProfileProvider';
 import { createBackend } from '../services/backend';
 import { emptyWorkspace } from '../domain/models';
-import type { EntityInput, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models';
+import type { EntityInput, EntityTable, Note, WorkspaceData, WorkspaceSettings } from '../domain/models';
 import { emptySyncState } from '../services/cloud-sync';
 import type { SyncState } from '../services/cloud-sync';
 
@@ -13,6 +13,7 @@ const syncService = 'sync' in backend ? backend.sync : null;
 export const messageOf = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
 interface AuthState {
   account: Account | null; loading: boolean; error: string; configured: boolean;
+  token: () => Promise<string>;
   retry: () => void; signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, nickname?: string) => Promise<boolean>; signOut: () => Promise<void>;
 }
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [account?.id]);
   const value: AuthState = {
     account, loading, error, configured: Boolean(backend.auth), retry: () => setAttempt(v => v + 1),
+    token: async () => { if(!backend.auth)throw new Error(backend.error);return backend.auth.token(); },
     signIn: async (email, password) => { if (!backend.auth) throw new Error(backend.error); await backend.auth.signIn(email, password); },
     signUp: async (email, password, nickname) => { if (!backend.auth) throw new Error(backend.error); return backend.auth.signUp(email, password, nickname); },
     signOut: async () => {
@@ -56,6 +58,7 @@ export function useAuth() { const value = useContext(AuthContext); if (!value) t
 interface WorkspaceState {
   data: WorkspaceData; loading: boolean; loaded: boolean; error: string; busy: boolean;
   reload: () => Promise<void>;
+  createNote: (input: EntityInput<'notes'>, id: string) => Promise<Note>;
   generateTasks: (ruleId: string, revision: string, days: string[]) => Promise<void>;
   reorderBoard: (projectId: string, ids: string[]) => Promise<void>;
   reorderSubtasks: (taskId: string, ids: string[]) => Promise<void>;
@@ -116,6 +119,7 @@ export function WorkspaceProvider({ account, children }: { account: Account; chi
   };
   const value: WorkspaceState = {
     data, loading, loaded, error, busy, reload,
+    createNote: async (input,id) => { let row:Note|undefined;await mutate(async()=>{row=await repository.createNote(account.id,input,id);if(mounted.current)setData(previous=>({...previous,notes:[row!,...previous.notes.filter(n=>n.id!==row!.id)]}));});if(!row)throw new Error('노트를 저장하지 못했습니다.');return row; },
     generateTasks: async (ruleId, revision, days) => mutate(async () => { await repository.generateTasks(account.id,ruleId,revision,days); if(mounted.current) await reload(false); }),
     reorderBoard: async (projectId, ids) => mutate(async () => { await repository.reorderBoard(account.id, projectId, ids); if (mounted.current) await reload(false); }),
     reorderSubtasks: async (taskId, ids) => mutate(async () => { await repository.reorderSubtasks(account.id, taskId, ids); if (mounted.current) await reload(false); }),

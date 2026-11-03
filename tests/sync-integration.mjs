@@ -33,9 +33,9 @@ globalThis.fetch=(url,init)=> {
  const body=JSON.parse(init.body);const task=tail.then(async()=>{
   await pg.query('begin');
   try {await pg.query('set local role authenticated');await pg.query("select set_config('request.jwt.claim.sub',$1,true)",[owner]);
-   const sql=url.endsWith('sync_capabilities_v6')?'select public.sync_capabilities_v6() result':url.endsWith('sync_apply_v6')?'select public.sync_apply_v6($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull_v6($1,$2) result';
-   const params=url.endsWith('sync_capabilities_v6')?[]:url.endsWith('sync_apply_v6')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
-   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply_v6') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
+   const sql=url.endsWith('sync_capabilities_v7')?'select public.sync_capabilities_v7() result':url.endsWith('sync_apply_v7')?'select public.sync_apply_v7($1,$2,$3,$4,$5,$6,$7) result':'select public.sync_pull_v7($1,$2) result';
+   const params=url.endsWith('sync_capabilities_v7')?[]:url.endsWith('sync_apply_v7')?[body.operation_id,body.entity_table,body.entity_id,body.action,body.payload,body.base_revision,body.base_updated_at]:[body.after_revision,body.batch_size];
+   const {rows}=await pg.query(sql,params);await pg.query('commit');if(loseAck && url.endsWith('sync_apply_v7') && body.entity_table==='notes'){loseAck=false;return Promise.reject(Error('lost committed response fixture'));}return new Response(JSON.stringify(rows[0].result));
   }catch(e){await pg.query('rollback');return new Response(JSON.stringify({message:e.message,code:e.code}),{status:/^(22|23)/.test(e.code??'')?400:500});}
  });tail=task.catch(()=>{});return task;
 };

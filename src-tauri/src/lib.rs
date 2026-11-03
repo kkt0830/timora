@@ -12,8 +12,8 @@ fn sql_error(e: rusqlite::Error) -> String {
 fn now() -> String {
     Utc::now().to_rfc3339()
 }
-pub const SCHEMA_VERSION: i64 = 10;
-pub const EXTENSION_TABLES: [&str; 12] = [
+pub const SCHEMA_VERSION: i64 = 11;
+pub const EXTENSION_TABLES: [&str; 13] = [
     "subtasks",
     "routines",
     "routine_completions",
@@ -26,6 +26,7 @@ pub const EXTENSION_TABLES: [&str; 12] = [
     "task_occurrences",
     "object_relations",
     "user_quotes",
+    "attachments",
 ];
 pub const TABLES: [&str; 6] = [
     "projects",
@@ -37,6 +38,7 @@ pub const TABLES: [&str; 6] = [
 ];
 fn fields(table: &str) -> Result<&'static [&'static str]> {
     match table {
+        "attachments" => Ok(&["resource_id", "filename", "mime", "byte_size", "sha256"]),
         "object_relations" => Ok(&[
             "source_id",
             "source_kind",
@@ -136,6 +138,39 @@ fn instant(s: &str) -> Result<DateTime<chrono::FixedOffset>> {
     DateTime::parse_from_rfc3339(s).map_err(|_| "일정 시간을 확인해 주세요.".into())
 }
 fn validate(table: &str, row: &Value) -> Result<()> {
+    if table == "attachments" {
+        limit(text(row, "filename")?, 255, true)?;
+        choice(
+            row,
+            "mime",
+            &[
+                "application/pdf",
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+                "text/plain",
+            ],
+        )?;
+        if !row["byte_size"]
+            .as_i64()
+            .is_some_and(|n| (1..=26214400).contains(&n))
+        {
+            return Err("파일은 25 MB 이하여야 합니다.".into());
+        }
+        let hash = text(row, "sha256")?;
+        if hash.len() != 64
+            || !hash
+                .bytes()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+        {
+            return Err("파일 체크섬 오류".into());
+        }
+        if let Some(id) = row["resource_id"].as_str() {
+            Uuid::parse_str(id).map_err(|_| "자료 연결 오류")?;
+        }
+        return Ok(());
+    }
+
     if table == "object_relations" {
         for key in ["source_id", "target_id"] {
             Uuid::parse_str(text(row, key)?).map_err(|_| "연결 대상 ID 오류")?;
@@ -526,6 +561,14 @@ impl Database {
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
+        if version < 11 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/011_attachments.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 11)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
         conn.query_row("SELECT id FROM local_identity WHERE singleton=1", [], |r| {
             r.get::<_, String>(0)
         })
@@ -771,6 +814,27 @@ impl Database {
         .into_iter()
         .next()
         .ok_or("저장 응답이 없습니다.".into())
+    }
+    pub fn create_note(&mut self, id: &str, input: Value) -> Result<Value> {
+        self.require_workspace()?;
+        Uuid::parse_str(id).map_err(|_| "노트 ID 오류")?;
+        validate("notes", &input)?;
+        let owner = self.owner()?;
+        let tx = self.conn.transaction().map_err(sql_error)?;
+        let row = if let Some(row) = json_rows(
+            &tx,
+            "SELECT * FROM notes WHERE id=?1 AND user_id=?2",
+            &[SqlValue::Text(id.into()), SqlValue::Text(owner.clone())],
+        )?
+        .into_iter()
+        .next()
+        {
+            row
+        } else {
+            Self::write(&tx, &owner, "notes", &input, id, false, false)?
+        };
+        tx.commit().map_err(sql_error)?;
+        Ok(row)
     }
     pub fn save(&mut self, table: &str, input: Value, id: Option<String>) -> Result<Value> {
         self.require_workspace()?;
@@ -1111,3 +1175,10 @@ pub use runtime::run;
 mod recurring;
 
 mod restore;
+
+mod attachments;
+#[cfg(feature = "desktop")]
+mod native_files;
+
+#[cfg(feature = "desktop")]
+mod updates;

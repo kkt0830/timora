@@ -75,3 +75,38 @@ fn workspace_tools_survive_restart_and_enforce_parent_integrity() {
         assert!(db.load().unwrap()[table].as_array().unwrap().is_empty());
     }
 }
+
+#[test]
+fn new_note_retry_preserves_first_commit_after_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("workspace.db");
+    let mut db = Database::open(&path).unwrap();
+    db.bind_verified_account(
+        &json!({"id":"11111111-1111-4111-8111-111111111111","email":"fixture@example.com"}),
+        "https://test.supabase.co",
+    )
+    .unwrap();
+    let id = "22222222-2222-4222-8222-222222222222";
+    let first = db
+        .create_note(
+            id,
+            json!({"title":"first","content":"committed","project_id":null}),
+        )
+        .unwrap();
+    drop(db);
+    let mut db = Database::open(&path).unwrap();
+    let retry = db
+        .create_note(
+            id,
+            json!({"title":"retry","content":"must not overwrite","project_id":null}),
+        )
+        .unwrap();
+    assert_eq!(retry, first);
+    assert_eq!(db.load().unwrap()["notes"].as_array().unwrap().len(), 1);
+    assert!(db
+        .create_note(
+            "invalid",
+            json!({"title":"bad","content":"","project_id":null})
+        )
+        .is_err());
+}

@@ -27,6 +27,13 @@ export class SupabaseRepository implements WorkspaceRepository {
       if (rows.length < 500) return all;
     }
   }
+  async createNote(userId:string,input:EntityInput<'notes'>,id:string):Promise<EntityMap['notes']>{
+    validateInput('notes',input);
+    const rows=await this.request<EntityMap['notes'][]>('notes?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify({...input,id,user_id:userId})});
+    if(rows[0])return rows[0];
+    const existing=await this.request<EntityMap['notes'][]>(`notes?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}&select=*`);
+    if(!existing[0])throw new Error('새 노트 저장 결과를 확인할 수 없습니다.');return existing[0];
+  }
   async generateTasks(_userId: string, ruleId: string, revision: string, days: string[]): Promise<void> { await this.request('rpc/generate_recurring_tasks', {method:'POST',body:JSON.stringify({rule_id:ruleId,expected_updated_at:revision,requested_days:days})}); }
   async reorderBoard(_userId: string, projectId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_board', { method: 'POST', body: JSON.stringify({ parent_id: projectId, ordered_ids: ids }) }); }
   async reorderSubtasks(_userId: string, taskId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_subtasks', { method: 'POST', body: JSON.stringify({ parent_id: taskId, ordered_ids: ids }) }); }
@@ -54,6 +61,7 @@ export class SupabaseRepository implements WorkspaceRepository {
     } catch(error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
     try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v5',{method:'POST',body:'{}'}); if(capability?.protocol===5){data.task_recurrences=await this.list('task_recurrences',userId);data.task_occurrences=await this.list('task_occurrences',userId);data.recurrence_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
     try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v6',{method:'POST',body:'{}'});if(capability?.protocol===6){data.object_relations=await this.list('object_relations',userId);data.user_quotes=await this.list('user_quotes',userId);data.extras_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
+    try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v7',{method:'POST',body:'{}'});if(capability?.protocol===7){data.attachments=await this.list('attachments',userId);data.attachments_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
     return data;
   }
   async save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {

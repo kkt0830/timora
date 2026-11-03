@@ -55,7 +55,8 @@ try {
     if (!tables.includes(table)) return fulfill({ message: 'Unexpected endpoint' }, 404);
     const id = url.searchParams.get('id')?.slice(3);
     if (request.method() === 'POST') {
-      const row = { ...body, id: crypto.randomUUID(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      if (body.id && stores[owner][table].some(item => item.id === body.id)) return fulfill([]);
+      const row = { ...body, id: body.id ?? crypto.randomUUID(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
       stores[owner][table].push(row); return fulfill([row]);
     }
     if (request.method() === 'PATCH') {
@@ -68,7 +69,7 @@ try {
       if (table === 'projects') for (const key of ['tasks', 'notes', 'events', 'library_items']) for (const item of stores[owner][key]) if (item.project_id === id) item.project_id = null;
       return fulfill(row ? [row] : []);
     }
-    return fulfill(stores[owner][table]);
+    return fulfill(stores[owner][table].filter(item => !id || item.id === id));
   });
   async function visible(locator) { await locator.waitFor({ state: 'visible' }); }
   async function login(id) {

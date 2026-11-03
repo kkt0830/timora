@@ -90,6 +90,23 @@ impl Database {
             }
             rows.push((table, values));
         }
+        let attachment_dir = profile
+            .parent()
+            .ok_or("첨부파일 위치 오류")?
+            .join("attachments");
+        if let Some((_, attachments)) = rows.iter().find(|(table, _)| *table == "attachments") {
+            for row in attachments {
+                let name = format!("attachments/{}", crate::attachments::blob_name(row)?);
+                if let Ok(entry) = zip.by_name(&name) {
+                    let mut bytes = Vec::new();
+                    entry
+                        .take(crate::attachments::MAX_FILE + 1)
+                        .read_to_end(&mut bytes)
+                        .map_err(|_| "백업 첨부파일 읽기 오류")?;
+                    crate::attachments::write_blob(&attachment_dir, row, &bytes)?;
+                }
+            }
+        }
         let mut avatar = None;
         if let Some(name) = identity["local_avatar"].as_str() {
             let mut bytes = Vec::new();
