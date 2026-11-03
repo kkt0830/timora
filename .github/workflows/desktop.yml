@@ -44,6 +44,9 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
       # Public settings enable first login; restoring local identity is network-independent.
       - run: npm run desktop:build -- --ci -- --locked
+      - name: Package versioned Windows installer and ZIP
+        shell: pwsh
+        run: ./scripts/package-windows.ps1
       - name: Windows executable and offline-capable NSIS installer
         uses: actions/upload-artifact@v4
         with:
@@ -51,5 +54,6 @@ jobs:
           path: |
             src-tauri/target/release/timora-desktop.exe
             src-tauri/target/release/bundle/nsis/*-setup.exe
+            dist-windows/*
           if-no-files-found: error
           retention-days: 30

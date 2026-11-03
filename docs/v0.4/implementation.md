@@ -68,3 +68,41 @@ PR CI database passed. SQLite job failed formatting of the test driver; correcte
 ### Post-merge checkpoint — 2026-11-01
 
 Baseline main b6ae875 includes merged #21/#22. Fixed a duplicated upcoming-deadline fixture introduced by combining those branches (duplicate const declarations prevented browser tests from parsing). Added month/week/day Calendar selection, previous/next period, Today navigation and existing item detail editing. Date-only task semantics and instant-based event overlap stay unchanged. Node 57 tests, production build, Android and desktop browser fixtures PASS. Calendar time blocks/resizing and the other outstanding requirements remain unimplemented; this is not full Calendar 2.0 or v0.4 completion. No production schema, signing or release changes.
+
+### Implementation-first checkpoint — 2026-11-01
+
+Per user direction, full acceptance verification is deferred. Added existing-note debounced autosave through WorkspaceRepository, explicit save/retry, owner/note-scoped best-effort draft recovery, external-change stop, safe append-only starter templates, and local-vs-Cloud save messaging. New notes still require the initial explicit save. User-editable templates, tags, encrypted draft storage, automatic transient retry and per-note Cloud acknowledgement remain outstanding.
+
+Added Project Task board/list switch, three existing status columns, counts, priority/date/title sorting, card details, drag status changes and accessible touch/keyboard select alternatives. Status persists through the existing Task repository/sync. Manual card ordering remains outstanding; this board uses derived sort order. No new schema or production changes. TypeScript check passes; UI/acceptance checks deferred, no full feature/release completion claim.
+
+### Routine persistence checkpoint — 2026-11-01
+
+Added SQLite schema 6 and additive PostgreSQL routines/routine_completions tables, owner-safe relationships, deterministic SHA-256-derived completion UUIDs, per-day status, archive/pause instead of discarding history, durable outbox and v3 RPCs. v1/v2 feeds exclude new entity types. Added routine CRUD/schedule controls, completion/undo/history, archive recovery and Today progress. Reminder preference is stored only; OS delivery is not implemented. Recurring Task linkage remains unfinished.
+
+Minimal data-safety verification: existing Rust 37 tests, TypeScript, isolated migration and actual two-SQLite/PostgreSQL integration including concurrent same-day completion, undo, retained history and owner isolation. Test cleanup now rolls back failed transactions and removes the third fixture user. Full UI/device acceptance is deferred per user direction. Production schema is unchanged; native v3 sync waits for corresponding server support.
+
+### Signing prerequisite handling
+
+User confirmed no Android signing key or GitHub OAuth/App registration exists. Added manual-only Android signed-candidate workflow and Gradle release signing from protected environment variables; missing values fail release builds, without debug-signing fallback. Candidate script checks certificate SHA-256, package ID, ARM64 and debuggable flag, then writes checksums/manifest. No publishing/installing step. Followed official Tauri Android signing documentation (tauri-apps/tauri-docs v2, distribute/Sign/android.mdx). Workflow/build verification remains pending because credentials are absent. Existing v0.3.1 debug-signature compatibility and user-data-preserving migration are still BLOCKED; generating a new key alone cannot make an existing app accept an update.
+
+### Backup UI checkpoint
+
+Added native system-picker backup export and archive inspection with aggregate metadata UI, logout-epoch checks, bounded archive reads, private temporary files and desktop create-new export. JavaScript receives no arbitrary filesystem permission. Used official Tauri dialog/fs Rust source to confirm picker/open APIs. Actual Android/Windows picker behavior is PENDING. Restore remains unimplemented and is explicitly labelled unavailable; archive inspection never replaces the active database. Native compilation status is tracked separately from TypeScript.
+
+### Autosave regression checkpoint — 2026-11-02
+
+Added bounded exponential retry (three retries) for transient HTTP autosave failures; authorization/validation errors remain explicit manual failures. Restored named editor controls and scoped close-button selectors. Browser regression now explicitly recovers the retained draft before editing and saving it; the full Web fixture passes. TypeScript passes. PR platform evidence: Windows, SQLite and database checks passed; Android APK/AAB build steps passed but emulator smoke failed. Detailed CI log access is unavailable, so the Android failure cause remains undetermined. Tags/templates persistence and the other outstanding matrix features are still pending; no production migration or release was performed.
+
+### Workspace tools — 2026-11-02
+
+Added SQLite schema 7 and Cloud protocol v4 for tags/note links, editable templates, task time blocks and board positions. Older v2/v3 feeds use explicit allowlists; v1 remains core-only. Note tags support CRUD/multiple selection/filter and global tag search; templates append safely to new/existing notes. Calendar time blocks use UTC instants with device-timezone input and overlap indicators; editing provides touch/keyboard movement and resizing. Project board order commits a full project permutation atomically and persists per task; reassignments retain the task's rank, with UUID tie-breaking. Cascade deletion protects dirty children through explicit sync conflicts.
+
+Validation: TypeScript, Node 57 tests, Rust existing suite + workspace tools restart/relationship/order rollback test; isolated PostgreSQL migration and two-SQLite/v4 sync integration PASS including all five new tables and account isolation. Full browser/device acceptance remains pending. Production unchanged. GitHub integration is excluded from current user-authorized scope; other outstanding requirements remain in scope.
+
+### Recurrence, relationships, quotes and restore — 2026-11-02
+
+Added Task recurrence definitions and immutable occurrence links (schema 8/protocol v5), atomic bounded generation in Rust/PostgreSQL, automatic today-only creation, explicit missed/future date generation, pause/archive and retained completion history. Two offline devices converge on deterministic occurrence/Task IDs. Added owner-bound endpoint registry, relation CRUD/backlinks and cycle-safe dependencies; user quotes synchronize through schema 9/protocol v6. Bundled original copy, daily snapshot history, source preferences and bundled favorites are device-local and explicitly labelled. All older feeds retain explicit allowlists. Existing Node tests plus quote selection, Rust recurrence/relationship tests, and two-SQLite/PostgreSQL integration passed.
+
+Added schema 10 restore hold, verified archive content reconstruction into the trusted live schema, same-account/server checks, pre-restore recovery archive, transactional rollback, preserved delivery metadata, undo restore and explicit sync resumption. No archive SQL/triggers execute during restore. Failure-injection test proves original rows survive a failed restore, pending operations survive successful restore, hold survives restart, and undo returns to previous content. Native picker/UI acceptance remains pending.
+
+Notification implementation follows official Tauri notification plugin APIs. Android schedules a bounded seven-day/64-item window; Windows scheduling is intentionally handled only while the app is running because the official desktop backend ignores scheduling options. Opt-in permissions, per-item disable, timing settings, cancellation/reconciliation and click navigation are implemented; scheduler intent/OS state are device-local. Native notification delivery/reboot/installed Windows identity acceptance is pending, not claimed by unit tests.

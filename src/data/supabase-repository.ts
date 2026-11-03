@@ -1,5 +1,6 @@
+import { routineCompletionId } from '../domain/routines.ts';
 import type { AuthService, WorkspaceRepository } from '../services/contracts.ts';
-import { emptyWorkspace, entityTables } from '../domain/models.ts';
+import { emptyWorkspace, entityTables, workspaceToolTables } from '../domain/models.ts';
 import type { EntityInput, EntityMap, EntityTable, WorkspaceData, WorkspaceSettings } from '../domain/models.ts';
 import { displayName, safeAvatarUrl } from '../domain/identity.ts';
 import { validateInput } from '../domain/validation.ts';
@@ -26,6 +27,15 @@ export class SupabaseRepository implements WorkspaceRepository {
       if (rows.length < 500) return all;
     }
   }
+  async createNote(userId:string,input:EntityInput<'notes'>,id:string):Promise<EntityMap['notes']>{
+    validateInput('notes',input);
+    const rows=await this.request<EntityMap['notes'][]>('notes?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify({...input,id,user_id:userId})});
+    if(rows[0])return rows[0];
+    const existing=await this.request<EntityMap['notes'][]>(`notes?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}&select=*`);
+    if(!existing[0])throw new Error('새 노트 저장 결과를 확인할 수 없습니다.');return existing[0];
+  }
+  async generateTasks(_userId: string, ruleId: string, revision: string, days: string[]): Promise<void> { await this.request('rpc/generate_recurring_tasks', {method:'POST',body:JSON.stringify({rule_id:ruleId,expected_updated_at:revision,requested_days:days})}); }
+  async reorderBoard(_userId: string, projectId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_board', { method: 'POST', body: JSON.stringify({ parent_id: projectId, ordered_ids: ids }) }); }
   async reorderSubtasks(_userId: string, taskId: string, ids: string[]): Promise<void> { await this.request('rpc/reorder_subtasks', { method: 'POST', body: JSON.stringify({ parent_id: taskId, ordered_ids: ids }) }); }
   async load(userId: string): Promise<WorkspaceData> {
     const data = emptyWorkspace(userId);
@@ -41,11 +51,36 @@ export class SupabaseRepository implements WorkspaceRepository {
         data.subtasks_available = true;
       }
     } catch (error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
+    try {
+      const capability = await this.request<{protocol:number}>('rpc/sync_capabilities_v3', { method:'POST', body:'{}' });
+      if (capability?.protocol === 3) { data.routines = await this.list('routines', userId); data.routine_completions = await this.list('routine_completions', userId); data.routines_available = true; }
+    } catch(error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
+    try {
+      const capability = await this.request<{protocol:number}>('rpc/sync_capabilities_v4', {method:'POST',body:'{}'});
+      if (capability?.protocol === 4) { for (const table of workspaceToolTables) Object.assign(data,{[table]:await this.list(table,userId)}); data.tools_available = true; }
+    } catch(error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
+    try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v5',{method:'POST',body:'{}'}); if(capability?.protocol===5){data.task_recurrences=await this.list('task_recurrences',userId);data.task_occurrences=await this.list('task_occurrences',userId);data.recurrence_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
+    try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v6',{method:'POST',body:'{}'});if(capability?.protocol===6){data.object_relations=await this.list('object_relations',userId);data.user_quotes=await this.list('user_quotes',userId);data.extras_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
+    try { const capability=await this.request<{protocol:number}>('rpc/sync_capabilities_v7',{method:'POST',body:'{}'});if(capability?.protocol===7){data.attachments=await this.list('attachments',userId);data.attachments_available=true;} }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error;}
     return data;
   }
   async save<K extends EntityTable>(table: K, userId: string, input: EntityInput<K>, id?: string): Promise<EntityMap[K]> {
     validateInput(table, input);
     if (table === 'library_items' && /\s/.test(String((input as EntityInput<'library_items'>).url))) input = { ...input, url: new URL(String((input as EntityInput<'library_items'>).url)).href };
+    if (table === 'note_tags' || table === 'board_positions') {
+      const row = input as unknown as EntityInput<'note_tags'> & EntityInput<'board_positions'>;
+      const stableId = table === 'note_tags' ? await routineCompletionId(row.note_id, row.tag_id) : row.task_id;
+      if (id && id !== stableId) throw new Error('연결 ID 오류');
+      const rows = await this.request<EntityMap[K][]>(`${table}?on_conflict=id`, {method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({...input,id:stableId,user_id:userId})});
+      if (!rows[0]) throw new Error('연결 저장 실패'); return rows[0];
+    }
+    if (table === 'routine_completions') {
+      const completion = input as EntityInput<'routine_completions'>;
+      const stableId = await routineCompletionId(completion.routine_id, completion.local_date);
+      if (id && id !== stableId) throw new Error('루틴 완료 기록 ID 오류');
+      const rows = await this.request<EntityMap[K][]>('routine_completions?on_conflict=id', { method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=representation'}, body: JSON.stringify({...input,id:stableId,user_id:userId}) });
+      if (!rows[0]) throw new Error('루틴 완료 저장 실패'); return rows[0];
+    }
     const query = id ? `?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}` : '';
     const rows = await this.request<EntityMap[K][]>(`${table}${query}`, { method: id ? 'PATCH' : 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...input, user_id: userId }) });
     if (!rows[0]) throw new Error('항목이 없거나 수정 권한이 없습니다. 새로고침해 주세요.');

@@ -1,3 +1,9 @@
+import { UpdateCenter } from './UpdateCenter';
+import { NotificationsPage, NotificationScheduler } from './Notifications';
+import { QuotesPage, DailyQuote } from './Quotes';
+import { RecurringTasksPage, RecurringTaskScheduler } from './RecurringTasks';
+import { BackupPage } from './BackupPage';
+import { RoutinesPage } from './RoutinesPage';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, CalendarDays, FileText, FolderKanban, Home, Inbox, LayoutGrid, ListTodo, Menu, MoreHorizontal, Search, RefreshCw, } from 'lucide-react';
@@ -23,6 +29,11 @@ const primary: NavItem[] = [
   { label: 'Calendar', path: '/calendar', icon: CalendarDays },
 ];
 const secondary: NavItem[] = [
+  { label: 'Updates', path: '/updates', icon: RefreshCw },
+  { label: 'Notifications', path: '/notifications', icon: CalendarDays },
+  { label: 'Quotes', path: '/quotes', icon: BookOpen },
+  { label: 'Recurring Tasks', path: '/recurring', icon: ListTodo },
+  { label: 'Routines', path: '/routines', icon: ListTodo },
   { label: 'Projects', path: '/projects', icon: FolderKanban },
   { label: 'Library', path: '/library', icon: BookOpen },
 ];
@@ -89,7 +100,7 @@ function WorkspaceContent() {
   const { loading, loaded, error, reload } = useWorkspace(); const auth = useAuth();
   if (loading) return <div className="card" role="status" aria-live="polite">Workspace를 불러오는 중…</div>;
   if (error && !loaded) return <div className="card error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>다시 시도</button>{!auth.account?.local && <button type="button" onClick={() => void auth.signOut()}>로그아웃</button>}</div>;
-  return <>{auth.account?.local_only && <p className="notice">기존 로컬 기록을 그대로 사용할 수 있습니다. <NavLink to="/account">계정 연결</NavLink>은 나중에 진행해도 됩니다.</p>}{error && <div className="error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>다시 시도</button></div>}{auth.error && <p className="error" role="alert">{auth.error}</p>}<Routes><Route path="/" element={<HomePage />} /><Route path="/today" element={<TodayPage />} /><Route path="/inbox" element={<InboxPage />} /><Route path="/tasks" element={<TasksPage />} /><Route path="/notes" element={<NotesPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/projects" element={<ProjectsPage />} /><Route path="/projects/:id" element={<ProjectDetailPage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/account" element={auth.account?.local ? <NativeAccountPage /> : <Navigate to="/" replace />} /><Route path="/profile" element={<ProfilePage />} /><Route path="/search" element={<SearchPage />} /><Route path="/sync" element={auth.account?.local ? <SyncPage /> : <Navigate to="/" replace />} /><Route path="/cloud-import" element={auth.account?.local ? <CloudImportPage /> : <Navigate to="/" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
+  return <>{auth.account?.local_only && <p className="notice">기존 로컬 기록을 그대로 사용할 수 있습니다. <NavLink to="/account">계정 연결</NavLink>은 나중에 진행해도 됩니다.</p>}{error && <div className="error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>다시 시도</button></div>}{auth.error && <p className="error" role="alert">{auth.error}</p>}<NotificationScheduler/><DailyQuote launch/><RecurringTaskScheduler/><Routes><Route path="/updates" element={<UpdateCenter/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/quotes" element={<QuotesPage/>}/><Route path="/recurring" element={<RecurringTasksPage/>}/><Route path="/" element={<HomePage />} /><Route path="/backup" element={auth.account?.local ? <BackupPage /> : <Navigate to="/" replace />} /><Route path="/routines" element={<RoutinesPage />} /><Route path="/today" element={<TodayPage />} /><Route path="/inbox" element={<InboxPage />} /><Route path="/tasks" element={<TasksPage />} /><Route path="/notes" element={<NotesPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/projects" element={<ProjectsPage />} /><Route path="/projects/:id" element={<ProjectDetailPage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/account" element={auth.account?.local ? <NativeAccountPage /> : <Navigate to="/" replace />} /><Route path="/profile" element={<ProfilePage />} /><Route path="/search" element={<SearchPage />} /><Route path="/sync" element={auth.account?.local ? <SyncPage /> : <Navigate to="/" replace />} /><Route path="/cloud-import" element={auth.account?.local ? <CloudImportPage /> : <Navigate to="/" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
 }
 function NativeAccountPage() { const navigate = useNavigate(); return <AuthPage connecting onLater={() => navigate('/profile')} />; }
 function AuthGate() {

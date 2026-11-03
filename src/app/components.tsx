@@ -67,3 +67,9 @@ export function Markdown({ content }: { content: string }) {
   if (code) blocks.push(<pre key="open-code"><code>{code.join('\n')}</code></pre>);
   return <div className="markdown">{blocks}</div>;
 }
+
+export function usePageWindow<T>(items:T[],label:string,size=100){
+ const [selected,setSelected]=useState(0);const pages=Math.max(1,Math.ceil(items.length/size));const page=Math.min(selected,pages-1);
+ const controls=items.length>size?<nav className="period-filters" aria-label={`${label} 페이지`}><button type="button" disabled={page===0} onClick={()=>setSelected(page-1)}>이전 페이지</button><span>{page+1} / {pages} · 전체 {items.length}개</span><button type="button" disabled={page+1>=pages} onClick={()=>setSelected(page+1)}>다음 페이지</button></nav>:null;
+ return {visible:items.slice(page*size,(page+1)*size),controls};
+}

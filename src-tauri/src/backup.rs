@@ -12,7 +12,20 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 const MAX_DB: u64 = 512 * 1024 * 1024;
 const MAX_AVATAR: u64 = 1024 * 1024;
-const MAX_MANIFEST: u64 = 16 * 1024;
+const MAX_MANIFEST: u64 = 1024 * 1024;
+pub(crate) const MAX_ARCHIVE: u64 = 2 * 1024 * 1024 * 1024;
+fn attachment_path(name: &str) -> bool {
+    let Some(name) = name.strip_prefix("attachments/") else {
+        return false;
+    };
+    name.is_ascii()
+        && name.len() == 101
+        && uuid::Uuid::parse_str(&name[..36]).is_ok()
+        && &name[36..37] == "-"
+        && name[37..]
+            .bytes()
+            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+}
 
 /// Only non-secret, aggregate information is exposed for confirmation.
 #[derive(Debug, serde::Serialize)]
@@ -24,6 +37,8 @@ pub(crate) struct BackupPreview {
     pub pending_changes: u64,
     pub conflicts: u64,
     pub has_profile_image: bool,
+    pub included_attachments: u64,
+    pub missing_attachments: u64,
 }
 
 fn digest<R: Read>(mut reader: R, mut output: impl Write, limit: u64) -> Result<(u64, String)> {
@@ -67,7 +82,17 @@ fn valid_db(path: &Path) -> Result<Option<String>> {
     for table in TABLES
         .iter()
         .copied()
-        .chain(EXTENSION_TABLES.into_iter().filter(|_| version >= 5))
+        .chain(EXTENSION_TABLES.into_iter().filter(|t| {
+            version
+                >= match *t {
+                    "subtasks" => 5,
+                    "routines" | "routine_completions" => 6,
+                    "task_recurrences" | "task_occurrences" => 8,
+                    "object_relations" | "user_quotes" => 9,
+                    "attachments" => 11,
+                    _ => 7,
+                }
+        }))
         .chain([
             "workspace_settings",
             "local_identity",
@@ -120,12 +145,17 @@ pub(crate) fn validate_archive<R: Read + Seek>(reader: R) -> Result<()> {
 #[allow(dead_code)]
 pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview> {
     let mut zip = ZipArchive::new(reader).map_err(|_| "백업 ZIP이 손상되었습니다.")?;
-    if !(2..=3).contains(&zip.len()) {
+    if !(2..=10003).contains(&zip.len()) {
         return Err("백업 파일 구성이 올바르지 않습니다.".into());
     }
     let mut names = BTreeSet::new();
+    let mut total = 0u64;
     for i in 0..zip.len() {
         let item = zip.by_index(i).map_err(|_| "백업 ZIP 항목 오류")?;
+        total = total.checked_add(item.size()).ok_or("백업 크기 오류")?;
+        if total > MAX_ARCHIVE {
+            return Err("백업은 2 GB 이하여야 합니다.".into());
+        }
         let name = item.name().to_string();
         if item.is_dir()
             || item.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000)
@@ -177,6 +207,7 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
     if entries.iter().any(|n| {
         n != "database/timora.db"
             && !(n.starts_with("profile/") && crate::valid_avatar_name(&n[8..]))
+            && !attachment_path(n)
     }) {
         return Err("허용되지 않은 백업 경로입니다.".into());
     }
@@ -186,6 +217,8 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
         let entry = zip.by_name(name).map_err(|_| "백업 항목 오류")?;
         let limit = if name == "database/timora.db" {
             MAX_DB
+        } else if name.starts_with("attachments/") {
+            crate::attachments::MAX_FILE
         } else {
             MAX_AVATAR
         };
@@ -207,7 +240,10 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
         {
             return Err("백업 무결성 확인에 실패했습니다.".into());
         }
-        if name != "database/timora.db" {
+        if name.starts_with("attachments/") {
+            crate::attachments::file_mime(&image)?;
+        }
+        if name.starts_with("profile/") {
             if image::guess_format(&image).ok() != Some(image::ImageFormat::Png) {
                 return Err("백업 프로필 사진 형식 오류".into());
             }
@@ -235,10 +271,45 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
     if manifest["database_schema_version"] != version {
         return Err("백업 manifest와 DB 버전이 다릅니다.".into());
     }
+    let mut included_attachments = 0u64;
+    let mut missing_attachments = 0u64;
+    let mut referenced = BTreeSet::new();
+    if version >= 11 {
+        for row in crate::json_rows(&db, "SELECT * FROM attachments", &[])? {
+            let name = format!("attachments/{}", crate::attachments::blob_name(&row)?);
+            referenced.insert(name.clone());
+            if entries.contains(&name) {
+                if files[&name]["size"] != row["byte_size"]
+                    || files[&name]["sha256"] != row["sha256"]
+                {
+                    return Err("백업 첨부파일 정보 불일치".into());
+                }
+                included_attachments += 1;
+            } else {
+                missing_attachments += 1;
+            }
+        }
+    }
+    if entries
+        .iter()
+        .any(|n| n.starts_with("attachments/") && !referenced.contains(n))
+    {
+        return Err("연결되지 않은 백업 첨부파일입니다.".into());
+    }
     let mut records = std::collections::BTreeMap::new();
     for table in TABLES
         .into_iter()
-        .chain(EXTENSION_TABLES.into_iter().filter(|_| version >= 5))
+        .chain(EXTENSION_TABLES.into_iter().filter(|t| {
+            version
+                >= match *t {
+                    "subtasks" => 5,
+                    "routines" | "routine_completions" => 6,
+                    "task_recurrences" | "task_occurrences" => 8,
+                    "object_relations" | "user_quotes" => 9,
+                    "attachments" => 11,
+                    _ => 7,
+                }
+        }))
     {
         let count: u64 = db
             .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
@@ -261,6 +332,8 @@ pub(crate) fn inspect_archive<R: Read + Seek>(reader: R) -> Result<BackupPreview
         pending_changes,
         conflicts,
         has_profile_image: avatar.is_some(),
+        included_attachments,
+        missing_attachments,
     })
 }
 
@@ -284,6 +357,28 @@ impl Database {
                 stage.join("profile").join(name),
                 MAX_AVATAR,
             ));
+        }
+        let attachment_dir = profile_dir
+            .parent()
+            .ok_or("백업 파일 경로 오류")?
+            .join("attachments");
+        for row in crate::json_rows(&self.conn, "SELECT * FROM attachments", &[])? {
+            let name = crate::attachments::blob_name(&row)?;
+            let path = attachment_dir.join(&name);
+            if path.is_file() {
+                sources.push((
+                    format!("attachments/{name}"),
+                    path,
+                    crate::attachments::MAX_FILE,
+                ));
+            }
+        }
+        let total: u64 = sources
+            .iter()
+            .map(|(_, p, _)| std::fs::metadata(p).map(|m| m.len()).unwrap_or(MAX_ARCHIVE))
+            .sum();
+        if sources.len() > 10002 || total > MAX_ARCHIVE - 2 * MAX_MANIFEST {
+            return Err("백업 크기가 2 GB 한도를 초과합니다.".into());
         }
         let mut options = std::fs::OpenOptions::new();
         options.write(true).read(true).create_new(true);

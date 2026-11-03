@@ -1288,3 +1288,9 @@ html[data-platform="android"] .topbar {
 .subtask-editor progress { width: 100%; margin-top: 12px; }
 .calendar-grid.calendar-single { grid-template-columns: minmax(0, 1fr); }
 .calendar-single .calendar-day { min-height: 120px; }
+.kanban-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.kanban-column { min-width: 0; min-height: 120px; padding: 8px; background: var(--bg, #f5f5f5); border-radius: 12px; }
+.kanban-task { margin-bottom: 12px; padding: 12px; overflow-wrap: anywhere; }
+.kanban-task small { display: block; margin-block: 8px; }
+.kanban-task select { width: 100%; min-height: 44px; }
+@media (max-width: 800px) { .kanban-board { grid-template-columns: minmax(0, 1fr); } }

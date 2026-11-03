@@ -1,3 +1,6 @@
+import { validateRecurrence } from './recurrence.ts';
+import { routineRule } from './routines.ts';
+import type { Routine } from './models.ts';
 import type { EntityInput, EntityTable } from './models.ts';
 
 export function safeUrl(value: string): string | null {
@@ -11,6 +14,26 @@ function validDate(value: unknown): boolean {
 }
 export function validateInput<K extends EntityTable>(table: K, input: EntityInput<K>): void {
   const row = input as unknown as Record<string, unknown>;
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  if (table === 'object_relations') { if (!uuid(row.source_id)||!uuid(row.target_id)||!['task','note','project','event','resource'].includes(String(row.source_kind))||!['task','note','project','event','resource'].includes(String(row.target_kind))||!['references','belongs_to','depends_on'].includes(String(row.kind))||(row.source_id===row.target_id&&row.source_kind===row.target_kind)) throw new Error('관계의 종류와 대상을 확인해 주세요.'); return; }
+  if (table === 'user_quotes') { if(typeof row.content!=='string'||!row.content.trim()||row.content.length>2000||typeof row.author!=='string'||row.author.length>200||![0,1].includes(Number(row.favorite))) throw new Error('문구·출처를 확인해 주세요.');return; }
+  if(table==='attachments'){if(typeof row.filename!=='string'||!row.filename.trim()||row.filename.length>255||!['application/pdf','image/png','image/jpeg','image/webp','text/plain'].includes(String(row.mime))||!Number.isInteger(row.byte_size)||Number(row.byte_size)<1||Number(row.byte_size)>26214400||!/^[0-9a-f]{64}$/.test(String(row.sha256))||(row.resource_id!==null&&!uuid(row.resource_id)))throw new Error('첨부파일 정보가 올바르지 않습니다.');return;}
+  if (table === 'tags') { if (typeof row.name !== 'string' || !row.name.trim() || row.name.length>80 || !/^#[0-9a-f]{6}$/i.test(String(row.color))) throw new Error('태그 이름·색상을 확인해 주세요.'); return; }
+  if (table === 'note_templates') { if (typeof row.title !== 'string' || !row.title.trim() || row.title.length>300 || typeof row.content !== 'string' || row.content.length>1000000) throw new Error('템플릿 제목·내용을 확인해 주세요.'); return; }
+  if (table === 'note_tags') { if (!uuid(row.note_id) || !uuid(row.tag_id)) throw new Error('태그 연결을 확인해 주세요.'); return; }
+  if (table === 'task_blocks' || table === 'board_positions') {
+    if (!uuid(row.task_id)) throw new Error('Task 연결을 확인해 주세요.');
+    if (table === 'board_positions' && (!Number.isInteger(row.position) || Number(row.position)<0 || Number(row.position)>2147483647)) throw new Error('보드 순서 오류');
+    if (table === 'task_blocks' && (!Number.isFinite(Date.parse(String(row.start_at))) || !Number.isFinite(Date.parse(String(row.end_at))) || Date.parse(String(row.start_at))>=Date.parse(String(row.end_at)))) throw new Error('종료 시간은 시작 이후여야 합니다.');
+    return;
+  }
+  if (table === 'routine_completions') {
+    if (!/^[0-9a-f-]{36}$/i.test(String(row.routine_id)) || typeof row.local_date !== 'string' || !validDate(row.local_date) || !['todo','done'].includes(String(row.status))) throw new Error('루틴 완료 기록을 확인해 주세요.');
+    return;
+  }
+  if (table === 'task_occurrences') { if (!uuid(row.recurrence_id) || !uuid(row.task_id) || typeof row.local_date !== 'string' || !validDate(row.local_date)) throw new Error('반복 회차 오류'); return; }
+  if (table === 'task_recurrences' && (!['low','medium','high'].includes(String(row.priority)) || (row.project_id !== null && !uuid(row.project_id)))) throw new Error('반복 작업 우선순위·프로젝트 오류');
+  if (table === 'routines' || table === 'task_recurrences') { validateRecurrence(routineRule(input as unknown as Routine)); if (!['active','paused','archived'].includes(String(row.status))) throw new Error('루틴 상태 오류'); }
   const label = table === 'projects' ? row.name : table === 'inbox_items' ? row.content : row.title;
   if (typeof label !== 'string' || !label.trim()) throw new Error('제목 또는 내용을 입력해 주세요.');
   if (label.length > (table === 'inbox_items' ? 20000 : 300)) throw new Error('제목은 300자, Inbox 내용은 20,000자 이내로 입력해 주세요.');
