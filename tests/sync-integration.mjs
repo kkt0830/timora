@@ -65,6 +65,23 @@ try {
  for(const [table,input] of Object.entries({tasks:{title:'T',description:'',status:'todo',priority:'high',start_date:null,due_date:'2026-10-12',project_id:project.id},events:{title:'E',description:'',start_at:'2026-10-12T09:00:00Z',end_at:'2026-10-12T10:00:00Z',project_id:project.id},library_items:{title:'L',description:'',url:'https://example.com',type:'article',project_id:project.id},inbox_items:{content:'Capture',type:'unclassified'}}))await phone.invoke('local_save',{table,input});
  await sync(phone);await sync(tablet);
  for(const table of ['projects','tasks','events','library_items','inbox_items'])assert.equal((await load(tablet,table)).length,1,table);
+ // Attachment bytes never enter the record protocol; metadata retains owner-safe parents.
+ const resource=(await load(phone,'library_items'))[0];
+ const attachment=await phone.invoke('local_save',{table:'attachments',input:{resource_id:resource.id,filename:'fixture.txt',mime:'text/plain',byte_size:4,sha256:'a'.repeat(64)}});
+ await sync(phone);await sync(tablet);await sync(other);
+ assert.equal((await load(tablet,'attachments'))[0].id,attachment.id);
+ assert.equal((await load(other,'attachments')).length,0);
+ await assert.rejects(phone.invoke('local_remove',{table:'library_items',id:resource.id}));
+ await assert.rejects(other.invoke('local_save',{table:'attachments',input:{resource_id:resource.id,filename:'invalid.txt',mime:'text/plain',byte_size:4,sha256:'a'.repeat(64)}}));
+ await pg.query('begin');
+ try {
+  await pg.query('set local role authenticated');await pg.query("select set_config('request.jwt.claim.sub',$1,true)",[B]);
+  assert.equal((await pg.query('select id from public.attachments')).rows.length,0);
+  await assert.rejects(pg.query("insert into public.attachments(user_id,resource_id,filename,mime,byte_size,sha256) values($1,$2,'invalid.txt','text/plain',4,$3)",[B,resource.id,'a'.repeat(64)]));
+ } finally {await pg.query('rollback');}
+ await phone.invoke('local_remove',{table:'attachments',id:attachment.id});await sync(phone);await sync(tablet);
+ assert.equal((await load(tablet,'attachments')).length,0);
+ console.log('PASS: attachment metadata sync, parent deletion guard, cross-owner RLS/FK and deletion propagation (bytes tested separately)');
  // Workspace tools use owner-safe dependencies and preserve source data when links are deleted.
  const tagged=await phone.invoke('local_save',{table:'notes',input:{title:'Tagged',content:'source',project_id:project.id}});
  const tag=await phone.invoke('local_save',{table:'tags',input:{name:'개발',color:'#5271ff'}});
