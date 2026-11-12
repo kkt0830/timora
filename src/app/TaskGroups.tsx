@@ -16,6 +16,6 @@ export function TaskGroups({ tasks, today, owner, open }: { tasks: Task[]; today
   return <div className="task-groups">{(Object.keys(groupLabels) as TaskGroup[]).map(group => {
     const rows = tasks.filter(task => taskGroup(task, today) === group);
     if (!rows.length) return null;
-    return <section className="card" key={group}><button type="button" className="group-heading" aria-expanded={!closed.includes(group)} aria-controls={`group-${group}`} onClick={() => toggle(group)}><span aria-hidden="true">{closed.includes(group) ? '›' : '⌄'}</span><strong>{groupLabels[group]}</strong><span className="count-badge">{rows.length}</span></button><div id={`group-${group}`} hidden={closed.includes(group)}><TaskList tasks={rows} open={open} /></div></section>;
+    return <section className="card" key={group}><button type="button" className="group-heading" aria-expanded={!closed.includes(group)} aria-controls={`group-${group}`} onClick={() => toggle(group)}><span aria-hidden="true">{closed.includes(group) ? '›' : '⌄'}</span><strong>{groupLabels[group]}</strong><span className="count-badge">{rows.length}</span></button><div id={`group-${group}`} hidden={closed.includes(group)}>{!closed.includes(group)&&<TaskList tasks={rows} open={open} />}</div></section>;
   })}</div>;
 }

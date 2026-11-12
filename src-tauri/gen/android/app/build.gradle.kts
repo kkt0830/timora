@@ -25,6 +25,24 @@ android {
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
+    val signingValues = listOf("TIMORA_ANDROID_KEYSTORE", "TIMORA_ANDROID_KEY_ALIAS", "TIMORA_ANDROID_STORE_PASSWORD", "TIMORA_ANDROID_KEY_PASSWORD")
+        .associateWith { System.getenv(it)?.takeIf { value -> value.isNotBlank() } }
+    val releaseSigningReady = signingValues.values.all { it != null }
+    if (releaseSigningReady) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(signingValues.getValue("TIMORA_ANDROID_KEYSTORE")!!)
+                keyAlias = signingValues.getValue("TIMORA_ANDROID_KEY_ALIAS")
+                storePassword = signingValues.getValue("TIMORA_ANDROID_STORE_PASSWORD")
+                keyPassword = signingValues.getValue("TIMORA_ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+    gradle.taskGraph.whenReady {
+        if (allTasks.any { it.project == project && it.name.contains("Release", ignoreCase = true) } && !releaseSigningReady) {
+            throw GradleException("Release signing is not configured. Provide the four TIMORA_ANDROID signing variables; debug signing is never used for release.")
+        }
+    }
     buildTypes {
         getByName("debug") {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
@@ -39,6 +57,7 @@ android {
             }
         }
         getByName("release") {
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("release")
             optimization {
                enable = true
             }

@@ -21,3 +21,10 @@ src-tauri/gen/*
 *.db-wal
 *.db-shm
 *.sqlite*
+
+# Private release signing material
+*.jks
+*.keystore
+keystore.properties
+
+dist-windows/

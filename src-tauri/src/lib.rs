@@ -12,8 +12,22 @@ fn sql_error(e: rusqlite::Error) -> String {
 fn now() -> String {
     Utc::now().to_rfc3339()
 }
-pub const SCHEMA_VERSION: i64 = 5;
-pub const EXTENSION_TABLES: [&str; 1] = ["subtasks"];
+pub const SCHEMA_VERSION: i64 = 11;
+pub const EXTENSION_TABLES: [&str; 13] = [
+    "subtasks",
+    "routines",
+    "routine_completions",
+    "tags",
+    "note_templates",
+    "note_tags",
+    "task_blocks",
+    "board_positions",
+    "task_recurrences",
+    "task_occurrences",
+    "object_relations",
+    "user_quotes",
+    "attachments",
+];
 pub const TABLES: [&str; 6] = [
     "projects",
     "tasks",
@@ -24,6 +38,52 @@ pub const TABLES: [&str; 6] = [
 ];
 fn fields(table: &str) -> Result<&'static [&'static str]> {
     match table {
+        "attachments" => Ok(&["resource_id", "filename", "mime", "byte_size", "sha256"]),
+        "object_relations" => Ok(&[
+            "source_id",
+            "source_kind",
+            "target_id",
+            "target_kind",
+            "kind",
+        ]),
+        "user_quotes" => Ok(&["content", "author", "favorite"]),
+        "tags" => Ok(&["name", "color"]),
+        "note_templates" => Ok(&["title", "content"]),
+        "note_tags" => Ok(&["note_id", "tag_id"]),
+        "task_blocks" => Ok(&["task_id", "start_at", "end_at"]),
+        "board_positions" => Ok(&["task_id", "position"]),
+        "task_occurrences" => Ok(&["recurrence_id", "local_date", "task_id"]),
+        "task_recurrences" => Ok(&[
+            "title",
+            "description",
+            "frequency",
+            "interval_days",
+            "start_date",
+            "end_date",
+            "occurrence_limit",
+            "weekdays",
+            "timezone",
+            "status",
+            "reminder_time",
+            "category",
+            "priority",
+            "project_id",
+        ]),
+        "routines" => Ok(&[
+            "title",
+            "description",
+            "frequency",
+            "interval_days",
+            "start_date",
+            "end_date",
+            "occurrence_limit",
+            "weekdays",
+            "timezone",
+            "status",
+            "reminder_time",
+            "category",
+        ]),
+        "routine_completions" => Ok(&["routine_id", "local_date", "status"]),
         "subtasks" => Ok(&["task_id", "title", "status", "position"]),
         "projects" => Ok(&["name", "description", "status", "color"]),
         "tasks" => Ok(&[
@@ -78,6 +138,156 @@ fn instant(s: &str) -> Result<DateTime<chrono::FixedOffset>> {
     DateTime::parse_from_rfc3339(s).map_err(|_| "일정 시간을 확인해 주세요.".into())
 }
 fn validate(table: &str, row: &Value) -> Result<()> {
+    if table == "attachments" {
+        limit(text(row, "filename")?, 255, true)?;
+        choice(
+            row,
+            "mime",
+            &[
+                "application/pdf",
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+                "text/plain",
+            ],
+        )?;
+        if !row["byte_size"]
+            .as_i64()
+            .is_some_and(|n| (1..=26214400).contains(&n))
+        {
+            return Err("파일은 25 MB 이하여야 합니다.".into());
+        }
+        let hash = text(row, "sha256")?;
+        if hash.len() != 64
+            || !hash
+                .bytes()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+        {
+            return Err("파일 체크섬 오류".into());
+        }
+        if let Some(id) = row["resource_id"].as_str() {
+            Uuid::parse_str(id).map_err(|_| "자료 연결 오류")?;
+        }
+        return Ok(());
+    }
+
+    if table == "object_relations" {
+        for key in ["source_id", "target_id"] {
+            Uuid::parse_str(text(row, key)?).map_err(|_| "연결 대상 ID 오류")?;
+        }
+        for key in ["source_kind", "target_kind"] {
+            choice(row, key, &["task", "note", "project", "event", "resource"])?;
+        }
+        return choice(row, "kind", &["references", "belongs_to", "depends_on"]);
+    }
+    if table == "user_quotes" {
+        limit(text(row, "content")?, 2000, true)?;
+        limit(text(row, "author")?, 200, false)?;
+        if !matches!(row["favorite"].as_i64(), Some(0) | Some(1)) {
+            return Err("즐겨찾기 값 오류".into());
+        }
+        return Ok(());
+    }
+
+    if table == "tags" {
+        limit(text(row, "name")?, 80, true)?;
+        let color = text(row, "color")?;
+        if color.len() != 7
+            || !color.starts_with('#')
+            || !color[1..].bytes().all(|c| c.is_ascii_hexdigit())
+        {
+            return Err("태그 색상 오류".into());
+        }
+        return Ok(());
+    }
+    if table == "note_templates" {
+        limit(text(row, "title")?, 300, true)?;
+        return limit(text(row, "content")?, 1000000, false);
+    }
+    if table == "note_tags" {
+        for key in ["note_id", "tag_id"] {
+            Uuid::parse_str(text(row, key)?).map_err(|_| "노트 태그 연결 오류")?;
+        }
+        return Ok(());
+    }
+    if table == "task_blocks" || table == "board_positions" {
+        Uuid::parse_str(text(row, "task_id")?).map_err(|_| "Task ID 오류")?;
+        if table == "task_blocks"
+            && instant(text(row, "start_at")?)? >= instant(text(row, "end_at")?)?
+        {
+            return Err("종료 시간은 시작 이후여야 합니다.".into());
+        }
+        if table == "board_positions"
+            && !row["position"]
+                .as_i64()
+                .is_some_and(|n| (0..=2147483647).contains(&n))
+        {
+            return Err("보드 순서 오류".into());
+        }
+        return Ok(());
+    }
+    if table == "routine_completions" {
+        Uuid::parse_str(text(row, "routine_id")?).map_err(|_| "루틴 ID 오류")?;
+        text(row, "local_date")?;
+        date(row, "local_date")?;
+        return choice(row, "status", &["todo", "done"]);
+    }
+    if table == "task_occurrences" {
+        Uuid::parse_str(text(row, "recurrence_id")?).map_err(|_| "반복 ID 오류")?;
+        Uuid::parse_str(text(row, "task_id")?).map_err(|_| "Task ID 오류")?;
+        text(row, "local_date")?;
+        return date(row, "local_date");
+    }
+    if table == "task_recurrences" {
+        choice(row, "priority", &["low", "medium", "high"])?;
+        if let Some(id) = row["project_id"].as_str() {
+            Uuid::parse_str(id).map_err(|_| "Project ID 오류")?;
+        }
+    }
+    if table == "routines" || table == "task_recurrences" {
+        limit(text(row, "title")?, 300, true)?;
+        limit(text(row, "description")?, 20000, false)?;
+        choice(
+            row,
+            "frequency",
+            &["daily", "weekdays", "weekly", "monthly", "yearly"],
+        )?;
+        choice(row, "status", &["active", "paused", "archived"])?;
+        text(row, "start_date")?;
+        date(row, "start_date")?;
+        date(row, "end_date")?;
+        if row["end_date"]
+            .as_str()
+            .is_some_and(|end| end < row["start_date"].as_str().unwrap())
+        {
+            return Err("반복 종료일 오류".into());
+        }
+        if !row["interval_days"]
+            .as_i64()
+            .is_some_and(|n| (1..=366).contains(&n))
+            || (!row["occurrence_limit"].is_null()
+                && !row["occurrence_limit"]
+                    .as_i64()
+                    .is_some_and(|n| (1..=10000).contains(&n)))
+        {
+            return Err("반복 간격/횟수 오류".into());
+        }
+        let days = text(row, "weekdays")?;
+        if !days.is_empty()
+            && days
+                .split(',')
+                .any(|d| !matches!(d, "0" | "1" | "2" | "3" | "4" | "5" | "6"))
+        {
+            return Err("반복 요일 오류".into());
+        }
+        limit(text(row, "timezone")?, 64, true)?;
+        limit(text(row, "category")?, 100, false)?;
+        if !row["reminder_time"].is_null() {
+            chrono::NaiveTime::parse_from_str(text(row, "reminder_time")?, "%H:%M")
+                .map_err(|_| "알림 시간 오류")?;
+        }
+        return Ok(());
+    }
     if table == "subtasks" {
         Uuid::parse_str(text(row, "task_id")?).map_err(|_| "Task ID를 확인해 주세요.")?;
         limit(text(row, "title")?, 300, true)?;
@@ -307,7 +517,55 @@ impl Database {
             let tx = conn.transaction().map_err(sql_error)?;
             tx.execute_batch(include_str!("../migrations/005_subtasks.sql"))
                 .map_err(sql_error)?;
-            tx.pragma_update(None, "user_version", SCHEMA_VERSION)
+            tx.pragma_update(None, "user_version", 5)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 6 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/006_routines.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 6)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 7 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/007_workspace_tools.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 7)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 8 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/008_recurring_tasks.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 8)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 9 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/009_relations_quotes.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 9)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 10 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/010_restore_guard.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 10)
+                .map_err(sql_error)?;
+            tx.commit().map_err(sql_error)?;
+        }
+        if version < 11 {
+            let tx = conn.transaction().map_err(sql_error)?;
+            tx.execute_batch(include_str!("../migrations/011_attachments.sql"))
+                .map_err(sql_error)?;
+            tx.pragma_update(None, "user_version", 11)
                 .map_err(sql_error)?;
             tx.commit().map_err(sql_error)?;
         }
@@ -457,6 +715,19 @@ impl Database {
         imported: bool,
     ) -> Result<Value> {
         validate(table, input)?;
+        if table == "routine_completions"
+            && id != completion_id(text(input, "routine_id")?, text(input, "local_date")?)
+        {
+            return Err("루틴 완료 기록 ID 오류".into());
+        }
+        if table == "note_tags"
+            && id != completion_id(text(input, "note_id")?, text(input, "tag_id")?)
+        {
+            return Err("노트 태그 ID 오류".into());
+        }
+        if table == "board_positions" && id != text(input, "task_id")? {
+            return Err("보드 순서 ID 오류".into());
+        }
         Uuid::parse_str(id).map_err(|_| "항목 ID를 확인해 주세요.")?;
         let columns = fields(table)?;
         let mut row = Map::new();
@@ -544,11 +815,53 @@ impl Database {
         .next()
         .ok_or("저장 응답이 없습니다.".into())
     }
+    pub fn create_note(&mut self, id: &str, input: Value) -> Result<Value> {
+        self.require_workspace()?;
+        Uuid::parse_str(id).map_err(|_| "노트 ID 오류")?;
+        validate("notes", &input)?;
+        let owner = self.owner()?;
+        let tx = self.conn.transaction().map_err(sql_error)?;
+        let row = if let Some(row) = json_rows(
+            &tx,
+            "SELECT * FROM notes WHERE id=?1 AND user_id=?2",
+            &[SqlValue::Text(id.into()), SqlValue::Text(owner.clone())],
+        )?
+        .into_iter()
+        .next()
+        {
+            row
+        } else {
+            Self::write(&tx, &owner, "notes", &input, id, false, false)?
+        };
+        tx.commit().map_err(sql_error)?;
+        Ok(row)
+    }
     pub fn save(&mut self, table: &str, input: Value, id: Option<String>) -> Result<Value> {
         self.require_workspace()?;
         let owner = self.owner()?;
-        let update = id.is_some();
-        let id = id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let mut update = id.is_some();
+        let id = if ["routine_completions", "note_tags", "board_positions"].contains(&table) {
+            validate(table, &input)?;
+            let expected = match table {
+                "note_tags" => completion_id(text(&input, "note_id")?, text(&input, "tag_id")?),
+                "board_positions" => text(&input, "task_id")?.to_string(),
+                _ => completion_id(text(&input, "routine_id")?, text(&input, "local_date")?),
+            };
+            if id.as_ref().is_some_and(|id| *id != expected) {
+                return Err("루틴 완료 기록 ID 오류".into());
+            }
+            update = self
+                .conn
+                .query_row(
+                    &format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE id=?1)"),
+                    [&expected],
+                    |r| r.get(0),
+                )
+                .map_err(sql_error)?;
+            expected
+        } else {
+            id.unwrap_or_else(|| Uuid::new_v4().to_string())
+        };
         let tx = self.conn.transaction().map_err(sql_error)?;
         let row = Self::write(&tx, &owner, table, &input, &id, update, false)?;
         tx.commit().map_err(sql_error)?;
@@ -572,13 +885,70 @@ impl Database {
             .map_err(sql_error)?;
         }
         if table == "projects" {
-            for child in ["tasks", "notes", "events", "library_items"] {
+            for child in [
+                "tasks",
+                "notes",
+                "events",
+                "library_items",
+                "task_recurrences",
+            ] {
                 conn.execute(&format!("UPDATE {child} SET project_id=NULL,updated_at=?1,sync_state=CASE WHEN remote_updated_at IS NULL THEN 'local' ELSE 'modified' END WHERE project_id=?2"),params![now(),id]).map_err(sql_error)?;
             }
         }
         conn.execute(&format!("DELETE FROM {table} WHERE id=?1"), [id])
             .map_err(sql_error)?;
         Ok(())
+    }
+    pub fn reorder_board(&mut self, project_id: &str, ids: Vec<String>) -> Result<()> {
+        self.require_workspace()?;
+        let owner = self.owner()?;
+        let tx = self.conn.transaction().map_err(sql_error)?;
+        let exists: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM projects WHERE id=?1 AND user_id=?2)",
+                params![project_id, owner],
+                |r| r.get(0),
+            )
+            .map_err(sql_error)?;
+        if !exists {
+            return Err("프로젝트를 찾을 수 없습니다.".into());
+        }
+        let rows = json_rows(
+            &tx,
+            "SELECT id FROM tasks WHERE project_id=?1 AND user_id=?2 ORDER BY id",
+            &[
+                SqlValue::Text(project_id.into()),
+                SqlValue::Text(owner.clone()),
+            ],
+        )?;
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|r| r["id"].as_str().unwrap().to_string())
+            .collect();
+        let mut expected = ids.clone();
+        expected.sort();
+        if actual != expected {
+            return Err("프로젝트 작업이 변경되었습니다. 새로고침 후 다시 정렬해 주세요.".into());
+        }
+        for (position, id) in ids.iter().enumerate() {
+            let update: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM board_positions WHERE id=?1)",
+                    [id],
+                    |r| r.get(0),
+                )
+                .map_err(sql_error)?;
+            Self::write(
+                &tx,
+                &owner,
+                "board_positions",
+                &json!({"task_id":id,"position":position}),
+                id,
+                update,
+                false,
+            )?;
+        }
+        tx.commit().map_err(sql_error)
     }
     pub fn reorder_subtasks(&mut self, task_id: &str, ids: Vec<String>) -> Result<()> {
         self.require_workspace()?;
@@ -777,6 +1147,12 @@ impl Database {
     }
 }
 
+fn completion_id(routine_id: &str, date: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(format!("{}:{}", routine_id.to_lowercase(), date).as_bytes());
+    Uuid::from_slice(&hash[..16]).unwrap().to_string()
+}
+
 pub fn valid_avatar_name(name: &str) -> bool {
     name.strip_suffix(".png")
         .is_some_and(|id| Uuid::parse_str(id).is_ok() && id.len() == 36)
@@ -795,3 +1171,14 @@ mod runtime;
 mod session_vault;
 #[cfg(feature = "desktop")]
 pub use runtime::run;
+
+mod recurring;
+
+mod restore;
+
+mod attachments;
+#[cfg(feature = "desktop")]
+mod native_files;
+
+#[cfg(feature = "desktop")]
+mod updates;

@@ -45,6 +45,13 @@ fn main() {
                     serde_json::from_value(a["ids"].clone()).unwrap(),
                 )
                 .map(|_| Value::Null),
+            "local_generate_tasks" => db
+                .generate_tasks(
+                    s("ruleId"),
+                    s("revision"),
+                    serde_json::from_value(a["days"].clone()).unwrap(),
+                )
+                .map(|_| Value::Null),
             "local_load" => db.load(),
             _ => Err("Unknown isolated test command".into()),
         };

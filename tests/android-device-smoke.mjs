@@ -173,6 +173,11 @@ c=sqlite3.connect(sys.argv[1]);c.execute("UPDATE local_identity SET cloud_user_i
   assert.equal(await page.evaluate(async()=>{try{await window.__TAURI_INTERNALS__.invoke('local_session_read');return false;}catch{return true;}}),true);
   console.log('Android Keystore: encrypted refresh fixture survived force-stop, local records stayed intact, and explicit logout cleared credential and locked IPC. Live Supabase refresh remains a physical-device gate.');
   console.log('Android emulator: fresh Auth/locked IPC and legacy-v1 upgrade passed; six-entity CRUD/settings and identity persisted through force-stop offline; real HashRouter/Back passed. Physical device/IME remains PENDING.');
+} catch (error) {
+  // Keep a bounded failure annotation available in the checks API as well as runner logs.
+  const detail=String(error.stack??error).slice(0,3500).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+  console.error(`::error title=Android smoke failure::${detail}`);
+  throw error;
 } finally {
   await session?.device.close();
 }

@@ -1,0 +1,78 @@
+name: Android signed release candidate (no publication)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: release-candidate
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      TIMORA_ANDROID_KEY_ALIAS: ${{ secrets.TIMORA_ANDROID_KEY_ALIAS }}
+      TIMORA_ANDROID_STORE_PASSWORD: ${{ secrets.TIMORA_ANDROID_STORE_PASSWORD }}
+      TIMORA_ANDROID_KEY_PASSWORD: ${{ secrets.TIMORA_ANDROID_KEY_PASSWORD }}
+      TIMORA_ANDROID_EXPECTED_CERT_SHA256: ${{ vars.TIMORA_ANDROID_EXPECTED_CERT_SHA256 }}
+      NDK_VERSION: 30.0.16248370
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require fixed signing identity
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TIMORA_ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64"
+          test -n "$TIMORA_ANDROID_KEY_ALIAS"
+          test -n "$TIMORA_ANDROID_STORE_PASSWORD"
+          test -n "$TIMORA_ANDROID_KEY_PASSWORD"
+          test -n "$TIMORA_ANDROID_EXPECTED_CERT_SHA256"
+          umask 077
+          python3 - <<'PY'
+          import base64, os, pathlib
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'timora-release.jks'
+          path.write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'], validate=True))
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('TIMORA_ANDROID_KEYSTORE=' + str(path) + '\n')
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '16111833'
+          packages: platform-tools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: gradle/actions/setup-gradle@v4
+      - name: SDK
+        run: |
+          sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;$NDK_VERSION"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: node scripts/validate-native-config.mjs
+      - name: Build signed ARM64 candidate
+        run: npm run android:build -- --apk --target aarch64 --split-per-abi --ci
+      - name: Verify signature and create checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p candidate
+          python3 scripts/verify-android-candidate.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: timora-android-signed-candidate
+          path: candidate/
+          if-no-files-found: error
+      - name: Remove private keystore
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/timora-release.jks"

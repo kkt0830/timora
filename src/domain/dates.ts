@@ -14,7 +14,7 @@ export function monthDays(month: Date): Date[] {
   const start = new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay());
   return Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
 }
-export function eventOnDay(event: CalendarEvent, key: string): boolean {
+export function eventOnDay(event: Pick<CalendarEvent, 'start_at' | 'end_at'>, key: string): boolean {
   const start = localDate(key);
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
   // Half-open interval; midnight belongs to the preceding day when ending.
